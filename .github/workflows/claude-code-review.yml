@@ -1,0 +1,95 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check review iteration count
+        id: check-iterations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REVIEW_COUNT=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+            --jq '[.[] | select(.user.type == "Bot")] | length' 2>/dev/null || echo "0")
+          echo "review_count=${REVIEW_COUNT}" >> "$GITHUB_OUTPUT"
+          if [ "$REVIEW_COUNT" -ge 3 ]; then
+            echo "max_reached=true" >> "$GITHUB_OUTPUT"
+            echo "Max review iterations (3) reached for PR #${{ github.event.pull_request.number }}"
+          else
+            echo "max_reached=false" >> "$GITHUB_OUTPUT"
+            echo "Review iteration $((REVIEW_COUNT + 1)) of 3 for PR #${{ github.event.pull_request.number }}"
+          fi
+
+      - name: Run Claude Code Review
+        if: steps.check-iterations.outputs.max_reached != 'true'
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "claude[bot],github-actions[bot]"
+          additional_permissions: |
+            actions: read
+          claude_args: "--allowedTools Bash Edit Read Write Glob Grep"
+          prompt: |
+            You are a code reviewer for this project.
+            Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} thoroughly.
+
+            ## REVIEW PROCESS
+
+            ### Step 1: Understand the Changes
+            - Read the PR diff: `gh pr diff ${{ github.event.pull_request.number }}`
+            - Read the PR description: `gh pr view ${{ github.event.pull_request.number }}`
+            - Understand what issue this PR addresses
+
+            ### Step 2: Review Against Standards
+            Check for:
+            - **Code quality**: Clean, readable, follows CLAUDE.md conventions
+            - **Type safety**: Proper typing, no `any` types (if TypeScript)
+            - **Security**: No hardcoded secrets, proper input validation, OWASP top 10
+            - **Performance**: No unnecessary work, efficient algorithms
+            - **Tests**: New features have tests, existing tests aren't broken
+            - **Architecture**: Follows established project patterns
+
+            ### Step 3: Provide Feedback
+            **If issues found:**
+            - Post specific, actionable review comments explaining what needs to change and why
+            - Submit the review as REQUEST_CHANGES. Include @claude in the review body so Claude can auto-fix:
+              `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "@claude Please fix the issues noted above."`
+
+            **If code looks good:**
+            - Approve the PR:
+              `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM! Code meets all quality standards."`
+            - Enable auto-merge with squash strategy:
+              `gh pr merge ${{ github.event.pull_request.number }} --squash --auto`
+
+            ## IMPORTANT
+            - Be constructive and specific in feedback
+            - Only request changes for real issues, not style nitpicks
+            - If the PR is generally good with minor suggestions, APPROVE with comments rather than requesting changes
+
+      - name: Auto-approve on max review iterations
+        if: steps.check-iterations.outputs.max_reached == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Max review iterations (3) reached. Auto-approving to prevent infinite loop."
+          gh pr review ${{ github.event.pull_request.number }} --approve \
+            --body "Auto-approved after 3 review iterations. Please review manually if needed."
+          gh pr merge ${{ github.event.pull_request.number }} --squash --auto || \
+            echo "Could not enable auto-merge. PR may require manual merge."

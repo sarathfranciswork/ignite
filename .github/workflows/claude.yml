@@ -1,0 +1,134 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned, labeled]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && github.event.action == 'assigned' && github.event.assignee.login == 'claude[bot]') ||
+      (github.event_name == 'issues' && github.event.action == 'opened' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude-code')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Get issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add claude-code label
+        if: steps.issue.outputs.number != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "claude-code" \
+            --description "Assigned to Claude Code for autonomous development" \
+            --color "7C3AED" 2>/dev/null || true
+          gh issue edit "${{ steps.issue.outputs.number }}" --add-label "claude-code"
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "claude[bot],github-actions[bot]"
+          additional_permissions: |
+            actions: read
+          claude_args: "--allowedTools Bash Edit Read Write Glob Grep"
+          prompt: |
+            You are an autonomous developer working on this project.
+            Follow every step below precisely.
+
+            ## STEP 0: Acknowledge & Update Kanban
+            If this is triggered from an issue (not a PR review):
+            1. Post an acknowledgment comment on the issue:
+               ```
+               gh issue comment <issue-number> --body "I'm picking up this issue now. I'll create a feature branch, implement the fix, run tests, and open a PR when ready.
+
+               **Status:** In Progress
+               **Branch:** \`claude/issue-<issue-number>-*\`"
+               ```
+            2. Move the issue to "In progress" on the Kanban board:
+               ```
+               chmod +x .github/scripts/update-kanban.sh
+               GH_TOKEN="$PROJECT_TOKEN" .github/scripts/update-kanban.sh --issue <issue-number> --status "In progress"
+               ```
+               If this fails, continue — it's non-blocking.
+
+            ## STEP 1: Create a Feature Branch
+            - Create a new branch from main: `claude/issue-<ISSUE_NUMBER>-<short-slug>`
+            - The slug should be 2-4 words derived from the issue title (lowercase, hyphenated)
+            - Example: `claude/issue-42-add-dark-mode`
+
+            ## STEP 2: Implement the Change
+            - Read the issue description carefully
+            - Read CLAUDE.md for coding standards
+            - Implement the requested feature or fix
+            - Write tests where applicable
+
+            ## STEP 3: Validate
+            - Run available checks (typecheck, lint, tests, build) as applicable
+            - Fix all errors before proceeding
+            - Commit your changes with a descriptive message following the convention:
+              `feat(scope): description` or `fix(scope): description`
+
+            ## STEP 4: Create a Pull Request
+            - Push your branch and create a PR using `gh pr create`
+            - PR title: clear, concise description of the change
+            - PR body MUST include:
+              - `Closes #<issue-number>` to auto-link and auto-close the issue
+              - A summary of what was implemented
+              - Any notable design decisions
+
+            ## STEP 5: Update Kanban to In Review
+            - After creating the PR, run:
+              ```
+              chmod +x .github/scripts/update-kanban.sh
+              GH_TOKEN="$PROJECT_TOKEN" .github/scripts/update-kanban.sh --issue <issue-number> --status "In review"
+              ```
+              If this fails, continue — the PR creation is what matters.
+
+            ## IF TRIGGERED FROM A PR REVIEW (fixing review feedback)
+            If this was triggered by a PR review requesting changes:
+            - Read the review comments to understand what needs to be fixed
+            - Checkout the PR branch (not main)
+            - Fix the issues raised in the review
+            - Run available validation checks
+            - Commit and push the fixes to the same branch
+            - Post a comment on the PR: "Fixed the review feedback. Ready for re-review."
+
+            ## IMPORTANT RULES
+            - Always follow CLAUDE.md guidelines
+            - Always run available validation before committing
+            - Write tests for new features when a test framework is configured
