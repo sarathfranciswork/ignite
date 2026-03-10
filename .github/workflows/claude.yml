@@ -6,9 +6,14 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned, labeled]
+    types: [labeled]
   pull_request_review:
     types: [submitted]
+
+# Prevent multiple Claude runs from executing simultaneously
+concurrency:
+  group: claude-code-execution
+  cancel-in-progress: false
 
 jobs:
   claude:
@@ -16,8 +21,6 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && github.event.action == 'assigned' && github.event.assignee.login == 'claude[bot]') ||
-      (github.event_name == 'issues' && github.event.action == 'opened' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
       (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude-code')
     runs-on: ubuntu-latest
     permissions:
@@ -44,18 +47,63 @@ jobs:
             echo "number=" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Add claude-code label
-        if: steps.issue.outputs.number != ''
-        continue-on-error: true
+      - name: Validate story is next in chain
+        if: >-
+          github.event_name == 'issues' &&
+          github.event.action == 'labeled' &&
+          github.event.label.name == 'claude-code' &&
+          steps.issue.outputs.number != ''
+        id: validate
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh label create "claude-code" \
-            --description "Assigned to Claude Code for autonomous development" \
-            --color "7C3AED" 2>/dev/null || true
-          gh issue edit "${{ steps.issue.outputs.number }}" --add-label "claude-code"
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          CHAIN_FILE=".github/story-chain.json"
+
+          if [ ! -f "$CHAIN_FILE" ]; then
+            echo "No chain file found. Proceeding (might be a non-chain issue)."
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check if this issue is in the chain
+          IN_CHAIN=$(jq --argjson num "$ISSUE_NUM" '[.chain[] | select(.issue == $num)] | length' "$CHAIN_FILE")
+
+          if [ "$IN_CHAIN" -eq 0 ]; then
+            echo "Issue #$ISSUE_NUM is not in the story chain. Proceeding as ad-hoc."
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check if any EARLIER story in the chain is still open
+          CURRENT_INDEX=$(jq --argjson num "$ISSUE_NUM" '[.chain | to_entries[] | select(.value.issue == $num)][0].key' "$CHAIN_FILE")
+
+          if [ "$CURRENT_INDEX" -gt 0 ]; then
+            PREV_INDEX=$((CURRENT_INDEX - 1))
+            PREV_ISSUE=$(jq -r ".chain[$PREV_INDEX].issue" "$CHAIN_FILE")
+            PREV_STATE=$(gh issue view "$PREV_ISSUE" --json state --jq '.state')
+
+            if [ "$PREV_STATE" = "OPEN" ]; then
+              echo "BLOCKED: Previous story #$PREV_ISSUE is still open. Cannot start #$ISSUE_NUM."
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              # Remove the label to prevent re-triggering
+              gh issue edit "$ISSUE_NUM" --remove-label "claude-code"
+              gh issue comment "$ISSUE_NUM" --body "Blocked: The previous story (#$PREV_ISSUE) has not been completed yet. This story will be triggered automatically when #$PREV_ISSUE is merged."
+              exit 0
+            fi
+          fi
+
+          echo "Validation passed. Issue #$ISSUE_NUM is ready for development."
+          echo "valid=true" >> "$GITHUB_OUTPUT"
+
+      - name: Abort if validation failed
+        if: steps.validate.outputs.valid == 'false'
+        run: |
+          echo "Story chain validation failed. Aborting."
+          exit 0
 
       - name: Run Claude Code
+        if: steps.validate.outputs.valid != 'false'
         id: claude
         uses: anthropics/claude-code-action@v1
         env:
@@ -67,17 +115,33 @@ jobs:
             actions: read
           claude_args: "--allowedTools Bash Edit Read Write Glob Grep"
           prompt: |
-            You are an autonomous developer working on this project.
+            You are an autonomous developer building the Ignite innovation management platform.
             Follow every step below precisely.
+
+            ## CONTEXT: Project Architecture
+            This is a T3 Stack application (Next.js 14+ App Router, tRPC, Prisma, Auth.js v5, Tailwind CSS, shadcn/ui).
+            Key architectural rules:
+            - TypeScript strict mode — no `any`, no `as any`, no `@ts-ignore`
+            - tRPC routers are thin dispatch — validate input, check permissions, call service, return result
+            - Services contain ALL business logic — no business logic in routers or components
+            - Status changes ONLY through state machine transition functions — never direct prisma.update({ status })
+            - Events via EventBus — services emit events, listeners handle cross-cutting concerns
+            - RBAC via middleware — every tRPC procedure checks permissions
+            - AI features are optional — platform must function fully without them
+
+            Before you start coding, read these files for full context:
+            - CLAUDE.md (coding standards and conventions)
+            - _bmad-output/project-context.md (127 rules for AI agent consistency)
+            - _bmad-output/planning-artifacts/architecture.md (full architecture decisions)
 
             ## STEP 0: Acknowledge & Update Kanban
             If this is triggered from an issue (not a PR review):
             1. Post an acknowledgment comment on the issue:
                ```
-               gh issue comment <issue-number> --body "I'm picking up this issue now. I'll create a feature branch, implement the fix, run tests, and open a PR when ready.
+               gh issue comment <issue-number> --body "I'm picking up this issue now. I'll create a feature branch, implement, run tests, and open a PR when ready.
 
                **Status:** In Progress
-               **Branch:** \`claude/issue-<issue-number>-*\`"
+               **Branch:** \`claude/issue-<issue-number>-<slug>\`"
                ```
             2. Move the issue to "In progress" on the Kanban board:
                ```
@@ -89,35 +153,45 @@ jobs:
             ## STEP 1: Create a Feature Branch
             - Create a new branch from main: `claude/issue-<ISSUE_NUMBER>-<short-slug>`
             - The slug should be 2-4 words derived from the issue title (lowercase, hyphenated)
-            - Example: `claude/issue-42-add-dark-mode`
+            - Example: `claude/issue-19-project-scaffold`
 
-            ## STEP 2: Implement the Change
-            - Read the issue description carefully
-            - Read CLAUDE.md for coding standards
-            - Implement the requested feature or fix
-            - Write tests where applicable
+            ## STEP 2: Understand What Exists
+            - Run `ls src/` to see the current project structure
+            - Read `package.json` to understand installed dependencies
+            - Read `prisma/schema.prisma` to understand the current data model
+            - Do NOT recreate files that already exist — build ON TOP of what's there
+            - If this is Story 1.1 (project scaffold), you ARE creating the initial structure
 
-            ## STEP 3: Validate
-            - Run available checks (typecheck, lint, tests, build) as applicable
-            - Fix all errors before proceeding
-            - Commit your changes with a descriptive message following the convention:
+            ## STEP 3: Implement the Change
+            - Read the issue description carefully for acceptance criteria
+            - Follow the architecture document patterns exactly
+            - Implement the requested feature
+            - Write tests where applicable (Vitest for unit, Playwright for E2E)
+            - Follow naming conventions: camelCase for functions/variables, PascalCase for components/types, snake_case for database columns
+
+            ## STEP 4: Validate
+            - Run available checks: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`
+            - Fix ALL errors before proceeding
+            - If a check command doesn't exist yet (early stories), skip it
+            - Commit your changes with a descriptive message:
               `feat(scope): description` or `fix(scope): description`
 
-            ## STEP 4: Create a Pull Request
+            ## STEP 5: Create a Pull Request
             - Push your branch and create a PR using `gh pr create`
             - PR title: clear, concise description of the change
             - PR body MUST include:
               - `Closes #<issue-number>` to auto-link and auto-close the issue
               - A summary of what was implemented
+              - Files changed and their purpose
               - Any notable design decisions
+              - Testing notes
 
-            ## STEP 5: Update Kanban to In Review
+            ## STEP 6: Update Kanban to In Review
             - After creating the PR, run:
               ```
               chmod +x .github/scripts/update-kanban.sh
               GH_TOKEN="$PROJECT_TOKEN" .github/scripts/update-kanban.sh --issue <issue-number> --status "In review"
               ```
-              If this fails, continue — the PR creation is what matters.
 
             ## IF TRIGGERED FROM A PR REVIEW (fixing review feedback)
             If this was triggered by a PR review requesting changes:
@@ -126,9 +200,14 @@ jobs:
             - Fix the issues raised in the review
             - Run available validation checks
             - Commit and push the fixes to the same branch
-            - Post a comment on the PR: "Fixed the review feedback. Ready for re-review."
+            - Post a comment on the PR summarizing what was fixed
 
-            ## IMPORTANT RULES
+            ## CRITICAL RULES
+            - NEVER recreate project scaffolding if it already exists
+            - NEVER modify CLAUDE.md, settings.json, or lock files unless explicitly told to
+            - NEVER hardcode secrets or API URLs — use environment variables
+            - NEVER commit .env files
             - Always follow CLAUDE.md guidelines
             - Always run available validation before committing
             - Write tests for new features when a test framework is configured
+            - One logical change per commit

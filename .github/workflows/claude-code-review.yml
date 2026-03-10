@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
 
+# Prevent overlapping reviews on the same PR
+concurrency:
+  group: claude-review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     runs-on: ubuntu-latest
@@ -47,8 +52,12 @@ jobs:
             actions: read
           claude_args: "--allowedTools Bash Edit Read Write Glob Grep"
           prompt: |
-            You are a code reviewer for this project.
+            You are a code reviewer for the Ignite innovation management platform.
             Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} thoroughly.
+
+            Before reviewing, read:
+            - CLAUDE.md for coding standards
+            - _bmad-output/project-context.md for architectural rules
 
             ## REVIEW PROCESS
 

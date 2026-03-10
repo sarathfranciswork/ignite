@@ -113,7 +113,7 @@ development_status:
   epic-11: backlog # #13
   11-1-external-user-access-guest-submissions: backlog # #66
   11-2-confidential-ideas-organizations: backlog # #67
-  11-3-communication-hub-segmented-email: backlog # #72
+  11-3-communication-hub-segmented-email: backlog # #68
   11-4-webhook-system-rest-api: backlog # #69
   11-5-adhoc-oneteam-evaluation-generic-submissions: backlog # #70
   11-6-kubernetes-helm-chart: backlog # #71

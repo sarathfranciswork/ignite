@@ -1,0 +1,126 @@
+name: Story Chain Dispatcher
+
+# Fires when a PR is merged. Looks up the closed issue in story-chain.json
+# and labels the NEXT story with 'claude-code' to trigger sequential execution.
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  dispatch-next:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract closed issue number from PR body
+        id: extract
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          # Match "Closes #N", "Fixes #N", "Resolves #N" (case-insensitive)
+          ISSUE_NUM=$(echo "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
+          echo "issue_number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+          if [ -n "$ISSUE_NUM" ]; then
+            echo "Found linked issue: #$ISSUE_NUM"
+          else
+            echo "No linked issue found in PR body. Chain will not advance."
+          fi
+
+      - name: Look up next story in chain
+        if: steps.extract.outputs.issue_number != ''
+        id: chain
+        run: |
+          ISSUE_NUM="${{ steps.extract.outputs.issue_number }}"
+          CHAIN_FILE=".github/story-chain.json"
+
+          if [ ! -f "$CHAIN_FILE" ]; then
+            echo "story-chain.json not found. Skipping."
+            echo "next_issue=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Find the current story and its successor
+          CURRENT=$(jq -r --argjson num "$ISSUE_NUM" '.chain[] | select(.issue == $num)' "$CHAIN_FILE")
+
+          if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
+            echo "Issue #$ISSUE_NUM is not in the story chain. Skipping."
+            echo "next_issue=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CURRENT_STORY=$(echo "$CURRENT" | jq -r '.story')
+          CURRENT_EPIC=$(echo "$CURRENT" | jq -r '.epic')
+          NEXT_ISSUE=$(echo "$CURRENT" | jq -r '.next // empty')
+
+          echo "Completed: Story $CURRENT_STORY (Epic $CURRENT_EPIC, Issue #$ISSUE_NUM)"
+
+          if [ -z "$NEXT_ISSUE" ] || [ "$NEXT_ISSUE" = "null" ]; then
+            echo "This was the LAST story in the chain. All stories complete!"
+            echo "next_issue=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          NEXT=$(jq -r --argjson num "$NEXT_ISSUE" '.chain[] | select(.issue == $num)' "$CHAIN_FILE")
+          NEXT_STORY=$(echo "$NEXT" | jq -r '.story')
+          NEXT_EPIC=$(echo "$NEXT" | jq -r '.epic')
+          NEXT_TITLE=$(echo "$NEXT" | jq -r '.title')
+          NEXT_PHASE=$(echo "$NEXT" | jq -r '.phase')
+
+          echo "Next up: Story $NEXT_STORY - $NEXT_TITLE (Epic $NEXT_EPIC, Phase $NEXT_PHASE, Issue #$NEXT_ISSUE)"
+          echo "next_issue=$NEXT_ISSUE" >> "$GITHUB_OUTPUT"
+          echo "next_story=$NEXT_STORY" >> "$GITHUB_OUTPUT"
+          echo "next_title=$NEXT_TITLE" >> "$GITHUB_OUTPUT"
+          echo "next_epic=$NEXT_EPIC" >> "$GITHUB_OUTPUT"
+          echo "current_story=$CURRENT_STORY" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger next story
+        if: steps.chain.outputs.next_issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEXT_ISSUE="${{ steps.chain.outputs.next_issue }}"
+          NEXT_STORY="${{ steps.chain.outputs.next_story }}"
+          NEXT_TITLE="${{ steps.chain.outputs.next_title }}"
+          CURRENT_STORY="${{ steps.chain.outputs.current_story }}"
+
+          echo "Triggering Story $NEXT_STORY (Issue #$NEXT_ISSUE)..."
+
+          # Add claude-code label to trigger the Claude workflow
+          gh issue edit "$NEXT_ISSUE" --add-label "claude-code"
+
+          # Post a comment so there's a visible audit trail
+          gh issue comment "$NEXT_ISSUE" --body "## Chain Triggered
+
+          Story **$CURRENT_STORY** has been completed and merged (PR #${{ github.event.pull_request.number }}).
+
+          This story (**$NEXT_STORY: $NEXT_TITLE**) is now ready for implementation.
+
+          Assigning to Claude for autonomous development."
+
+          echo "Successfully triggered Story $NEXT_STORY"
+
+      - name: Post completion summary
+        if: steps.chain.outputs.next_issue == '' && steps.extract.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.extract.outputs.issue_number }}"
+          # Check if this was the last story
+          CHAIN_FILE=".github/story-chain.json"
+          CURRENT=$(jq -r --argjson num "$ISSUE_NUM" '.chain[] | select(.issue == $num)' "$CHAIN_FILE" 2>/dev/null)
+          NEXT=$(echo "$CURRENT" | jq -r '.next // empty' 2>/dev/null)
+
+          if [ -n "$CURRENT" ] && { [ -z "$NEXT" ] || [ "$NEXT" = "null" ]; }; then
+            echo "Last story completed! Posting celebration comment."
+            gh issue comment "$ISSUE_NUM" --body "## All Stories Complete!
+
+            This was the final story in the Ignite development chain. All 78 stories across 16 epics have been implemented.
+
+            Time to celebrate and do a full platform review!"
+          fi
