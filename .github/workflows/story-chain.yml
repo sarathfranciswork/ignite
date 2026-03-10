@@ -17,16 +17,27 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout latest main
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Extract closed issue number from PR body
         id: extract
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Match "Closes #N", "Fixes #N", "Resolves #N" (case-insensitive)
-          ISSUE_NUM=$(echo "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s+#\K[0-9]+' | head -1)
+          ISSUE_NUM=$(echo "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s*#\K[0-9]+' | head -1)
+
+          # Fallback: check GitHub's linked closing issues API
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "No keyword match in PR body. Checking GitHub linked issues..."
+            ISSUE_NUM=$(gh pr view "$PR_NUMBER" --json closingIssuesReferences --jq '.closingIssuesReferences[0].number // empty' 2>/dev/null || echo "")
+          fi
+
           echo "issue_number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
           if [ -n "$ISSUE_NUM" ]; then
             echo "Found linked issue: #$ISSUE_NUM"
@@ -93,17 +104,22 @@ jobs:
 
           echo "Triggering Story $NEXT_STORY (Issue #$NEXT_ISSUE)..."
 
+          # Remove label first (in case it already exists — re-adding a label is a no-op)
+          gh issue edit "$NEXT_ISSUE" --remove-label "claude-code" 2>/dev/null || true
+          sleep 2
+
           # Add claude-code label to trigger the Claude workflow
           gh issue edit "$NEXT_ISSUE" --add-label "claude-code"
 
           # Post a comment so there's a visible audit trail
-          gh issue comment "$NEXT_ISSUE" --body "## Chain Triggered
+          COMMENT_BODY="## Chain Triggered
 
           Story **$CURRENT_STORY** has been completed and merged (PR #${{ github.event.pull_request.number }}).
 
           This story (**$NEXT_STORY: $NEXT_TITLE**) is now ready for implementation.
 
           Assigning to Claude for autonomous development."
+          gh issue comment "$NEXT_ISSUE" --body "$COMMENT_BODY"
 
           echo "Successfully triggered Story $NEXT_STORY"
 
@@ -133,9 +149,5 @@ jobs:
 
           if [ -n "$CURRENT" ] && { [ -z "$NEXT" ] || [ "$NEXT" = "null" ]; }; then
             echo "Last story completed! Posting celebration comment."
-            gh issue comment "$ISSUE_NUM" --body "## All Stories Complete!
-
-            This was the final story in the Ignite development chain. All 78 stories across 16 epics have been implemented.
-
-            Time to celebrate and do a full platform review!"
+            gh issue comment "$ISSUE_NUM" --body "## All Stories Complete! All 78 stories across 16 epics have been implemented. Time to celebrate and do a full platform review!"
           fi

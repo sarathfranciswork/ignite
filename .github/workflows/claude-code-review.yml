@@ -30,8 +30,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Count only CHANGES_REQUESTED reviews from bots (not approvals/comments)
           REVIEW_COUNT=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
-            --jq '[.[] | select(.user.type == "Bot")] | length' 2>/dev/null || echo "0")
+            --jq '[.[] | select(.user.type == "Bot" and .state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
           echo "review_count=${REVIEW_COUNT}" >> "$GITHUB_OUTPUT"
           if [ "$REVIEW_COUNT" -ge 3 ]; then
             echo "max_reached=true" >> "$GITHUB_OUTPUT"
@@ -74,6 +75,7 @@ jobs:
             - **Performance**: No unnecessary work, efficient algorithms
             - **Tests**: New features have tests, existing tests aren't broken
             - **Architecture**: Follows established project patterns
+            - **Logger API**: pino uses `logger.info({data}, "message")` — object FIRST, message SECOND
 
             ### Step 3: Provide Feedback
             **If issues found:**
@@ -82,23 +84,24 @@ jobs:
               `gh pr review ${{ github.event.pull_request.number }} --request-changes --body "@claude Please fix the issues noted above."`
 
             **If code looks good:**
-            - Approve the PR:
-              `gh pr review ${{ github.event.pull_request.number }} --approve --body "LGTM! Code meets all quality standards."`
+            - Post a comment with your review findings:
+              `gh pr comment ${{ github.event.pull_request.number }} --body "Code review: LGTM. All standards met."`
             - Enable auto-merge with squash strategy:
               `gh pr merge ${{ github.event.pull_request.number }} --squash --auto`
 
             ## IMPORTANT
             - Be constructive and specific in feedback
             - Only request changes for real issues, not style nitpicks
-            - If the PR is generally good with minor suggestions, APPROVE with comments rather than requesting changes
+            - If the PR is generally good with minor suggestions, enable auto-merge with a comment rather than requesting changes
+            - ALWAYS enable auto-merge (`gh pr merge --squash --auto`) when the code looks good
 
-      - name: Auto-approve on max review iterations
+      - name: Auto-merge on max review iterations
         if: steps.check-iterations.outputs.max_reached == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Max review iterations (3) reached. Auto-approving to prevent infinite loop."
-          gh pr review ${{ github.event.pull_request.number }} --approve \
-            --body "Auto-approved after 3 review iterations. Please review manually if needed."
+          echo "Max review iterations (3) reached. Enabling auto-merge to prevent infinite loop."
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Auto-merge enabled after 3 review iterations. Review cycles exhausted."
           gh pr merge ${{ github.event.pull_request.number }} --squash --auto || \
             echo "Could not enable auto-merge. PR may require manual merge."

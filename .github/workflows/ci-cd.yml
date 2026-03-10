@@ -12,10 +12,10 @@ env:
   ARTIFACT_REGISTRY: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ignite
   IMAGE_TAG: ${{ github.sha }}
 
-# Cancel in-progress runs for the same branch/PR
+# Cancel in-progress PR runs but NEVER cancel main deployments
 concurrency:
   group: ci-cd-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # ════════════════════════════════════════════════════════════

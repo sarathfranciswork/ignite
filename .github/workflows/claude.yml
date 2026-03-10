@@ -10,9 +10,10 @@ on:
   pull_request_review:
     types: [submitted]
 
-# Prevent multiple Claude runs from executing simultaneously
+# Per-issue concurrency: allows parallel work on different issues
+# but prevents duplicate runs for the same issue
 concurrency:
-  group: claude-code-execution
+  group: claude-code-${{ github.event.issue.number || github.event.pull_request.number || 'default' }}
   cancel-in-progress: false
 
 jobs:
@@ -34,7 +35,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Get issue number
         id: issue
@@ -45,6 +46,21 @@ jobs:
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
           else
             echo "number=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check main branch CI health
+        if: github.event_name == 'issues' && github.event.action == 'labeled'
+        id: main_health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          LAST_MAIN_CI=$(gh run list --workflow=ci-cd.yml --branch=main --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
+          if [ "$LAST_MAIN_CI" = "failure" ]; then
+            echo "WARNING: Main branch CI is currently broken. Proceeding with caution."
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Validate story is next in chain
@@ -128,6 +144,8 @@ jobs:
             - Events via EventBus — services emit events, listeners handle cross-cutting concerns
             - RBAC via middleware — every tRPC procedure checks permissions
             - AI features are optional — platform must function fully without them
+            - The logger uses pino. API is: `logger.info({data}, "message")` — object FIRST, message string SECOND
+            - For string-only logs: `logger.info("message")` is fine
 
             Before you start coding, read these files for full context:
             - CLAUDE.md (coding standards and conventions)
@@ -182,21 +200,29 @@ jobs:
             git fetch origin main
             git rebase origin/main
             ```
-            If there are conflicts during rebase, resolve them by:
-            - Keeping OUR changes for new files we created
-            - For files that exist on both sides, merge intelligently (keep both features)
-            - After resolving: `git add <files>` then `git rebase --continue`
+
+            ### Resolving rebase conflicts:
+            - **For new files you created**: Keep YOUR version (`git checkout --ours <file>`)
+            - **For `package-lock.json`**: ALWAYS run `git checkout --theirs package-lock.json && npm install && git add package-lock.json`
+            - **For `prisma/schema.prisma`**: Accept BOTH sides (additive merge). Keep all models from both versions. After resolving, run `npx prisma validate` to confirm correctness.
+            - **For other shared files**: Merge intelligently — keep both features
+            - After resolving each file: `git add <file>` then `git rebase --continue`
 
             Then push and create the PR:
             - Push your branch: `git push --force-with-lease origin <branch>`
             - Create a PR using `gh pr create`
             - PR title: clear, concise description of the change
             - PR body MUST include:
-              - `Closes #<issue-number>` to auto-link and auto-close the issue
+              - `Closes #<issue-number>` — THIS IS CRITICAL for the story chain to advance
               - A summary of what was implemented
               - Files changed and their purpose
               - Any notable design decisions
               - Testing notes
+
+            After creating the PR, enable auto-merge so it merges when CI passes:
+            ```
+            gh pr merge <PR_NUMBER> --squash --auto
+            ```
 
             ## STEP 6: Update Kanban to In Review
             - After creating the PR, run:
@@ -209,7 +235,11 @@ jobs:
             If this was triggered by a PR review or comment requesting changes:
             - Read the review comments to understand what needs to be fixed
             - Checkout the PR branch (not main)
-            - If asked to rebase, run: `git fetch origin main && git rebase origin/main`, resolve conflicts, then `git push --force-with-lease`
+            - If asked to rebase:
+              1. `git fetch origin main`
+              2. `git rebase origin/main`
+              3. Resolve conflicts using the rules above (especially package-lock.json and prisma)
+              4. `git push --force-with-lease`
             - Otherwise, fix the issues raised in the review
             - Run available validation checks
             - Commit and push the fixes to the same branch
@@ -224,3 +254,4 @@ jobs:
             - Always run available validation before committing
             - Write tests for new features when a test framework is configured
             - One logical change per commit
+            - The PR body MUST contain `Closes #<issue-number>` for the chain to work

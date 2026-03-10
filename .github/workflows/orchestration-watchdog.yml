@@ -22,7 +22,7 @@ permissions:
 env:
   PRODUCTION_URL: https://ignite-app-132793395302.us-central1.run.app
   TOTAL_STORIES: 78
-  MAX_RETRIES: 2
+  MAX_RETRIES: 3
   CLAUDE_RUN_TIMEOUT_MINUTES: 45
   PR_AUTO_MERGE_HOURS: 2
   PR_CI_FIX_MINUTES: 30
@@ -55,18 +55,18 @@ jobs:
           fi
 
           # Get all issue numbers from the chain
-          ALL_ISSUES=$(jq -r '.chain[].issue' "$CHAIN_FILE")
-          TOTAL=$(echo "$ALL_ISSUES" | wc -l)
+          TOTAL=$(jq '.chain | length' "$CHAIN_FILE")
 
-          # Count closed stories
+          # Batch fetch: get all repo issues in one API call (much faster than 78 individual calls)
+          ALL_ISSUES_DATA=$(gh issue list --state all --limit 200 --json number,state,labels 2>/dev/null || echo "[]")
+
           CLOSED_COUNT=0
           ACTIVE_ISSUE=""
           ACTIVE_STORY=""
 
-          for ISSUE_NUM in $ALL_ISSUES; do
-            ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json state,labels 2>/dev/null || echo '{"state":"UNKNOWN","labels":[]}')
-            STATE=$(echo "$ISSUE_DATA" | jq -r '.state')
-            HAS_CLAUDE_LABEL=$(echo "$ISSUE_DATA" | jq -r '[.labels[]?.name // empty] | any(. == "claude-code")')
+          for ISSUE_NUM in $(jq -r '.chain[].issue' "$CHAIN_FILE"); do
+            STATE=$(echo "$ALL_ISSUES_DATA" | jq -r --argjson num "$ISSUE_NUM" '[.[] | select(.number == $num)][0].state // "UNKNOWN"')
+            HAS_CLAUDE_LABEL=$(echo "$ALL_ISSUES_DATA" | jq -r --argjson num "$ISSUE_NUM" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code")')
 
             if [ "$STATE" = "CLOSED" ]; then
               CLOSED_COUNT=$((CLOSED_COUNT + 1))
@@ -102,27 +102,32 @@ jobs:
             NEXT_STORY=""
             NEXT_TITLE=""
 
-            # Iterate through chain to find first open story whose predecessor is closed
+            # Iterate through chain using batch data to find first open story whose predecessor is closed+merged
             CHAIN_LENGTH=$(jq '.chain | length' "$CHAIN_FILE")
             for i in $(seq 0 $((CHAIN_LENGTH - 1))); do
               ISSUE_NUM=$(jq -r ".chain[$i].issue" "$CHAIN_FILE")
-              ISSUE_STATE=$(gh issue view "$ISSUE_NUM" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+              ISSUE_STATE=$(echo "$ALL_ISSUES_DATA" | jq -r --argjson num "$ISSUE_NUM" '[.[] | select(.number == $num)][0].state // "UNKNOWN"')
 
               if [ "$ISSUE_STATE" = "OPEN" ]; then
                 if [ "$i" -eq 0 ]; then
-                  # First story in chain, no predecessor needed
                   NEXT_ISSUE="$ISSUE_NUM"
                   NEXT_STORY=$(jq -r ".chain[$i].story" "$CHAIN_FILE")
                   NEXT_TITLE=$(jq -r ".chain[$i].title" "$CHAIN_FILE")
                   break
                 else
                   PREV_ISSUE=$(jq -r ".chain[$((i - 1))].issue" "$CHAIN_FILE")
-                  PREV_STATE=$(gh issue view "$PREV_ISSUE" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+                  PREV_STATE=$(echo "$ALL_ISSUES_DATA" | jq -r --argjson num "$PREV_ISSUE" '[.[] | select(.number == $num)][0].state // "UNKNOWN"')
                   if [ "$PREV_STATE" = "CLOSED" ]; then
-                    NEXT_ISSUE="$ISSUE_NUM"
-                    NEXT_STORY=$(jq -r ".chain[$i].story" "$CHAIN_FILE")
-                    NEXT_TITLE=$(jq -r ".chain[$i].title" "$CHAIN_FILE")
-                    break
+                    # Verify predecessor was actually merged (not just manually closed)
+                    MERGED_PR=$(gh pr list --state merged --search "Closes #$PREV_ISSUE" --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+                    if [ -n "$MERGED_PR" ]; then
+                      NEXT_ISSUE="$ISSUE_NUM"
+                      NEXT_STORY=$(jq -r ".chain[$i].story" "$CHAIN_FILE")
+                      NEXT_TITLE=$(jq -r ".chain[$i].title" "$CHAIN_FILE")
+                      break
+                    else
+                      echo "Predecessor #$PREV_ISSUE is closed but has no merged PR. Skipping."
+                    fi
                   fi
                 fi
               fi
@@ -224,7 +229,7 @@ jobs:
           ACTIVE_ISSUE="${{ steps.story_chain.outputs.active_issue }}"
 
           # Count existing retry comments to enforce max retries
-          RETRY_COUNT=$(gh issue view "$ACTIVE_ISSUE" --json comments --jq '[.comments[] | select(.body | startswith("## Orchestration: Retry"))] | length' 2>/dev/null || echo "0")
+          RETRY_COUNT=$(gh issue view "$ACTIVE_ISSUE" --json comments --jq '[.comments[] | select(.body | contains("Orchestration: Retry"))] | length' 2>/dev/null || echo "0")
 
           if [ "$RETRY_COUNT" -ge "${{ env.MAX_RETRIES }}" ]; then
             echo "retried=false" >> "$GITHUB_OUTPUT"
@@ -281,6 +286,9 @@ jobs:
 
           echo "Triggering stuck chain: Story $NEXT_STORY (#$NEXT_ISSUE)"
 
+          # Remove first then re-add (adding an existing label is a no-op that won't fire events)
+          gh issue edit "$NEXT_ISSUE" --remove-label "claude-code" 2>/dev/null || true
+          sleep 2
           gh issue edit "$NEXT_ISSUE" --add-label "claude-code" || true
 
           gh issue comment "$NEXT_ISSUE" --body "## Orchestration: Chain Recovery

@@ -35,6 +35,12 @@ jobs:
           BRANCHES=$(git branch -r --merged origin/main | grep -v 'origin/main' | grep -v 'origin/HEAD' | sed 's/origin\///')
 
           for BRANCH in $BRANCHES; do
+            # Skip branches with open PRs
+            OPEN_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || echo "0")
+            if [ "$OPEN_PR" -gt 0 ]; then
+              echo "Skipping $BRANCH (has open PR)"
+              continue
+            fi
             echo "Deleting merged branch: $BRANCH"
             git push origin --delete "$BRANCH" 2>/dev/null || true
           done
