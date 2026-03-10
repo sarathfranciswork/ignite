@@ -147,7 +147,8 @@ jobs:
           allowed_bots: "claude[bot],github-actions[bot]"
           additional_permissions: |
             actions: read
-          claude_args: "--allowedTools Bash Edit Read Write Glob Grep"
+          claude_args: ""
+          show_full_output: true
           prompt: |
             You are an autonomous developer building the Ignite innovation management platform.
             Follow every step below precisely.
