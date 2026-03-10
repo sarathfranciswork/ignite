@@ -220,10 +220,27 @@ jobs:
 
       - name: Start test infrastructure
         run: |
-          docker compose -f docker-compose.ci.yml up -d
-          # Wait for services to be healthy
-          sleep 10
-          timeout 60 bash -c 'until curl -sf http://localhost:3000/api/health; do sleep 2; done'
+          docker compose -f docker-compose.ci.yml up -d --build
+          echo "Waiting for app to become healthy..."
+          timeout 180 bash -c '
+            until curl -sf http://localhost:3000/api/health > /dev/null 2>&1; do
+              echo "  Waiting... ($(date +%H:%M:%S))"
+              # Show container status
+              docker compose -f docker-compose.ci.yml ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || true
+              sleep 5
+            done
+          ' || {
+            echo "=== App failed to start within 180s ==="
+            echo "--- Container status ---"
+            docker compose -f docker-compose.ci.yml ps
+            echo "--- App container logs ---"
+            docker compose -f docker-compose.ci.yml logs app --tail 100
+            echo "--- Postgres logs ---"
+            docker compose -f docker-compose.ci.yml logs postgres --tail 30
+            exit 1
+          }
+          echo "App is healthy!"
+          curl -sf http://localhost:3000/api/health | jq .
 
       - name: Run E2E tests
         run: npx playwright test --project=chromium
@@ -274,9 +291,18 @@ jobs:
 
       - name: Start test infrastructure
         run: |
-          docker compose -f docker-compose.ci.yml up -d
-          sleep 10
-          timeout 60 bash -c 'until curl -sf http://localhost:3000/api/health; do sleep 2; done'
+          docker compose -f docker-compose.ci.yml up -d --build
+          echo "Waiting for app to become healthy..."
+          timeout 180 bash -c '
+            until curl -sf http://localhost:3000/api/health > /dev/null 2>&1; do
+              sleep 5
+            done
+          ' || {
+            echo "=== App failed to start ==="
+            docker compose -f docker-compose.ci.yml logs app --tail 100
+            exit 1
+          }
+          echo "App is healthy!"
 
       - name: Run visual regression tests
         run: npx playwright test --project=visual-desktop --project=visual-mobile
