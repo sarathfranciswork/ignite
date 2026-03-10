@@ -10,6 +10,14 @@ datasource db {
 
 // ── Auth.js Models ────────────────────────────────────────────
 
+enum GlobalRole {
+  PLATFORM_ADMIN
+  INNOVATION_MANAGER
+  MEMBER
+
+  @@map("global_role")
+}
+
 enum NotificationFrequency {
   IMMEDIATE
   DAILY
@@ -25,6 +33,8 @@ model User {
   name          String?
   image         String?
   password      String?
+  globalRole    GlobalRole @default(MEMBER) @map("global_role")
+  isActive      Boolean   @default(true) @map("is_active")
   bio           String?   @db.Text
   skills        String[]  @default([])
   notificationFrequency NotificationFrequency @default(IMMEDIATE) @map("notification_frequency")
@@ -76,6 +86,33 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// ── Resource Role Models ──────────────────────────────────────
+
+enum ResourceRoleType {
+  CAMPAIGN_MANAGER
+  CAMPAIGN_COACH
+  CAMPAIGN_CONTRIBUTOR
+  CHANNEL_MANAGER
+  CHANNEL_CONTRIBUTOR
+
+  @@map("resource_role_type")
+}
+
+model ResourceRole {
+  id          String           @id @default(cuid())
+  userId      String           @map("user_id")
+  resourceId  String           @map("resource_id")
+  resourceType String          @map("resource_type") // "campaign" or "channel"
+  role        ResourceRoleType
+  assignedAt  DateTime         @default(now()) @map("assigned_at")
+  assignedBy  String?          @map("assigned_by")
+
+  @@unique([userId, resourceId, role])
+  @@index([userId])
+  @@index([resourceId])
+  @@map("resource_roles")
 }
 
 // ── Organizational Models ─────────────────────────────────────

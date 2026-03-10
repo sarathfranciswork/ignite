@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import { loginInput, validateCredentials } from "@/server/services/auth.service";
+import type { GlobalRole } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -39,12 +40,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { globalRole: true },
+        });
+        if (dbUser) {
+          token.globalRole = dbUser.globalRole;
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (typeof token.id === "string" && session.user) {
         session.user.id = token.id;
+        session.user.globalRole = token.globalRole as GlobalRole | undefined;
       }
       return session;
     },

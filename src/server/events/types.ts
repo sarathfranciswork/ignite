@@ -18,6 +18,9 @@ export interface EventMap {
   "user.profileUpdated": EventPayload;
   "evaluation.completed": EventPayload;
   "notification.created": EventPayload;
+  "rbac.roleAssigned": EventPayload;
+  "rbac.roleRemoved": EventPayload;
+  "rbac.globalRoleChanged": EventPayload;
 }
 
 export type EventName = keyof EventMap;
