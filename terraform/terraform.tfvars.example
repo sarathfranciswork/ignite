@@ -1,0 +1,24 @@
+# Copy this to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+
+project_id = "ignite-XXXXXX"
+region     = "us-central1"
+zone       = "us-central1-a"
+
+# Cloud SQL - db-g1-small is ~$25/mo, db-f1-micro is ~$8/mo (shared CPU, not recommended for prod)
+db_tier = "db-g1-small"
+db_name = "ignite"
+db_user = "ignite"
+
+# Cloud Run
+cloud_run_min_instances = 0  # Scale to zero when idle (cost savings)
+cloud_run_max_instances = 3
+cloud_run_cpu           = "1"
+cloud_run_memory        = "1Gi"
+
+# Redis - 1GB BASIC tier is ~$35/mo
+redis_tier           = "BASIC"
+redis_memory_size_gb = 1
+
+# Custom domain (optional)
+# domain = "ignite.example.com"

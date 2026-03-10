@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary-500: 99 102 241;
+    --accent-500: 245 158 11;
+    --background: 255 255 255;
+    --foreground: 3 7 18;
+  }
+
+  body {
+    font-family:
+      "Inter Variable",
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

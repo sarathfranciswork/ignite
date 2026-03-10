@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.github
+_bmad
+_bmad-output
+docs
+terraform
+coverage
+tests/visual-baselines
+*.md
+!README.md
+.env
+.env.*
+!.env.example
