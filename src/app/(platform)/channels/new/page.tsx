@@ -84,9 +84,7 @@ export default function NewChannelPage() {
                 placeholder="e.g., Sustainability Ideas"
                 maxLength={200}
               />
-              {errors.title && (
-                <p className="text-sm text-red-600">{errors.title.message}</p>
-              )}
+              {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -97,9 +95,7 @@ export default function NewChannelPage() {
                 placeholder="Short description shown on channel cards"
                 maxLength={500}
               />
-              {errors.teaser && (
-                <p className="text-sm text-red-600">{errors.teaser.message}</p>
-              )}
+              {errors.teaser && <p className="text-sm text-red-600">{errors.teaser.message}</p>}
             </div>
 
             <div className="space-y-2">
