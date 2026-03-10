@@ -1,33 +1,38 @@
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
 import {
   updateProfileInput,
   getUserProfile,
   updateUserProfile,
   UserServiceError,
 } from "@/server/services/user.service";
+import { Action } from "@/server/lib/permissions";
 
-// TODO(story-1.4): Add requirePermission middleware to all procedures
 export const userRouter = createTRPCRouter({
-  getProfile: protectedProcedure.query(async ({ ctx }) => {
-    try {
-      return await getUserProfile(ctx.session.user.id);
-    } catch (error) {
-      if (error instanceof UserServiceError && error.code === "USER_NOT_FOUND") {
-        throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  getProfile: protectedProcedure
+    .use(requirePermission(Action.USER_READ_OWN))
+    .query(async ({ ctx }) => {
+      try {
+        return await getUserProfile(ctx.session.user.id);
+      } catch (error) {
+        if (error instanceof UserServiceError && error.code === "USER_NOT_FOUND") {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
       }
-      throw error;
-    }
-  }),
+    }),
 
-  updateProfile: protectedProcedure.input(updateProfileInput).mutation(async ({ ctx, input }) => {
-    try {
-      return await updateUserProfile(ctx.session.user.id, input);
-    } catch (error) {
-      if (error instanceof UserServiceError && error.code === "USER_NOT_FOUND") {
-        throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  updateProfile: protectedProcedure
+    .use(requirePermission(Action.USER_UPDATE_OWN))
+    .input(updateProfileInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await updateUserProfile(ctx.session.user.id, input);
+      } catch (error) {
+        if (error instanceof UserServiceError && error.code === "USER_NOT_FOUND") {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
       }
-      throw error;
-    }
-  }),
+    }),
 });
