@@ -1,0 +1,67 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Minimal User model for notification system (full model in future stories)
+model User {
+  id                String          @id @default(cuid())
+  email             String          @unique
+  firstName         String
+  lastName          String
+  displayName       String?
+  timezone          String          @default("UTC")
+  emailFrequency    EmailFrequency  @default(IMMEDIATELY)
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  notifications     Notification[]
+
+  @@index([email])
+}
+
+enum EmailFrequency {
+  IMMEDIATELY
+  DAILY
+  WEEKLY
+  NEVER
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // "IDEA_SUBMITTED", "COMMENT_ADDED", "EVALUATION_REQUESTED", etc.
+  title       String
+  body        String?
+  link        String?
+  entityType  String?  // "IDEA", "CAMPAIGN", "EVALUATION_SESSION"
+  entityId    String?
+
+  isRead      Boolean  @default(false)
+  isEmailed   Boolean  @default(false)
+
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, isEmailed])
+  @@index([createdAt])
+}
+
+model NotificationTemplate {
+  id          String  @id @default(cuid())
+  eventType   String  @unique
+  subject     String
+  bodyHtml    String
+  isActive    Boolean @default(true)
+
+  updatedAt   DateTime @updatedAt
+}
