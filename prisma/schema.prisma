@@ -221,6 +221,9 @@ model Campaign {
   description     String?        @db.Text
   bannerUrl       String?        @map("banner_url")
   videoUrl        String?        @map("video_url")
+  callToAction    String?        @map("call_to_action")
+  supportContent  String?        @db.Text @map("support_content")
+  tags            String[]       @default([])
   status          CampaignStatus @default(DRAFT)
   previousStatus  CampaignStatus? @map("previous_status")
   submissionType  SubmissionType @default(CALL_FOR_IDEAS) @map("submission_type")

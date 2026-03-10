@@ -181,6 +181,10 @@ export async function updateCampaign(input: CampaignUpdateInput, updatedById: st
   if (updateData.teaser !== undefined) data.teaser = updateData.teaser;
   if (updateData.bannerUrl !== undefined) data.bannerUrl = updateData.bannerUrl;
   if (updateData.videoUrl !== undefined) data.videoUrl = updateData.videoUrl;
+  if (updateData.callToAction !== undefined) data.callToAction = updateData.callToAction;
+  if (updateData.supportContent !== undefined) data.supportContent = updateData.supportContent;
+  if (updateData.tags !== undefined) data.tags = updateData.tags;
+  if (updateData.setupType !== undefined) data.setupType = updateData.setupType;
   if (updateData.submissionCloseDate !== undefined) {
     data.submissionCloseDate = updateData.submissionCloseDate
       ? new Date(updateData.submissionCloseDate)

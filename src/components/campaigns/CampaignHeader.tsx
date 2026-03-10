@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Calendar, User, ArrowLeft } from "lucide-react";
+import { Calendar, User, ArrowLeft, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -69,12 +69,21 @@ export function CampaignHeader({ campaign }: CampaignHeaderProps) {
           </div>
         </div>
         {campaign.status === "DRAFT" && (
-          <Link
-            href={`/campaigns/${campaign.id}/settings`}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Edit Campaign
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/campaigns/${campaign.id}/wizard`}
+              className={buttonVariants({ variant: "default" })}
+            >
+              <Wand2 className="mr-2 h-4 w-4" />
+              Advanced Wizard
+            </Link>
+            <Link
+              href={`/campaigns/${campaign.id}/settings`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              Edit Campaign
+            </Link>
+          </div>
         )}
       </div>
     </div>

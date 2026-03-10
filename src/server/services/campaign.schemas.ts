@@ -1,5 +1,26 @@
 import { z } from "zod";
 
+// ── Custom Field Schemas ────────────────────────────────────
+
+export const visibilityConditionSchema = z.object({
+  fieldId: z.string().min(1),
+  operator: z.enum(["equals", "notEquals"]),
+  value: z.string(),
+});
+
+export const customFieldSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(["text", "textarea", "keyword", "selection", "checkbox"]),
+  label: z.string().min(1, "Label is required").max(200),
+  helpText: z.string().max(500).default(""),
+  isMandatory: z.boolean().default(false),
+  displayOrder: z.number().int().min(0),
+  options: z.array(z.string().max(100)).max(50).optional(),
+  visibilityCondition: visibilityConditionSchema.nullable().optional(),
+});
+
+export const customFieldsArraySchema = z.array(customFieldSchema).max(30);
+
 // ── Campaign Input Schemas ──────────────────────────────────
 
 export const campaignCreateInput = z.object({
@@ -20,6 +41,8 @@ export const campaignUpdateInput = z.object({
   teaser: z.string().max(500).optional(),
   bannerUrl: z.string().url().max(2048).optional().nullable(),
   videoUrl: z.string().url().max(2048).optional().nullable(),
+  callToAction: z.string().max(200).optional().nullable(),
+  supportContent: z.string().max(5000).optional().nullable(),
   submissionCloseDate: z.string().optional().nullable(),
   votingCloseDate: z.string().optional().nullable(),
   plannedCloseDate: z.string().optional().nullable(),
@@ -40,6 +63,8 @@ export const campaignUpdateInput = z.object({
   votingCriteria: z.unknown().optional(),
   customFields: z.unknown().optional(),
   settings: z.unknown().optional(),
+  setupType: z.enum(["SIMPLE", "ADVANCED"]).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
 });
 
 export const campaignListInput = z.object({
