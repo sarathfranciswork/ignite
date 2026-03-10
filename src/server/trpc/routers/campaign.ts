@@ -26,6 +26,12 @@ import {
   setCampaignMembers,
   listCampaignMembers,
 } from "@/server/services/campaign-member.service";
+import {
+  campaignKpiInput,
+  getCampaignKpis,
+  getCampaignKpiTimeSeries,
+} from "@/server/services/kpi.service";
+import { z } from "zod";
 
 function handleCampaignError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -147,5 +153,28 @@ export const campaignRouter = createTRPCRouter({
     .input(campaignMemberListInput)
     .query(async ({ input }) => {
       return listCampaignMembers(input);
+    }),
+
+  getKpis: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(Action.CAMPAIGN_READ, (input) => input.campaignId),
+    )
+    .input(campaignKpiInput)
+    .query(async ({ input }) => {
+      return getCampaignKpis(input.campaignId);
+    }),
+
+  getKpiTimeSeries: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(Action.CAMPAIGN_READ, (input) => input.campaignId),
+    )
+    .input(
+      z.object({
+        campaignId: z.string().cuid(),
+        days: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .query(async ({ input }) => {
+      return getCampaignKpiTimeSeries(input.campaignId, input.days);
     }),
 });
