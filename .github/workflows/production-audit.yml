@@ -1,0 +1,301 @@
+name: Production Audit
+
+on:
+  schedule:
+    # Run every 4 hours
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      audit_mode:
+        description: "Audit mode"
+        required: true
+        default: "development"
+        type: choice
+        options:
+          - development
+          - full
+
+# Cancel in-progress runs for the same workflow
+concurrency:
+  group: production-audit
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+
+env:
+  PROD_URL: https://ignite-app-132793395302.us-central1.run.app
+  AUDIT_MODE: ${{ github.event.inputs.audit_mode || 'development' }}
+
+jobs:
+  audit:
+    name: Production Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ──────────────────────────────────────────────────────────
+      # 1. Setup
+      # ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # ──────────────────────────────────────────────────────────
+      # 2. Functional Audit
+      # ──────────────────────────────────────────────────────────
+      - name: Run production audit script
+        id: audit
+        run: npx tsx .github/scripts/production-audit.ts
+        env:
+          AUDIT_MODE: ${{ env.AUDIT_MODE }}
+          PROD_URL: ${{ env.PROD_URL }}
+
+      # ──────────────────────────────────────────────────────────
+      # 3. Claude Analysis
+      # ──────────────────────────────────────────────────────────
+      - name: Analyze audit results with Claude
+        id: claude-analysis
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are analyzing a production audit report for the Ignite application.
+
+            ## Audit Mode: ${{ env.AUDIT_MODE }}
+
+            ## Audit Report (JSON)
+            ```json
+            $(cat audit-report/audit-report.json)
+            ```
+
+            ## Screenshots
+            Screenshots of each page have been captured in the audit-report/ directory.
+
+            ## Instructions
+
+            Analyze the audit report and categorize each finding into one of these severity levels:
+
+            - **CRITICAL**: App crashes, 500 errors, security issues, health check failures
+            - **BUG**: Broken functionality, JavaScript errors, layout breaks, broken images, 404 resources
+            - **IMPROVEMENT**: UX issues, accessibility problems, performance concerns (load time > 5s)
+            - **COSMETIC**: Minor visual issues, alignment problems, inconsistent styling
+
+            **Mode-specific behavior:**
+            - In "development" mode: Only report CRITICAL and BUG findings. Ignore "Coming Soon" pages, placeholder content, and missing features — these are expected during incremental development.
+            - In "full" mode: Report ALL findings across all severity levels, including missing features and incomplete pages.
+
+            For each finding, provide:
+            1. Severity level
+            2. Page/route affected
+            3. Description of the issue
+            4. Suggested fix or investigation steps
+
+            Format your response as a structured markdown report with sections for each severity level.
+            At the top, include a summary with counts per severity.
+
+            If there are no findings for a severity level, note "None found" for that section.
+
+      # ──────────────────────────────────────────────────────────
+      # 4. Issue Management
+      # ──────────────────────────────────────────────────────────
+      - name: Create issues for critical and bug findings
+        if: always() && steps.audit.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Read the audit report
+            let report;
+            try {
+              const reportPath = path.join(process.env.GITHUB_WORKSPACE, 'audit-report', 'audit-report.json');
+              report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+            } catch (err) {
+              console.log('Could not read audit report:', err.message);
+              return;
+            }
+
+            const findings = [];
+
+            // Collect critical/bug findings from the audit report
+            // Health check failures
+            if (report.health && !report.health.healthy) {
+              findings.push({
+                severity: 'CRITICAL',
+                title: `[Audit] Health check failure: ${report.health.error || 'unhealthy status'}`,
+                body: `## Production Audit Finding\n\n**Severity:** CRITICAL\n**Route:** /api/health\n**Timestamp:** ${report.timestamp}\n\n### Details\n\nThe health endpoint returned an unhealthy status.\n\n\`\`\`json\n${JSON.stringify(report.health, null, 2)}\n\`\`\`\n\n### Suggested Action\n\nInvestigate server health immediately. Check database connectivity, Redis, and service dependencies.`
+              });
+            }
+
+            // Page-level findings
+            if (report.pages) {
+              for (const page of report.pages) {
+                // 500 errors
+                if (page.status >= 500) {
+                  findings.push({
+                    severity: 'CRITICAL',
+                    title: `[Audit] Server error ${page.status} on ${page.route}`,
+                    body: `## Production Audit Finding\n\n**Severity:** CRITICAL\n**Route:** ${page.route}\n**HTTP Status:** ${page.status}\n**Timestamp:** ${report.timestamp}\n\n### Details\n\nThe page returned a ${page.status} server error.\n\n### Suggested Action\n\nCheck server logs for this route. Investigate potential crashes or unhandled exceptions.`
+                  });
+                }
+
+                // JavaScript console errors
+                if (page.consoleErrors && page.consoleErrors.length > 0) {
+                  const errorList = page.consoleErrors.map(e => `- ${e}`).join('\n');
+                  findings.push({
+                    severity: 'BUG',
+                    title: `[Audit] JavaScript errors on ${page.route}`,
+                    body: `## Production Audit Finding\n\n**Severity:** BUG\n**Route:** ${page.route}\n**Timestamp:** ${report.timestamp}\n\n### Console Errors\n\n${errorList}\n\n### Suggested Action\n\nInvestigate and fix the JavaScript errors on this page.`
+                  });
+                }
+
+                // Broken resources (images, CSS, 404s)
+                if (page.brokenResources && page.brokenResources.length > 0) {
+                  const resourceList = page.brokenResources.map(r => `- [${r.status}] ${r.url} (${r.type})`).join('\n');
+                  findings.push({
+                    severity: 'BUG',
+                    title: `[Audit] Broken resources on ${page.route}`,
+                    body: `## Production Audit Finding\n\n**Severity:** BUG\n**Route:** ${page.route}\n**Timestamp:** ${report.timestamp}\n\n### Broken Resources\n\n${resourceList}\n\n### Suggested Action\n\nFix or remove references to missing resources.`
+                  });
+                }
+
+                // Page load failures
+                if (page.error) {
+                  findings.push({
+                    severity: 'CRITICAL',
+                    title: `[Audit] Page load failure on ${page.route}`,
+                    body: `## Production Audit Finding\n\n**Severity:** CRITICAL\n**Route:** ${page.route}\n**Timestamp:** ${report.timestamp}\n\n### Error\n\n${page.error}\n\n### Suggested Action\n\nInvestigate why this page fails to load entirely.`
+                  });
+                }
+              }
+            }
+
+            console.log(`Found ${findings.length} issues to process`);
+
+            // For each finding, check if issue already exists and create if not
+            for (const finding of findings) {
+              try {
+                // Search for existing issue by title
+                const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:issue "${finding.title}" in:title`;
+                const searchResult = await github.rest.search.issuesAndPullRequests({
+                  q: searchQuery
+                });
+
+                if (searchResult.data.total_count > 0) {
+                  console.log(`Issue already exists: "${finding.title}" (#${searchResult.data.items[0].number})`);
+                  continue;
+                }
+
+                // Create new issue
+                const labels = ['audit-bug'];
+                if (finding.severity === 'CRITICAL') {
+                  labels.push('priority:critical');
+                }
+
+                const issue = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: finding.title,
+                  body: finding.body,
+                  labels: labels
+                });
+
+                console.log(`Created issue #${issue.data.number}: ${finding.title}`);
+              } catch (err) {
+                console.log(`Error processing finding "${finding.title}": ${err.message}`);
+              }
+            }
+
+      - name: Update orchestration status issue
+        if: always() && steps.audit.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            let report;
+            try {
+              const reportPath = path.join(process.env.GITHUB_WORKSPACE, 'audit-report', 'audit-report.json');
+              report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+            } catch (err) {
+              console.log('Could not read audit report:', err.message);
+              return;
+            }
+
+            // Build summary
+            const totalPages = report.pages ? report.pages.length : 0;
+            const healthStatus = report.health?.healthy ? 'Healthy' : 'UNHEALTHY';
+            const errorPages = report.pages ? report.pages.filter(p => p.status >= 500).length : 0;
+            const jsErrorPages = report.pages ? report.pages.filter(p => p.consoleErrors && p.consoleErrors.length > 0).length : 0;
+            const brokenResourcePages = report.pages ? report.pages.filter(p => p.brokenResources && p.brokenResources.length > 0).length : 0;
+            const avgLoadTime = report.pages && report.pages.length > 0
+              ? (report.pages.reduce((sum, p) => sum + (p.loadTimeMs || 0), 0) / report.pages.length).toFixed(0)
+              : 'N/A';
+
+            const mode = process.env.AUDIT_MODE || 'development';
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const summary = [
+              `## Production Audit Report`,
+              ``,
+              `**Timestamp:** ${report.timestamp}`,
+              `**Mode:** ${mode}`,
+              `**Production URL:** ${process.env.PROD_URL}`,
+              `**Run:** [View workflow](${runUrl})`,
+              ``,
+              `### Summary`,
+              `| Metric | Value |`,
+              `|--------|-------|`,
+              `| Health Status | ${healthStatus} |`,
+              `| Pages Audited | ${totalPages} |`,
+              `| Server Errors (5xx) | ${errorPages} |`,
+              `| Pages with JS Errors | ${jsErrorPages} |`,
+              `| Pages with Broken Resources | ${brokenResourcePages} |`,
+              `| Avg Page Load Time | ${avgLoadTime}ms |`,
+              ``
+            ].join('\n');
+
+            // Search for the orchestration status issue
+            const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open "Production Audit Status" in:title`;
+            const searchResult = await github.rest.search.issuesAndPullRequests({
+              q: searchQuery
+            });
+
+            if (searchResult.data.total_count > 0) {
+              const issueNumber = searchResult.data.items[0].number;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: summary
+              });
+              console.log(`Updated orchestration issue #${issueNumber}`);
+            } else {
+              console.log('No orchestration status issue found. Skipping status update.');
+            }
+
+      # ──────────────────────────────────────────────────────────
+      # 5. Artifact Upload
+      # ──────────────────────────────────────────────────────────
+      - name: Upload audit screenshots and report
+        if: always() && steps.audit.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-audit-${{ github.run_number }}
+          path: audit-report/
+          retention-days: 7

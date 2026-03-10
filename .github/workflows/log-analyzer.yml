@@ -1,0 +1,508 @@
+# Cloud Run Production Log Analyzer
+#
+# Fetches recent Cloud Run logs, analyzes them for errors, and creates
+# GitHub issues for recurring error patterns.
+#
+# Schedule: Every 2 hours
+# Manual trigger: workflow_dispatch
+#
+# Prerequisites:
+#   - The GitHub Actions service account (ignite-github-actions) needs
+#     the `roles/logging.viewer` IAM role on GCP project ignite-489804.
+#     This must be granted manually via:
+#       gcloud projects add-iam-policy-binding ignite-489804 \
+#         --member="serviceAccount:<SA_EMAIL>" \
+#         --role="roles/logging.viewer"
+#
+# Required GitHub Secrets:
+#   - GCP_PROJECT_ID
+#   - GCP_WIF_PROVIDER  (Workload Identity Federation provider)
+#   - GCP_SA_EMAIL       (Service account email)
+
+name: Log Analyzer
+
+on:
+  schedule:
+    - cron: "0 */2 * * *" # Every 2 hours
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+  id-token: write # Required for GCP Workload Identity Federation
+
+concurrency:
+  group: log-analyzer
+
+env:
+  CLOUD_RUN_SERVICE: ignite-app
+  CLOUD_RUN_REGION: us-central1
+  GCP_PROJECT: ignite-489804
+
+jobs:
+  analyze-logs:
+    name: Analyze Cloud Run Logs
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------------------------------
+      # 1. Authenticate to GCP via Workload Identity Federation
+      # ----------------------------------------------------------------
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+        continue-on-error: true
+
+      - name: Check GCP auth result
+        id: auth_check
+        run: |
+          if [ "${{ steps.auth.outcome }}" != "success" ]; then
+            echo "::warning::GCP authentication failed. Skipping log analysis."
+            echo "auth_ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "auth_ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ----------------------------------------------------------------
+      # 2. Set up Cloud SDK
+      # ----------------------------------------------------------------
+      - name: Set up Cloud SDK
+        if: steps.auth_check.outputs.auth_ok == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ----------------------------------------------------------------
+      # 3. Fetch recent logs (last 2 hours)
+      # ----------------------------------------------------------------
+      - name: Fetch Cloud Run error logs
+        if: steps.auth_check.outputs.auth_ok == 'true'
+        id: fetch_logs
+        run: |
+          echo "Fetching error logs from the last 2 hours..."
+
+          LOGS=$(gcloud logging read \
+            'resource.type="cloud_run_revision" AND resource.labels.service_name="ignite-app" AND (severity>=ERROR OR textPayload=~"error|Error|ERROR|exception|Exception|EXCEPTION|crash|Crash|FATAL|fatal|panic|unhandled")' \
+            --project="${{ env.GCP_PROJECT }}" \
+            --limit=100 \
+            --format=json \
+            --freshness=2h 2>&1) || true
+
+          # Check if gcloud command produced valid output
+          if echo "$LOGS" | jq empty 2>/dev/null; then
+            LOG_COUNT=$(echo "$LOGS" | jq 'length')
+            echo "Fetched $LOG_COUNT log entries."
+            # Write logs to file to avoid argument length limits
+            echo "$LOGS" > /tmp/raw_logs.json
+            echo "fetch_ok=true" >> "$GITHUB_OUTPUT"
+            echo "log_count=$LOG_COUNT" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Failed to fetch logs or no valid JSON returned."
+            echo "Raw output: $LOGS"
+            echo '[]' > /tmp/raw_logs.json
+            echo "fetch_ok=false" >> "$GITHUB_OUTPUT"
+            echo "log_count=0" >> "$GITHUB_OUTPUT"
+          fi
+        continue-on-error: true
+
+      # ----------------------------------------------------------------
+      # 4. Analyze logs - group, deduplicate, extract patterns
+      # ----------------------------------------------------------------
+      - name: Analyze log patterns
+        if: steps.auth_check.outputs.auth_ok == 'true' && steps.fetch_logs.outputs.fetch_ok == 'true' && steps.fetch_logs.outputs.log_count != '0'
+        id: analyze
+        run: |
+          cat << 'ANALYSIS_SCRIPT' > /tmp/analyze_logs.py
+          import json
+          import re
+          import sys
+          import hashlib
+          from collections import defaultdict
+
+          # Known non-issues to ignore
+          IGNORE_PATTERNS = [
+              r"health\s*check.*connection\s*reset",
+              r"connection\s*reset\s*by\s*peer.*health",
+              r"cold\s*start\s*warn",
+              r"prisma.*connection\s*pool.*scale",
+              r"prisma.*pool.*warming",
+              r"timed out waiting for connection.*pool",
+              r"healthz",
+              r"readiness\s*check",
+              r"liveness\s*check",
+          ]
+
+          def should_ignore(text):
+              """Check if log entry matches a known non-issue pattern."""
+              if not text:
+                  return False
+              text_lower = text.lower()
+              for pattern in IGNORE_PATTERNS:
+                  if re.search(pattern, text_lower):
+                      return True
+              return False
+
+          def extract_error_key(entry):
+              """Extract a normalized error key for grouping similar errors."""
+              text = ""
+              if "textPayload" in entry:
+                  text = entry["textPayload"]
+              elif "jsonPayload" in entry:
+                  payload = entry["jsonPayload"]
+                  if isinstance(payload, dict):
+                      text = payload.get("message", "") or payload.get("error", "") or json.dumps(payload)
+                  else:
+                      text = str(payload)
+              elif "protoPayload" in entry:
+                  text = json.dumps(entry.get("protoPayload", {}))
+
+              if not text:
+                  text = entry.get("severity", "UNKNOWN_ERROR")
+
+              # Normalize: remove timestamps, UUIDs, hex addresses, line numbers
+              normalized = re.sub(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[.\d]*Z?", "<TIMESTAMP>", text)
+              normalized = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<UUID>", normalized, flags=re.IGNORECASE)
+              normalized = re.sub(r"0x[0-9a-fA-F]+", "<ADDR>", normalized)
+              normalized = re.sub(r":\d+:\d+", ":<LINE>", normalized)
+              normalized = re.sub(r"port \d+", "port <PORT>", normalized)
+              normalized = re.sub(r"\b\d{5,}\b", "<NUM>", normalized)
+
+              # Take first 200 chars for grouping key
+              key = normalized[:200].strip()
+              return key, text
+
+          def extract_stack_trace(entry):
+              """Try to extract a stack trace from the log entry."""
+              text = ""
+              if "textPayload" in entry:
+                  text = entry["textPayload"]
+              elif "jsonPayload" in entry and isinstance(entry["jsonPayload"], dict):
+                  text = entry["jsonPayload"].get("stack", "") or entry["jsonPayload"].get("stackTrace", "") or entry["jsonPayload"].get("message", "")
+
+              # Look for common stack trace patterns
+              stack_patterns = [
+                  r"((?:at .+\(.+\)\n?)+)",                 # Node.js style
+                  r"(Traceback[\s\S]*?(?:\n\S|$))",          # Python style
+                  r"((?:(?:panic|goroutine)[\s\S]*?(?:\n\n|$)))",  # Go style
+              ]
+              for pat in stack_patterns:
+                  match = re.search(pat, text)
+                  if match:
+                      return match.group(1)[:1000]  # Cap at 1000 chars
+              return ""
+
+          def main():
+              with open("/tmp/raw_logs.json", "r") as f:
+                  logs = json.load(f)
+
+              if not logs:
+                  print("No logs to analyze.")
+                  with open("/tmp/analysis.json", "w") as f:
+                      json.dump([], f)
+                  return
+
+              # Group by error pattern
+              groups = defaultdict(lambda: {
+                  "count": 0,
+                  "severity": "ERROR",
+                  "sample_timestamp": "",
+                  "sample_payload": "",
+                  "stack_trace": "",
+                  "pattern": "",
+              })
+
+              for entry in logs:
+                  key, raw_text = extract_error_key(entry)
+
+                  # Skip known non-issues
+                  if should_ignore(raw_text):
+                      continue
+
+                  severity = entry.get("severity", "ERROR")
+                  timestamp = entry.get("timestamp", entry.get("receiveTimestamp", ""))
+
+                  group = groups[key]
+                  group["count"] += 1
+                  group["pattern"] = key
+
+                  # Keep the highest severity seen
+                  severity_rank = {"DEBUG": 0, "INFO": 1, "NOTICE": 2, "WARNING": 3, "ERROR": 4, "CRITICAL": 5, "ALERT": 6, "EMERGENCY": 7}
+                  if severity_rank.get(severity, 4) > severity_rank.get(group["severity"], 4):
+                      group["severity"] = severity
+
+                  # Keep the most recent timestamp and its payload as sample
+                  if timestamp > group["sample_timestamp"]:
+                      group["sample_timestamp"] = timestamp
+                      group["sample_payload"] = raw_text[:2000]  # Cap payload size
+
+                  # Try to extract stack trace if we don't have one yet
+                  if not group["stack_trace"]:
+                      group["stack_trace"] = extract_stack_trace(entry)
+
+              results = sorted(groups.values(), key=lambda x: x["count"], reverse=True)
+
+              with open("/tmp/analysis.json", "w") as f:
+                  json.dump(results, f, indent=2)
+
+              print(f"Analysis complete: {len(results)} unique error patterns found.")
+              for r in results:
+                  print(f"  [{r['severity']}] count={r['count']} - {r['pattern'][:80]}")
+
+          if __name__ == "__main__":
+              main()
+          ANALYSIS_SCRIPT
+
+          python3 /tmp/analyze_logs.py
+
+          # Set output for downstream steps
+          PATTERN_COUNT=$(jq 'length' /tmp/analysis.json)
+          ACTIONABLE_COUNT=$(jq '[.[] | select(.count >= 2)] | length' /tmp/analysis.json)
+          echo "pattern_count=$PATTERN_COUNT" >> "$GITHUB_OUTPUT"
+          echo "actionable_count=$ACTIONABLE_COUNT" >> "$GITHUB_OUTPUT"
+          echo "analysis_ok=true" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      # ----------------------------------------------------------------
+      # 5. Create or update GitHub issues for recurring errors
+      # ----------------------------------------------------------------
+      - name: Create or update issues for error patterns
+        if: steps.analyze.outputs.analysis_ok == 'true' && steps.analyze.outputs.actionable_count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: sarathfrancis90/ignite
+        run: |
+          cat << 'ISSUE_SCRIPT' > /tmp/create_issues.py
+          import json
+          import subprocess
+          import hashlib
+          import sys
+
+          def run_gh(args, input_text=None):
+              """Run a gh CLI command and return stdout."""
+              cmd = ["gh"] + args
+              result = subprocess.run(cmd, capture_output=True, text=True, input=input_text)
+              return result.stdout.strip(), result.stderr.strip(), result.returncode
+
+          def search_existing_issue(pattern_hash, repo):
+              """Search for an existing open issue with the given pattern hash."""
+              query = f'repo:{repo} is:issue is:open label:prod-error "{pattern_hash}" in:body'
+              stdout, stderr, rc = run_gh([
+                  "api", "search/issues",
+                  "-X", "GET",
+                  "-f", f"q={query}",
+                  "--jq", ".items[0].number // empty"
+              ])
+              if rc == 0 and stdout:
+                  try:
+                      return int(stdout.strip())
+                  except ValueError:
+                      return None
+              return None
+
+          def create_issue(title, body, repo):
+              """Create a new GitHub issue."""
+              stdout, stderr, rc = run_gh([
+                  "issue", "create",
+                  "--repo", repo,
+                  "--title", title,
+                  "--label", "prod-error,bug",
+                  "--body", body,
+              ])
+              if rc == 0:
+                  print(f"  Created issue: {stdout}")
+                  return True
+              else:
+                  print(f"  Failed to create issue: {stderr}")
+                  return False
+
+          def comment_on_issue(issue_number, body, repo):
+              """Add a comment to an existing issue."""
+              stdout, stderr, rc = run_gh([
+                  "issue", "comment",
+                  "--repo", repo,
+                  str(issue_number),
+                  "--body", body,
+              ])
+              if rc == 0:
+                  print(f"  Commented on issue #{issue_number}")
+                  return True
+              else:
+                  print(f"  Failed to comment on issue #{issue_number}: {stderr}")
+                  return False
+
+          def main():
+              import os
+              repo = os.environ.get("REPO", "sarathfrancis90/ignite")
+
+              with open("/tmp/analysis.json", "r") as f:
+                  patterns = json.load(f)
+
+              # Only process patterns with count >= 2
+              actionable = [p for p in patterns if p["count"] >= 2]
+
+              if not actionable:
+                  print("No actionable error patterns (count >= 2). Nothing to do.")
+                  return
+
+              # Ensure labels exist (ignore errors if they already do)
+              for label in ["prod-error", "bug"]:
+                  run_gh(["label", "create", "--repo", repo, label, "--force", "--description", f"Auto-created label: {label}"])
+
+              created = 0
+              updated = 0
+
+              for pattern in actionable:
+                  pattern_hash = hashlib.sha256(pattern["pattern"].encode()).hexdigest()[:12]
+                  short_desc = pattern["pattern"][:80].replace("\n", " ").strip()
+                  title = f"[Prod Error] {short_desc}"
+
+                  # Truncate title to 256 chars (GitHub limit)
+                  if len(title) > 256:
+                      title = title[:253] + "..."
+
+                  # Check for existing issue
+                  existing = search_existing_issue(pattern_hash, repo)
+
+                  stack_section = ""
+                  if pattern.get("stack_trace"):
+                      stack_section = f"""
+          ### Stack Trace
+          ```
+          {pattern['stack_trace']}
+          ```
+          """
+
+                  if existing:
+                      # Update existing issue with a comment
+                      comment_body = f"""## Recurring Error Update
+
+          | Field | Value |
+          |-------|-------|
+          | **Occurrences (last 2h)** | {pattern['count']} |
+          | **Severity** | {pattern['severity']} |
+          | **Latest Occurrence** | {pattern['sample_timestamp']} |
+
+          ### Latest Sample
+          ```
+          {pattern['sample_payload'][:1500]}
+          ```
+
+          <!-- pattern-hash:{pattern_hash} -->
+          """
+                      if comment_on_issue(existing, comment_body, repo):
+                          updated += 1
+                  else:
+                      # Create new issue
+                      issue_body = f"""## Production Error Detected
+
+          This issue was automatically created by the log analyzer workflow.
+
+          | Field | Value |
+          |-------|-------|
+          | **Error Pattern** | `{pattern['pattern'][:200]}` |
+          | **Occurrences (last 2h)** | {pattern['count']} |
+          | **Severity** | {pattern['severity']} |
+          | **First Seen** | {pattern['sample_timestamp']} |
+          | **Service** | ignite-app (us-central1) |
+          | **Project** | ignite-489804 |
+
+          ### Sample Log Entry
+          ```
+          {pattern['sample_payload'][:1500]}
+          ```
+          {stack_section}
+          ### Investigation Steps
+          1. Check Cloud Run logs: [View in Cloud Console](https://console.cloud.google.com/run/detail/us-central1/ignite-app/logs?project=ignite-489804)
+          2. Check recent deployments for related changes
+          3. Review error pattern and identify root cause
+
+          ---
+          *Pattern Hash: `{pattern_hash}`*
+          <!-- pattern-hash:{pattern_hash} -->
+          """
+                      if create_issue(title, issue_body, repo):
+                          created += 1
+
+              # Write summary for later steps
+              summary = {
+                  "created": created,
+                  "updated": updated,
+                  "total_patterns": len(actionable),
+              }
+              with open("/tmp/issue_summary.json", "w") as f:
+                  json.dump(summary, f)
+
+              print(f"\nSummary: {created} issues created, {updated} issues updated, {len(actionable)} patterns processed.")
+
+          if __name__ == "__main__":
+              main()
+          ISSUE_SCRIPT
+
+          python3 /tmp/create_issues.py
+        continue-on-error: true
+
+      # ----------------------------------------------------------------
+      # 6. Post summary to orchestration status issue
+      # ----------------------------------------------------------------
+      - name: Post orchestration status summary
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: sarathfrancis90/ignite
+        run: |
+          # Determine overall status
+          AUTH_OK="${{ steps.auth_check.outputs.auth_ok }}"
+          FETCH_OK="${{ steps.fetch_logs.outputs.fetch_ok }}"
+          LOG_COUNT="${{ steps.fetch_logs.outputs.log_count }}"
+          PATTERN_COUNT="${{ steps.analyze.outputs.pattern_count }}"
+          ACTIONABLE_COUNT="${{ steps.analyze.outputs.actionable_count }}"
+
+          if [ "$AUTH_OK" != "true" ]; then
+            STATUS="warning"
+            MESSAGE="Log analyzer skipped - GCP authentication failed."
+          elif [ "$FETCH_OK" != "true" ]; then
+            STATUS="warning"
+            MESSAGE="Log analyzer skipped - failed to fetch logs from Cloud Run."
+          elif [ "${LOG_COUNT:-0}" = "0" ]; then
+            STATUS="ok"
+            MESSAGE="No error logs found in the last 2 hours."
+          else
+            STATUS="ok"
+            MESSAGE="Analyzed ${LOG_COUNT:-0} log entries. Found ${PATTERN_COUNT:-0} unique error patterns, ${ACTIONABLE_COUNT:-0} actionable (count >= 2)."
+
+            # Include issue creation summary if available
+            if [ -f /tmp/issue_summary.json ]; then
+              CREATED=$(jq -r '.created // 0' /tmp/issue_summary.json)
+              UPDATED=$(jq -r '.updated // 0' /tmp/issue_summary.json)
+              MESSAGE="$MESSAGE Created $CREATED new issues, updated $UPDATED existing issues."
+            fi
+          fi
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          COMMENT_BODY="## Log Analyzer Status
+
+          | Field | Value |
+          |-------|-------|
+          | **Status** | \`${STATUS}\` |
+          | **Timestamp** | ${TIMESTAMP} |
+          | **Run** | [View workflow run](${RUN_URL}) |
+
+          ${MESSAGE}
+          "
+
+          # Find the orchestration status issue (look for issue with 'orchestration' label or title)
+          ORCH_ISSUE=$(gh api "search/issues" \
+            -X GET \
+            -f "q=repo:${REPO} is:issue is:open \"orchestration\" in:title" \
+            --jq '.items[0].number // empty' 2>/dev/null || true)
+
+          if [ -n "$ORCH_ISSUE" ]; then
+            gh issue comment --repo "$REPO" "$ORCH_ISSUE" --body "$COMMENT_BODY" || \
+              echo "::warning::Failed to post comment to orchestration issue #${ORCH_ISSUE}"
+          else
+            echo "No orchestration status issue found. Skipping status update."
+            echo "Summary: $MESSAGE"
+          fi

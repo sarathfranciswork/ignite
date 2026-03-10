@@ -1,0 +1,689 @@
+name: Orchestration Watchdog
+
+# Self-healing watchdog that monitors the entire Ignite orchestration pipeline.
+# Checks story chain health, PR status, CI/CD pipeline, and production health.
+# Automatically recovers from common failure modes.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # Every 15 minutes
+  workflow_dispatch: # Manual trigger
+
+concurrency:
+  group: orchestration-watchdog
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+  pull-requests: write
+  actions: read
+
+env:
+  PRODUCTION_URL: https://ignite-app-132793395302.us-central1.run.app
+  TOTAL_STORIES: 78
+  MAX_RETRIES: 2
+  CLAUDE_RUN_TIMEOUT_MINUTES: 45
+  PR_AUTO_MERGE_HOURS: 2
+  PR_CI_FIX_MINUTES: 30
+  PR_ALERT_HOURS: 4
+
+jobs:
+  watchdog:
+    name: Orchestration Watchdog
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ══════════════════════════════════════════════════════════
+      # 1. Story Chain Health
+      # ══════════════════════════════════════════════════════════
+      - name: "Check story chain health"
+        id: story_chain
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          CHAIN_FILE=".github/story-chain.json"
+
+          if [ ! -f "$CHAIN_FILE" ]; then
+            echo "story_status=error" >> "$GITHUB_OUTPUT"
+            echo "story_message=story-chain.json not found" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Get all issue numbers from the chain
+          ALL_ISSUES=$(jq -r '.chain[].issue' "$CHAIN_FILE")
+          TOTAL=$(echo "$ALL_ISSUES" | wc -l)
+
+          # Count closed stories
+          CLOSED_COUNT=0
+          ACTIVE_ISSUE=""
+          ACTIVE_STORY=""
+
+          for ISSUE_NUM in $ALL_ISSUES; do
+            ISSUE_DATA=$(gh issue view "$ISSUE_NUM" --json state,labels 2>/dev/null || echo '{"state":"UNKNOWN","labels":[]}')
+            STATE=$(echo "$ISSUE_DATA" | jq -r '.state')
+            HAS_CLAUDE_LABEL=$(echo "$ISSUE_DATA" | jq -r '[.labels[]?.name // empty] | any(. == "claude-code")')
+
+            if [ "$STATE" = "CLOSED" ]; then
+              CLOSED_COUNT=$((CLOSED_COUNT + 1))
+            fi
+
+            if [ "$HAS_CLAUDE_LABEL" = "true" ] && [ "$STATE" = "OPEN" ]; then
+              ACTIVE_ISSUE="$ISSUE_NUM"
+              ACTIVE_STORY=$(jq -r --argjson num "$ISSUE_NUM" '.chain[] | select(.issue == $num) | .story' "$CHAIN_FILE")
+              ACTIVE_TITLE=$(jq -r --argjson num "$ISSUE_NUM" '.chain[] | select(.issue == $num) | .title' "$CHAIN_FILE")
+            fi
+          done
+
+          echo "closed_count=$CLOSED_COUNT" >> "$GITHUB_OUTPUT"
+          echo "total_stories=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "active_issue=$ACTIVE_ISSUE" >> "$GITHUB_OUTPUT"
+          echo "active_story=$ACTIVE_STORY" >> "$GITHUB_OUTPUT"
+
+          if [ "$CLOSED_COUNT" -eq "$TOTAL" ]; then
+            echo "story_status=complete" >> "$GITHUB_OUTPUT"
+            echo "story_message=All $TOTAL stories complete!" >> "$GITHUB_OUTPUT"
+            echo "chain_complete=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "chain_complete=false" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$ACTIVE_ISSUE" ]; then
+            echo "story_status=active" >> "$GITHUB_OUTPUT"
+            echo "story_message=Story $ACTIVE_STORY (#$ACTIVE_ISSUE): $ACTIVE_TITLE" >> "$GITHUB_OUTPUT"
+          else
+            # No active story — find the next one that should be triggered
+            NEXT_ISSUE=""
+            NEXT_STORY=""
+            NEXT_TITLE=""
+
+            # Iterate through chain to find first open story whose predecessor is closed
+            CHAIN_LENGTH=$(jq '.chain | length' "$CHAIN_FILE")
+            for i in $(seq 0 $((CHAIN_LENGTH - 1))); do
+              ISSUE_NUM=$(jq -r ".chain[$i].issue" "$CHAIN_FILE")
+              ISSUE_STATE=$(gh issue view "$ISSUE_NUM" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+
+              if [ "$ISSUE_STATE" = "OPEN" ]; then
+                if [ "$i" -eq 0 ]; then
+                  # First story in chain, no predecessor needed
+                  NEXT_ISSUE="$ISSUE_NUM"
+                  NEXT_STORY=$(jq -r ".chain[$i].story" "$CHAIN_FILE")
+                  NEXT_TITLE=$(jq -r ".chain[$i].title" "$CHAIN_FILE")
+                  break
+                else
+                  PREV_ISSUE=$(jq -r ".chain[$((i - 1))].issue" "$CHAIN_FILE")
+                  PREV_STATE=$(gh issue view "$PREV_ISSUE" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+                  if [ "$PREV_STATE" = "CLOSED" ]; then
+                    NEXT_ISSUE="$ISSUE_NUM"
+                    NEXT_STORY=$(jq -r ".chain[$i].story" "$CHAIN_FILE")
+                    NEXT_TITLE=$(jq -r ".chain[$i].title" "$CHAIN_FILE")
+                    break
+                  fi
+                fi
+              fi
+            done
+
+            if [ -n "$NEXT_ISSUE" ]; then
+              echo "story_status=stuck" >> "$GITHUB_OUTPUT"
+              echo "story_message=Chain stuck. Next story: $NEXT_STORY (#$NEXT_ISSUE) - $NEXT_TITLE" >> "$GITHUB_OUTPUT"
+              echo "next_issue=$NEXT_ISSUE" >> "$GITHUB_OUTPUT"
+              echo "next_story=$NEXT_STORY" >> "$GITHUB_OUTPUT"
+              echo "next_title=$NEXT_TITLE" >> "$GITHUB_OUTPUT"
+            else
+              echo "story_status=waiting" >> "$GITHUB_OUTPUT"
+              echo "story_message=All stories either closed or predecessor still open. Chain is progressing." >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: "Check Claude workflow run for active story"
+        id: claude_run
+        if: steps.story_chain.outputs.active_issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ACTIVE_ISSUE="${{ steps.story_chain.outputs.active_issue }}"
+
+          # Check for in-progress Claude Code workflow runs
+          RUNS=$(gh run list --workflow=claude.yml --status=in_progress --json databaseId,createdAt,status --limit 5 2>/dev/null || echo "[]")
+          RUN_COUNT=$(echo "$RUNS" | jq 'length')
+
+          if [ "$RUN_COUNT" -gt 0 ]; then
+            # Check the oldest in-progress run for timeout
+            OLDEST_CREATED=$(echo "$RUNS" | jq -r 'sort_by(.createdAt) | .[0].createdAt')
+            OLDEST_RUN_ID=$(echo "$RUNS" | jq -r 'sort_by(.createdAt) | .[0].databaseId')
+            OLDEST_EPOCH=$(date -d "$OLDEST_CREATED" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$OLDEST_CREATED" +%s 2>/dev/null || echo "0")
+            NOW_EPOCH=$(date +%s)
+            ELAPSED_MINUTES=$(( (NOW_EPOCH - OLDEST_EPOCH) / 60 ))
+
+            echo "claude_running=true" >> "$GITHUB_OUTPUT"
+            echo "claude_run_id=$OLDEST_RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "claude_elapsed_minutes=$ELAPSED_MINUTES" >> "$GITHUB_OUTPUT"
+
+            if [ "$ELAPSED_MINUTES" -gt "${{ env.CLAUDE_RUN_TIMEOUT_MINUTES }}" ]; then
+              echo "claude_timeout=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "claude_timeout=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "claude_running=false" >> "$GITHUB_OUTPUT"
+            echo "claude_timeout=false" >> "$GITHUB_OUTPUT"
+
+            # Check if the most recent Claude run for this issue failed
+            RECENT_RUNS=$(gh run list --workflow=claude.yml --json databaseId,conclusion,status --limit 5 2>/dev/null || echo "[]")
+            FAILED_RUN=$(echo "$RECENT_RUNS" | jq -r '[.[] | select(.status != "in_progress" and .conclusion == "failure")][0].databaseId // empty')
+
+            if [ -n "$FAILED_RUN" ]; then
+              echo "claude_failed=true" >> "$GITHUB_OUTPUT"
+              echo "claude_failed_run_id=$FAILED_RUN" >> "$GITHUB_OUTPUT"
+            else
+              echo "claude_failed=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: "Post timeout warning on active story"
+        if: steps.claude_run.outputs.claude_timeout == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ACTIVE_ISSUE="${{ steps.story_chain.outputs.active_issue }}"
+          ELAPSED="${{ steps.claude_run.outputs.claude_elapsed_minutes }}"
+          RUN_ID="${{ steps.claude_run.outputs.claude_run_id }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID"
+
+          # Check if we already posted a timeout warning recently (within last hour)
+          EXISTING=$(gh issue view "$ACTIVE_ISSUE" --json comments --jq '[.comments[] | select(.body | contains("Orchestration: Timeout Warning")) | select(.createdAt > (now - 3600 | todate))] | length' 2>/dev/null || echo "0")
+
+          if [ "$EXISTING" -eq 0 ]; then
+            gh issue comment "$ACTIVE_ISSUE" --body "## Orchestration: Timeout Warning
+
+          The Claude workflow run has been in progress for **${ELAPSED} minutes** (threshold: ${{ env.CLAUDE_RUN_TIMEOUT_MINUTES }} min).
+
+          - **Run ID:** [$RUN_ID]($RUN_URL)
+          - **Active Story:** ${{ steps.story_chain.outputs.active_story }}
+
+          This may indicate the run is stuck. If it does not complete soon, the watchdog will attempt a retry on the next cycle." || true
+          fi
+
+      # ══════════════════════════════════════════════════════════
+      # 2. Self-Healing: Retry Failed Claude Runs
+      # ══════════════════════════════════════════════════════════
+      - name: "Self-heal: Retry failed Claude run"
+        id: self_heal_claude
+        if: steps.claude_run.outputs.claude_failed == 'true' && steps.story_chain.outputs.active_issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ACTIVE_ISSUE="${{ steps.story_chain.outputs.active_issue }}"
+
+          # Count existing retry comments to enforce max retries
+          RETRY_COUNT=$(gh issue view "$ACTIVE_ISSUE" --json comments --jq '[.comments[] | select(.body | startswith("## Orchestration: Retry"))] | length' 2>/dev/null || echo "0")
+
+          if [ "$RETRY_COUNT" -ge "${{ env.MAX_RETRIES }}" ]; then
+            echo "retried=false" >> "$GITHUB_OUTPUT"
+            echo "Max retries (${{ env.MAX_RETRIES }}) reached for issue #$ACTIVE_ISSUE. Creating alert."
+
+            # Create an alert issue
+            EXISTING_ALERT=$(gh issue list --label "orchestration-alert" --state open --json number --jq '[.[] | select(true)] | length' 2>/dev/null || echo "0")
+            if [ "$EXISTING_ALERT" -eq 0 ]; then
+              gh issue create \
+                --title "Orchestration Alert: Story #$ACTIVE_ISSUE stuck after ${{ env.MAX_RETRIES }} retries" \
+                --label "orchestration-alert,bug" \
+                --body "## Orchestration Alert: Max Retries Exceeded
+
+          **Story:** ${{ steps.story_chain.outputs.active_story }} (#$ACTIVE_ISSUE)
+          **Retries exhausted:** ${{ env.MAX_RETRIES }}
+
+          The Claude workflow has failed ${{ env.MAX_RETRIES }} times for this story. Manual intervention is required.
+
+          ### Recommended Actions
+          1. Check the [workflow runs](/${{ github.repository }}/actions/workflows/claude.yml) for error details
+          2. Review the issue requirements for complexity or blockers
+          3. Manually re-trigger by removing and re-adding the \`claude-code\` label after fixing any issues" || true
+            fi
+          else
+            echo "retried=true" >> "$GITHUB_OUTPUT"
+            ATTEMPT=$((RETRY_COUNT + 1))
+
+            # Remove and re-add claude-code label to retry
+            gh issue edit "$ACTIVE_ISSUE" --remove-label "claude-code" || true
+            sleep 2
+            gh issue edit "$ACTIVE_ISSUE" --add-label "claude-code" || true
+
+            gh issue comment "$ACTIVE_ISSUE" --body "## Orchestration: Retry (Attempt $ATTEMPT/${{ env.MAX_RETRIES }})
+
+          The previous Claude workflow run failed. Automatically retrying by re-applying the \`claude-code\` label.
+
+          **Failed Run:** ${{ steps.claude_run.outputs.claude_failed_run_id }}
+          **Retry:** $ATTEMPT of ${{ env.MAX_RETRIES }}" || true
+          fi
+
+      # ══════════════════════════════════════════════════════════
+      # 3. Self-Healing: Unstick the Story Chain
+      # ══════════════════════════════════════════════════════════
+      - name: "Self-heal: Trigger next story if chain is stuck"
+        id: self_heal_chain
+        if: steps.story_chain.outputs.story_status == 'stuck' && steps.story_chain.outputs.next_issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          NEXT_ISSUE="${{ steps.story_chain.outputs.next_issue }}"
+          NEXT_STORY="${{ steps.story_chain.outputs.next_story }}"
+          NEXT_TITLE="${{ steps.story_chain.outputs.next_title }}"
+
+          echo "Triggering stuck chain: Story $NEXT_STORY (#$NEXT_ISSUE)"
+
+          gh issue edit "$NEXT_ISSUE" --add-label "claude-code" || true
+
+          gh issue comment "$NEXT_ISSUE" --body "## Orchestration: Chain Recovery
+
+          The story chain was stuck (no active story detected). The watchdog is triggering this story automatically.
+
+          **Story:** $NEXT_STORY - $NEXT_TITLE
+          **Trigger:** Orchestration Watchdog (self-healing)" || true
+
+          echo "triggered=true" >> "$GITHUB_OUTPUT"
+          echo "triggered_issue=$NEXT_ISSUE" >> "$GITHUB_OUTPUT"
+          echo "triggered_story=$NEXT_STORY" >> "$GITHUB_OUTPUT"
+
+      # ══════════════════════════════════════════════════════════
+      # 4. PR Health
+      # ══════════════════════════════════════════════════════════
+      - name: "Check PR health"
+        id: pr_health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          NOW_EPOCH=$(date +%s)
+
+          # Get all open PRs (authored by anyone, we filter for Claude-created ones)
+          OPEN_PRS=$(gh pr list --state open --json number,createdAt,headRefName,author,title,statusCheckRollup --limit 20 2>/dev/null || echo "[]")
+
+          PR_ISSUES=""
+          PR_ACTIONS=""
+          PR_COUNT=$(echo "$OPEN_PRS" | jq 'length')
+
+          echo "open_pr_count=$PR_COUNT" >> "$GITHUB_OUTPUT"
+
+          for i in $(seq 0 $((PR_COUNT - 1))); do
+            PR_NUM=$(echo "$OPEN_PRS" | jq -r ".[$i].number")
+            PR_CREATED=$(echo "$OPEN_PRS" | jq -r ".[$i].createdAt")
+            PR_TITLE=$(echo "$OPEN_PRS" | jq -r ".[$i].title")
+            PR_BRANCH=$(echo "$OPEN_PRS" | jq -r ".[$i].headRefName")
+            PR_AUTHOR=$(echo "$OPEN_PRS" | jq -r ".[$i].author.login")
+
+            # Only process Claude-created PRs (branch starts with claude/)
+            if [[ ! "$PR_BRANCH" =~ ^claude/ ]]; then
+              continue
+            fi
+
+            PR_CREATED_EPOCH=$(date -d "$PR_CREATED" +%s 2>/dev/null || echo "0")
+            ELAPSED_HOURS=$(( (NOW_EPOCH - PR_CREATED_EPOCH) / 3600 ))
+            ELAPSED_MINUTES=$(( (NOW_EPOCH - PR_CREATED_EPOCH) / 60 ))
+
+            # Get check status
+            CHECK_STATUS=$(echo "$OPEN_PRS" | jq -r ".[$i].statusCheckRollup // [] | if length == 0 then \"PENDING\" else (if all(.conclusion == \"SUCCESS\" or .status == \"COMPLETED\" and .conclusion == \"SUCCESS\") then \"SUCCESS\" elif any(.conclusion == \"FAILURE\") then \"FAILURE\" else \"PENDING\" end) end")
+
+            # Detailed check via gh pr checks
+            PR_CHECKS=$(gh pr checks "$PR_NUM" 2>/dev/null || echo "")
+            ALL_PASS=$(echo "$PR_CHECKS" | grep -c "pass" || echo "0")
+            ANY_FAIL=$(echo "$PR_CHECKS" | grep -c "fail" || echo "0")
+
+            # Auto-merge: PR open > 2 hours with passing CI
+            if [ "$ELAPSED_HOURS" -ge "${{ env.PR_AUTO_MERGE_HOURS }}" ] && [ "$ANY_FAIL" -eq 0 ] && [ "$ALL_PASS" -gt 0 ]; then
+              echo "Auto-merging PR #$PR_NUM (open ${ELAPSED_HOURS}h, CI passing)"
+              gh pr merge "$PR_NUM" --auto --squash || true
+              PR_ACTIONS="${PR_ACTIONS}Auto-merge enabled for PR #$PR_NUM (open ${ELAPSED_HOURS}h, CI passing)\n"
+            fi
+
+            # CI fix request: PR has failing CI for > 30 minutes
+            if [ "$ANY_FAIL" -gt 0 ] && [ "$ELAPSED_MINUTES" -ge "${{ env.PR_CI_FIX_MINUTES }}" ]; then
+              # Check if we already posted a fix request recently
+              EXISTING_FIX=$(gh pr view "$PR_NUM" --json comments --jq '[.comments[] | select(.body | contains("please fix the CI failures"))] | length' 2>/dev/null || echo "0")
+
+              if [ "$EXISTING_FIX" -eq 0 ]; then
+                echo "Requesting CI fix for PR #$PR_NUM"
+                gh pr review "$PR_NUM" --comment --body "@claude please fix the CI failures" || true
+                PR_ACTIONS="${PR_ACTIONS}Requested CI fix for PR #$PR_NUM (failing > ${PR_CI_FIX_MINUTES}min)\n"
+              fi
+            fi
+
+            # Alert: PR open > 4 hours
+            if [ "$ELAPSED_HOURS" -ge "${{ env.PR_ALERT_HOURS }}" ]; then
+              # Check if alert issue already exists for this PR
+              EXISTING_ALERT=$(gh issue list --label "orchestration-alert" --state open --search "PR #$PR_NUM" --json number --jq 'length' 2>/dev/null || echo "0")
+
+              if [ "$EXISTING_ALERT" -eq 0 ]; then
+                echo "Creating alert for long-open PR #$PR_NUM"
+                gh issue create \
+                  --title "Orchestration Alert: PR #$PR_NUM open > ${ELAPSED_HOURS}h" \
+                  --label "orchestration-alert" \
+                  --body "## Orchestration Alert: Stale Pull Request
+
+          **PR:** #$PR_NUM - $PR_TITLE
+          **Branch:** \`$PR_BRANCH\`
+          **Open for:** ${ELAPSED_HOURS} hours
+          **CI Status:** $([ "$ANY_FAIL" -gt 0 ] && echo 'FAILING' || echo 'PASSING/PENDING')
+
+          This PR has been open longer than the ${PR_ALERT_HOURS}-hour threshold. Please review and take action.
+
+          ### Recommended Actions
+          1. Review the PR for merge readiness
+          2. Check CI status and fix any failures
+          3. Merge or close the PR to unblock the story chain" || true
+                PR_ACTIONS="${PR_ACTIONS}Created alert issue for PR #$PR_NUM (open ${ELAPSED_HOURS}h)\n"
+              fi
+            fi
+
+            PR_ISSUES="${PR_ISSUES}PR #$PR_NUM: ${PR_TITLE} (${ELAPSED_HOURS}h, CI: $([ "$ANY_FAIL" -gt 0 ] && echo 'FAIL' || echo 'OK'))\n"
+          done
+
+          echo "pr_summary<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -n "$PR_ISSUES" ]; then
+            echo -e "$PR_ISSUES" >> "$GITHUB_OUTPUT"
+          else
+            echo "No open Claude PRs" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "pr_actions<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -n "$PR_ACTIONS" ]; then
+            echo -e "$PR_ACTIONS" >> "$GITHUB_OUTPUT"
+          else
+            echo "None" >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      # ══════════════════════════════════════════════════════════
+      # 5. CI/CD Pipeline Health
+      # ══════════════════════════════════════════════════════════
+      - name: "Check CI/CD pipeline health"
+        id: cicd_health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+
+          # Get the last CI/CD run on main
+          LAST_RUN=$(gh run list --workflow=ci-cd.yml --branch=main --limit 1 --json databaseId,conclusion,status,createdAt,headSha 2>/dev/null || echo "[]")
+          RUN_COUNT=$(echo "$LAST_RUN" | jq 'length')
+
+          if [ "$RUN_COUNT" -eq 0 ]; then
+            echo "cicd_status=none" >> "$GITHUB_OUTPUT"
+            echo "cicd_message=No CI/CD runs found on main" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CONCLUSION=$(echo "$LAST_RUN" | jq -r '.[0].conclusion // "in_progress"')
+          STATUS=$(echo "$LAST_RUN" | jq -r '.[0].status')
+          RUN_ID=$(echo "$LAST_RUN" | jq -r '.[0].databaseId')
+          CREATED=$(echo "$LAST_RUN" | jq -r '.[0].createdAt')
+          SHA=$(echo "$LAST_RUN" | jq -r '.[0].headSha')
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID"
+
+          echo "cicd_run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "cicd_created=$CREATED" >> "$GITHUB_OUTPUT"
+          echo "cicd_sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "cicd_run_url=$RUN_URL" >> "$GITHUB_OUTPUT"
+
+          if [ "$CONCLUSION" = "success" ]; then
+            echo "cicd_status=healthy" >> "$GITHUB_OUTPUT"
+            echo "cicd_message=Last CI/CD run succeeded ($CREATED)" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "in_progress" ]; then
+            echo "cicd_status=running" >> "$GITHUB_OUTPUT"
+            echo "cicd_message=CI/CD run in progress ($CREATED)" >> "$GITHUB_OUTPUT"
+          else
+            echo "cicd_status=failed" >> "$GITHUB_OUTPUT"
+            echo "cicd_message=Last CI/CD run FAILED (conclusion: $CONCLUSION)" >> "$GITHUB_OUTPUT"
+
+            # Analyze which jobs failed
+            FAILED_JOBS=$(gh run view "$RUN_ID" --json jobs --jq '[.jobs[] | select(.conclusion == "failure")] | map(.name) | join(", ")' 2>/dev/null || echo "unknown")
+            echo "cicd_failed_jobs=$FAILED_JOBS" >> "$GITHUB_OUTPUT"
+
+            # Check if an alert already exists for this run
+            EXISTING_ALERT=$(gh issue list --label "orchestration-alert" --state open --search "CI/CD run $RUN_ID" --json number --jq 'length' 2>/dev/null || echo "0")
+
+            if [ "$EXISTING_ALERT" -eq 0 ]; then
+              gh issue create \
+                --title "Orchestration Alert: CI/CD pipeline failed on main" \
+                --label "orchestration-alert,bug" \
+                --body "## Orchestration Alert: CI/CD Pipeline Failure
+
+          **Run ID:** [$RUN_ID]($RUN_URL)
+          **Commit:** \`${SHA:0:8}\`
+          **Failed Stages:** $FAILED_JOBS
+          **Time:** $CREATED
+
+          The CI/CD pipeline on \`main\` has failed. This blocks deployments and may indicate broken code was merged.
+
+          ### Recommended Actions
+          1. Check the [failed run]($RUN_URL) for details
+          2. Identify the failing stage(s): $FAILED_JOBS
+          3. Fix the issue and push to main, or revert the breaking commit" || true
+            fi
+          fi
+
+      # ══════════════════════════════════════════════════════════
+      # 6. Production Health
+      # ══════════════════════════════════════════════════════════
+      - name: "Check production health"
+        id: prod_health
+        run: |
+          set +e
+          PROD_URL="${{ env.PRODUCTION_URL }}"
+          ISSUES_FOUND=""
+
+          # Check /api/health
+          HEALTH_STATUS=$(curl -sf -o /tmp/health_response.json -w "%{http_code}" "${PROD_URL}/api/health" 2>/dev/null || echo "000")
+          HEALTH_BODY=$(cat /tmp/health_response.json 2>/dev/null || echo "{}")
+
+          if [ "$HEALTH_STATUS" = "200" ]; then
+            # Check for degraded status in response body
+            DEGRADED=$(echo "$HEALTH_BODY" | jq -r '.status // "ok"' 2>/dev/null || echo "ok")
+            if [ "$DEGRADED" = "degraded" ] || [ "$DEGRADED" = "unhealthy" ]; then
+              echo "health_api=degraded" >> "$GITHUB_OUTPUT"
+              ISSUES_FOUND="${ISSUES_FOUND}/api/health returned status: $DEGRADED\n"
+            else
+              echo "health_api=healthy" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "health_api=down" >> "$GITHUB_OUTPUT"
+            ISSUES_FOUND="${ISSUES_FOUND}/api/health returned HTTP $HEALTH_STATUS\n"
+          fi
+
+          # Check key routes
+          ROUTES_OK=true
+          for ROUTE in "/" "/login" "/dashboard"; do
+            ROUTE_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${PROD_URL}${ROUTE}" 2>/dev/null || echo "000")
+            if [ "$ROUTE_STATUS" != "200" ] && [ "$ROUTE_STATUS" != "302" ] && [ "$ROUTE_STATUS" != "307" ]; then
+              ROUTES_OK=false
+              ISSUES_FOUND="${ISSUES_FOUND}${ROUTE} returned HTTP $ROUTE_STATUS\n"
+            fi
+          done
+
+          if [ "$ROUTES_OK" = true ] && [ "$HEALTH_STATUS" = "200" ]; then
+            echo "prod_status=healthy" >> "$GITHUB_OUTPUT"
+            echo "prod_message=All endpoints responding normally" >> "$GITHUB_OUTPUT"
+          else
+            echo "prod_status=unhealthy" >> "$GITHUB_OUTPUT"
+            echo "prod_message<<EOF" >> "$GITHUB_OUTPUT"
+            echo -e "$ISSUES_FOUND" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: "Create alert for production issues"
+        if: steps.prod_health.outputs.prod_status == 'unhealthy'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+
+          # Check if a production alert already exists (open)
+          EXISTING_ALERT=$(gh issue list --label "orchestration-alert,production" --state open --json number --jq 'length' 2>/dev/null || echo "0")
+
+          if [ "$EXISTING_ALERT" -eq 0 ]; then
+            gh issue create \
+              --title "Orchestration Alert: Production health check failing" \
+              --label "orchestration-alert,production,bug" \
+              --body "## Orchestration Alert: Production Health Degraded
+
+          **Production URL:** ${{ env.PRODUCTION_URL }}
+          **Health API:** ${{ steps.prod_health.outputs.health_api }}
+          **Detected at:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          ### Issues Found
+          ${{ steps.prod_health.outputs.prod_message }}
+
+          ### Recommended Actions
+          1. Check the [production URL](${{ env.PRODUCTION_URL }}/api/health) directly
+          2. Review the latest [CI/CD deployment](/${{ github.repository }}/actions/workflows/ci-cd.yml)
+          3. Check GCP Cloud Run console for the \`ignite-app\` service in \`us-central1\`
+          4. If needed, roll back via: \`gcloud run services update-traffic ignite-app --region us-central1 --to-revisions <prev-revision>=100\`" || true
+          fi
+
+      # ══════════════════════════════════════════════════════════
+      # 7. Status Report
+      # ══════════════════════════════════════════════════════════
+      - name: "Find or create orchestration status issue"
+        id: status_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+
+          # Find existing status issue by label
+          STATUS_ISSUE=$(gh issue list --label "orchestration-status" --state open --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          if [ -z "$STATUS_ISSUE" ]; then
+            # Create the status issue
+            STATUS_ISSUE=$(gh issue create \
+              --title "Orchestration Status Dashboard" \
+              --label "orchestration-status" \
+              --body "This issue is automatically updated by the Orchestration Watchdog every 15 minutes. Do not close." \
+              --json number --jq '.number' 2>/dev/null || echo "")
+
+            if [ -n "$STATUS_ISSUE" ]; then
+              # Pin the issue (pin via gh api)
+              gh api graphql -f query='
+                mutation {
+                  pinIssue(input: {issueId: "'"$(gh issue view "$STATUS_ISSUE" --json id --jq '.id')"'"}) {
+                    issue { number }
+                  }
+                }
+              ' 2>/dev/null || true
+            fi
+          fi
+
+          echo "issue_number=$STATUS_ISSUE" >> "$GITHUB_OUTPUT"
+
+      - name: "Update orchestration status report"
+        if: steps.status_issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          STATUS_ISSUE="${{ steps.status_issue.outputs.issue_number }}"
+          NOW=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          # Determine overall health
+          STORY_STATUS="${{ steps.story_chain.outputs.story_status }}"
+          CICD_STATUS="${{ steps.cicd_health.outputs.cicd_status }}"
+          PROD_STATUS="${{ steps.prod_health.outputs.prod_status }}"
+
+          if [ "$STORY_STATUS" = "stuck" ] || [ "$CICD_STATUS" = "failed" ] || [ "$PROD_STATUS" = "unhealthy" ]; then
+            OVERALL="NEEDS ATTENTION"
+          elif [ "$STORY_STATUS" = "complete" ]; then
+            OVERALL="COMPLETE"
+          else
+            OVERALL="HEALTHY"
+          fi
+
+          # Build progress bar
+          CLOSED="${{ steps.story_chain.outputs.closed_count }}"
+          TOTAL="${{ steps.story_chain.outputs.total_stories }}"
+          if [ -n "$CLOSED" ] && [ -n "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
+            PCT=$((CLOSED * 100 / TOTAL))
+            FILLED=$((PCT / 5))
+            EMPTY=$((20 - FILLED))
+            BAR=$(printf '%0.s=' $(seq 1 $FILLED 2>/dev/null || echo ""))$(printf '%0.s-' $(seq 1 $EMPTY 2>/dev/null || echo ""))
+          else
+            PCT=0
+            BAR="--------------------"
+            CLOSED="?"
+            TOTAL="?"
+          fi
+
+          # Build self-healing actions summary
+          ACTIONS_TAKEN=""
+          if [ "${{ steps.self_heal_claude.outputs.retried }}" = "true" ]; then
+            ACTIONS_TAKEN="${ACTIONS_TAKEN}- Retried failed Claude run for story #${{ steps.story_chain.outputs.active_issue }}\n"
+          fi
+          if [ "${{ steps.self_heal_chain.outputs.triggered }}" = "true" ]; then
+            ACTIONS_TAKEN="${ACTIONS_TAKEN}- Triggered stuck chain: Story ${{ steps.self_heal_chain.outputs.triggered_story }} (#${{ steps.self_heal_chain.outputs.triggered_issue }})\n"
+          fi
+
+          # CI/CD info
+          CICD_INFO="${{ steps.cicd_health.outputs.cicd_message }}"
+          if [ "$CICD_STATUS" = "failed" ]; then
+            CICD_INFO="${CICD_INFO} | Failed: ${{ steps.cicd_health.outputs.cicd_failed_jobs }}"
+          fi
+
+          # Compose the report body
+          REPORT_BODY=$(cat <<ENDOFBODY
+          ## Orchestration Status Dashboard
+
+          **Last Updated:** ${NOW}
+          **Overall Status:** ${OVERALL}
+
+          ---
+
+          ### Story Chain Progress
+          \`\`\`
+          [${BAR}] ${CLOSED}/${TOTAL} (${PCT}%)
+          \`\`\`
+
+          | Metric | Value |
+          |--------|-------|
+          | **Current Story** | ${{ steps.story_chain.outputs.story_message }} |
+          | **Stories Completed** | ${CLOSED} / ${TOTAL} |
+          | **Chain Status** | ${STORY_STATUS} |
+
+          ### CI/CD Pipeline
+          | Metric | Value |
+          |--------|-------|
+          | **Status** | ${CICD_STATUS} |
+          | **Details** | ${CICD_INFO} |
+          | **Last Run** | ${{ steps.cicd_health.outputs.cicd_run_url }} |
+
+          ### Production Health
+          | Metric | Value |
+          |--------|-------|
+          | **Status** | ${PROD_STATUS} |
+          | **Health API** | ${{ steps.prod_health.outputs.health_api }} |
+          | **URL** | ${{ env.PRODUCTION_URL }} |
+
+          ### Open Pull Requests
+          ${{ steps.pr_health.outputs.pr_summary }}
+
+          ### PR Actions Taken
+          ${{ steps.pr_health.outputs.pr_actions }}
+
+          ### Self-Healing Actions
+          $(if [ -n "$ACTIONS_TAKEN" ]; then echo -e "$ACTIONS_TAKEN"; else echo "None this cycle"; fi)
+
+          ---
+          *Updated by [Orchestration Watchdog](/${{ github.repository }}/actions/workflows/orchestration-watchdog.yml) | Run [${{ github.run_id }}](/${{ github.repository }}/actions/runs/${{ github.run_id }})*
+          ENDOFBODY
+          )
+
+          # Update the status issue body
+          gh issue edit "$STATUS_ISSUE" --body "$REPORT_BODY" || true
