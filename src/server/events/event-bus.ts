@@ -20,7 +20,7 @@ class TypedEventBus {
   }
 
   emit<T extends EventName>(event: T, payload: EventMap[T]): void {
-    logger.info("EventBus emit", { event, entityId: payload.entityId });
+    logger.info({ event, entityId: payload.entityId }, "EventBus emit");
     this.emitter.emit(event, payload);
   }
 
