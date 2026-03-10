@@ -1,0 +1,117 @@
+// Prisma schema for Community Insights — Story 9.4 (FR79)
+//
+// This schema defines the Insight model and its relationships.
+// It extends the base schema from docs/02-DATABASE-SCHEMA.md with
+// the enriched fields required by Story 9.4 acceptance criteria:
+//   - type enum (SIGNAL/OBSERVATION/OPPORTUNITY/RISK)
+//   - scope enum (GLOBAL/CAMPAIGN/TREND)
+//   - visibility for approval workflow
+//   - scopeEntityId for polymorphic linking
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum InsightType {
+  SIGNAL
+  OBSERVATION
+  OPPORTUNITY
+  RISK
+}
+
+enum InsightScope {
+  GLOBAL
+  CAMPAIGN
+  TREND
+}
+
+enum InsightVisibility {
+  PUBLISHED
+  PENDING_APPROVAL
+  DRAFT
+  ARCHIVED
+}
+
+// ─── User (minimal, for relation references) ───────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  insights Insight[]
+}
+
+// ─── Campaign (minimal, for relation references) ───────────────────────────
+
+model Campaign {
+  id    String @id @default(cuid())
+  title String
+
+  insights Insight[]
+}
+
+// ─── Trend (minimal, for relation references) ──────────────────────────────
+
+model Trend {
+  id    String @id @default(cuid())
+  title String
+
+  insightLinks TrendInsightLink[]
+}
+
+// ─── Insight ───────────────────────────────────────────────────────────────
+
+model Insight {
+  id            String            @id @default(cuid())
+  title         String
+  content       String
+  insightType   InsightType
+  scope         InsightScope      @default(GLOBAL)
+  scopeEntityId String?
+  visibility    InsightVisibility @default(PUBLISHED)
+  sourceUrl     String?
+  imageUrl      String?
+  isEditorial   Boolean           @default(false)
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trendLinks TrendInsightLink[]
+
+  @@index([createdById])
+  @@index([campaignId])
+  @@index([scope])
+  @@index([insightType])
+  @@index([visibility])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ─── Trend–Insight Link (many-to-many) ─────────────────────────────────────
+
+model TrendInsightLink {
+  id        String @id @default(cuid())
+  trendId   String
+  insightId String
+
+  trend   Trend   @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  insight Insight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+  @@unique([trendId, insightId])
+}
