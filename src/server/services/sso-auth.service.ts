@@ -130,7 +130,13 @@ interface MappedAttributes {
   skills?: string;
 }
 
-const VALID_TARGET_FIELDS: ReadonlySet<string> = new Set(["email", "name", "image", "bio", "skills"]);
+const VALID_TARGET_FIELDS: ReadonlySet<string> = new Set([
+  "email",
+  "name",
+  "image",
+  "bio",
+  "skills",
+]);
 
 function mapAttributes(
   rawAttributes: Record<string, string>,
