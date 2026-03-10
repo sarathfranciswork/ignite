@@ -33,6 +33,7 @@ vi.mock("@/server/lib/prisma", () => ({
     user: {
       findUnique: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -94,8 +95,12 @@ const mockGroups = [
 ];
 
 describe("group.service", () => {
+  const prismaTransaction = (prisma as unknown as { $transaction: Mock }).$transaction;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    // $transaction mock for array-style transactions
+    prismaTransaction.mockResolvedValue(undefined);
   });
 
   // ── Input Validation ───────────────────────────────────
@@ -303,7 +308,7 @@ describe("group.service", () => {
   // ── deleteGroup ────────────────────────────────────────
 
   describe("deleteGroup", () => {
-    it("deletes group and its memberships", async () => {
+    it("deletes group and its memberships in a transaction", async () => {
       groupFindUnique.mockResolvedValue({
         ...mockGroups[0],
         _count: { members: 2 },
@@ -311,6 +316,10 @@ describe("group.service", () => {
 
       await deleteGroup("group-1", "admin-1");
 
+      expect(prismaTransaction).toHaveBeenCalledTimes(1);
+      const transactionArg = prismaTransaction.mock.calls[0]?.[0];
+      expect(Array.isArray(transactionArg)).toBe(true);
+      expect(transactionArg).toHaveLength(2);
       expect(membershipDeleteMany).toHaveBeenCalledWith({
         where: { groupId: "group-1" },
       });

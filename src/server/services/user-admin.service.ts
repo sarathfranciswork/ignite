@@ -1,64 +1,23 @@
-import { z } from "zod";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
 import { invalidateUserCache, updateGlobalRole } from "@/server/services/rbac.service";
 import type { Prisma } from "@prisma/client";
+import type { UserListInput, UserCreateInput, UserUpdateInput } from "./admin.schemas";
+
+export {
+  userListInput,
+  userCreateInput,
+  userUpdateInput,
+  userToggleActiveInput,
+  bulkAssignRoleInput,
+  bulkAssignOrgUnitInput,
+  bulkDeactivateInput,
+  userGetByIdInput,
+} from "./admin.schemas";
+export type { UserListInput, UserCreateInput, UserUpdateInput } from "./admin.schemas";
 
 const childLogger = logger.child({ service: "user-admin" });
-
-// ── Input Schemas ──────────────────────────────────────────
-
-export const userListInput = z.object({
-  cursor: z.string().cuid().optional(),
-  limit: z.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  status: z.enum(["all", "active", "inactive"]).default("all"),
-  role: z.enum(["PLATFORM_ADMIN", "INNOVATION_MANAGER", "MEMBER"]).optional(),
-  orgUnitId: z.string().cuid().optional(),
-});
-
-export const userCreateInput = z.object({
-  email: z.string().email("Invalid email address").max(255),
-  name: z.string().min(1, "Name is required").max(100),
-  globalRole: z.enum(["PLATFORM_ADMIN", "INNOVATION_MANAGER", "MEMBER"]).default("MEMBER"),
-});
-
-export const userUpdateInput = z.object({
-  userId: z.string().cuid(),
-  name: z.string().min(1).max(100).optional(),
-  globalRole: z.enum(["PLATFORM_ADMIN", "INNOVATION_MANAGER", "MEMBER"]).optional(),
-  orgUnitIds: z.array(z.string().cuid()).optional(),
-});
-
-export const userToggleActiveInput = z.object({
-  userId: z.string().cuid(),
-  isActive: z.boolean(),
-});
-
-export const bulkAssignRoleInput = z.object({
-  userIds: z.array(z.string().cuid()).min(1).max(100),
-  globalRole: z.enum(["PLATFORM_ADMIN", "INNOVATION_MANAGER", "MEMBER"]),
-});
-
-export const bulkAssignOrgUnitInput = z.object({
-  userIds: z.array(z.string().cuid()).min(1).max(100),
-  orgUnitId: z.string().cuid(),
-});
-
-export const bulkDeactivateInput = z.object({
-  userIds: z.array(z.string().cuid()).min(1).max(100),
-});
-
-export const userGetByIdInput = z.object({
-  userId: z.string().cuid(),
-});
-
-export type UserListInput = z.infer<typeof userListInput>;
-export type UserCreateInput = z.infer<typeof userCreateInput>;
-export type UserUpdateInput = z.infer<typeof userUpdateInput>;
-
-// ── User select shape ─────────────────────────────────────
 
 const userSelectFields = {
   id: true,
@@ -75,8 +34,6 @@ const userSelectFields = {
     },
   },
 } as const;
-
-// ── Service Functions ──────────────────────────────────────
 
 export async function listUsers(input: UserListInput) {
   const where: Prisma.UserWhereInput = {};
@@ -183,38 +140,39 @@ export async function updateUser(input: UserUpdateInput, actorId: string) {
     throw new UserAdminServiceError("User not found", "USER_NOT_FOUND");
   }
 
-  // Update global role if changed
+  // Update global role if changed (outside transaction — uses RBAC cache)
   if (input.globalRole && input.globalRole !== existing.globalRole) {
     await updateGlobalRole(input.userId, input.globalRole, actorId);
   }
 
-  // Update name if provided
-  if (input.name) {
-    await prisma.user.update({
-      where: { id: input.userId },
-      data: { name: input.name },
-    });
-  }
-
-  // Update org unit assignments if provided
-  if (input.orgUnitIds !== undefined) {
-    await prisma.userOrgUnit.deleteMany({
-      where: { userId: input.userId },
-    });
-
-    if (input.orgUnitIds.length > 0) {
-      await prisma.userOrgUnit.createMany({
-        data: input.orgUnitIds.map((orgUnitId) => ({
-          userId: input.userId,
-          orgUnitId,
-        })),
+  // Update name and org units atomically
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    if (input.name) {
+      await tx.user.update({
+        where: { id: input.userId },
+        data: { name: input.name },
       });
     }
-  }
 
-  const updated = await prisma.user.findUnique({
-    where: { id: input.userId },
-    select: userSelectFields,
+    if (input.orgUnitIds !== undefined) {
+      await tx.userOrgUnit.deleteMany({
+        where: { userId: input.userId },
+      });
+
+      if (input.orgUnitIds.length > 0) {
+        await tx.userOrgUnit.createMany({
+          data: input.orgUnitIds.map((orgUnitId) => ({
+            userId: input.userId,
+            orgUnitId,
+          })),
+        });
+      }
+    }
+
+    return tx.user.findUnique({
+      where: { id: input.userId },
+      select: userSelectFields,
+    });
   });
 
   childLogger.info({ userId: input.userId, actorId }, "User updated by admin");
@@ -240,7 +198,7 @@ export async function toggleUserActive(userId: string, isActive: boolean, actorI
     throw new UserAdminServiceError("User not found", "USER_NOT_FOUND");
   }
 
-  if (userId === actorId) {
+  if (userId === actorId && !isActive) {
     throw new UserAdminServiceError("Cannot deactivate your own account", "SELF_DEACTIVATION");
   }
 
@@ -328,8 +286,6 @@ export async function bulkDeactivate(userIds: string[], actorId: string) {
 
   return { deactivated: result.count, total: filteredIds.length };
 }
-
-// ── Error Class ────────────────────────────────────────────
 
 export class UserAdminServiceError extends Error {
   constructor(

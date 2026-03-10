@@ -30,6 +30,7 @@ vi.mock("@/server/lib/prisma", () => ({
     orgUnit: {
       findUnique: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -69,6 +70,7 @@ const userCreate = prisma.user.create as unknown as Mock;
 const userUpdate = prisma.user.update as unknown as Mock;
 const userUpdateMany = prisma.user.updateMany as unknown as Mock;
 const orgUnitFindUnique = (prisma.orgUnit as unknown as { findUnique: Mock }).findUnique;
+const prismaTransaction = (prisma as unknown as { $transaction: Mock }).$transaction;
 
 const mockUserList = [
   {
@@ -98,6 +100,10 @@ const mockUserList = [
 describe("user-admin.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // $transaction mock: execute callback with prisma as tx proxy
+    prismaTransaction.mockImplementation(async (cb: (tx: typeof prisma) => Promise<unknown>) => {
+      return cb(prisma);
+    });
   });
 
   // ── Input Validation ───────────────────────────────────
@@ -318,6 +324,16 @@ describe("user-admin.service", () => {
       await expect(toggleUserActive("admin-1", false, "admin-1")).rejects.toMatchObject({
         code: "SELF_DEACTIVATION",
       });
+    });
+
+    it("allows self-reactivation", async () => {
+      userFindUnique.mockResolvedValue({ id: "admin-1", isActive: false });
+      userUpdate.mockResolvedValue({ ...mockUserList[0], id: "admin-1", isActive: true });
+
+      const result = await toggleUserActive("admin-1", true, "admin-1");
+
+      expect(result.isActive).toBe(true);
+      expect(invalidateUserCache).toHaveBeenCalledWith("admin-1");
     });
 
     it("throws if user not found", async () => {
