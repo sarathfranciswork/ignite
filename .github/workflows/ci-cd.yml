@@ -307,6 +307,9 @@ jobs:
     needs: [e2e, visual]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+
     permissions:
       contents: read
       id-token: write
@@ -424,9 +427,6 @@ jobs:
             URL="${{ needs.deploy.outputs.url }}"
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
-        env:
-          # This step may not have GCP auth, so fall back to needs output
-
       - name: Smoke tests
         run: |
           URL="${{ needs.deploy.outputs.url }}"
