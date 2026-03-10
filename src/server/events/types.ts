@@ -14,10 +14,12 @@ export interface EventMap {
   "campaign.membersUpdated": EventPayload;
   "campaign.sponsorCommented": EventPayload;
   "campaign.shortlistApproved": EventPayload;
+  "idea.created": EventPayload;
   "idea.submitted": EventPayload;
   "idea.updated": EventPayload;
   "idea.statusChanged": EventPayload;
   "idea.voted": EventPayload;
+  "idea.deleted": EventPayload;
   "user.registered": EventPayload;
   "user.profileUpdated": EventPayload;
   "evaluation.completed": EventPayload;

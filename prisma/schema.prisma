@@ -50,6 +50,8 @@ model User {
   createdChannels     Channel[]                   @relation("ChannelCreatedBy")
   channelMemberships  ChannelMember[]
   spaceMemberships    InnovationSpaceMembership[]
+  contributedIdeas    Idea[]                      @relation("IdeaContributor")
+  coAuthoredIdeas     IdeaCoAuthor[]
 
   @@map("users")
 }
@@ -338,6 +340,7 @@ model Campaign {
   createdBy    User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
   members      CampaignMember[]
   kpiSnapshots CampaignKpiSnapshot[]
+  ideas        Idea[]
 
   @@index([status])
   @@index([submissionType])
@@ -455,4 +458,77 @@ model ChannelMember {
   @@index([channelId])
   @@index([userId])
   @@map("channel_members")
+}
+
+// ── Idea Models ─────────────────────────────────────────────
+
+enum IdeaStatus {
+  DRAFT
+  QUALIFICATION
+  COMMUNITY_DISCUSSION
+  HOT
+  EVALUATION
+  SELECTED_IMPLEMENTATION
+  IMPLEMENTED
+  ARCHIVED
+
+  @@map("idea_status")
+}
+
+model Idea {
+  id             String     @id @default(cuid())
+  title          String
+  teaser         String?    @db.Text
+  description    String?    @db.Text
+  status         IdeaStatus @default(DRAFT)
+  previousStatus IdeaStatus? @map("previous_status")
+
+  // Campaign association
+  campaignId String   @map("campaign_id")
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Contributor (author)
+  contributorId String @map("contributor_id")
+  contributor   User   @relation("IdeaContributor", fields: [contributorId], references: [id])
+
+  // Content
+  category           String?
+  tags               String[]  @default([])
+  customFieldValues  Json?     @map("custom_field_values")
+  attachments        Json?
+  isConfidential     Boolean   @default(false) @map("is_confidential")
+  inventionDisclosure Boolean  @default(false) @map("invention_disclosure")
+
+  // Engagement counters (denormalized for performance)
+  likesCount    Int @default(0) @map("likes_count")
+  commentsCount Int @default(0) @map("comments_count")
+  viewsCount    Int @default(0) @map("views_count")
+
+  // Timestamps
+  submittedAt DateTime? @map("submitted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  coAuthors IdeaCoAuthor[]
+
+  @@index([campaignId])
+  @@index([contributorId])
+  @@index([status])
+  @@index([campaignId, status])
+  @@map("ideas")
+}
+
+model IdeaCoAuthor {
+  id     String @id @default(cuid())
+  ideaId String @map("idea_id")
+  userId String @map("user_id")
+
+  idea Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ideaId, userId])
+  @@index([ideaId])
+  @@index([userId])
+  @@map("idea_co_authors")
 }

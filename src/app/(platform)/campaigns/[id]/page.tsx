@@ -9,6 +9,7 @@ import { CampaignLifecycleBar } from "@/components/campaigns/CampaignLifecycleBa
 import { CampaignPhaseControls } from "@/components/campaigns/CampaignPhaseControls";
 import { CampaignCockpit } from "@/components/campaigns/CampaignCockpit";
 import { CopyCampaignButton } from "@/components/campaigns/CopyCampaignButton";
+import { CampaignIdeasTab } from "@/components/ideas/CampaignIdeasTab";
 import { trpc } from "@/lib/trpc";
 
 const TABS = [
@@ -142,13 +143,7 @@ export default function CampaignDetailPage() {
         )}
 
         {activeTab === "ideas" && (
-          <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">
-            <Lightbulb className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Ideas</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Idea management will be available in a future story.
-            </p>
-          </div>
+          <CampaignIdeasTab campaignId={campaign.id} campaignStatus={campaign.status} />
         )}
 
         {activeTab === "evaluation" && (

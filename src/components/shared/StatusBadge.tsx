@@ -10,7 +10,12 @@ type StatusValue =
   | "EVALUATION"
   | "CLOSED"
   | "ACTIVE"
-  | "ARCHIVED";
+  | "ARCHIVED"
+  | "QUALIFICATION"
+  | "COMMUNITY_DISCUSSION"
+  | "HOT"
+  | "SELECTED_IMPLEMENTATION"
+  | "IMPLEMENTED";
 
 const STATUS_CONFIG: Record<StatusValue, { label: string; className: string }> = {
   DRAFT: {
@@ -44,6 +49,26 @@ const STATUS_CONFIG: Record<StatusValue, { label: string; className: string }> =
   ARCHIVED: {
     label: "Archived",
     className: "bg-gray-100 text-gray-500 border-gray-200",
+  },
+  QUALIFICATION: {
+    label: "Qualification",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  COMMUNITY_DISCUSSION: {
+    label: "Community Discussion",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  HOT: {
+    label: "Hot",
+    className: "bg-red-50 text-red-700 border-red-200",
+  },
+  SELECTED_IMPLEMENTATION: {
+    label: "Selected for Implementation",
+    className: "bg-teal-50 text-teal-700 border-teal-200",
+  },
+  IMPLEMENTED: {
+    label: "Implemented",
+    className: "bg-green-50 text-green-700 border-green-200",
   },
 };
 
