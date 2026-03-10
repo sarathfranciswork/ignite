@@ -4,15 +4,13 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import { loginInput, validateCredentials } from "@/server/services/auth.service";
+import { authConfig } from "./auth.config";
 import type { GlobalRole } from "@prisma/client";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-    newUser: "/dashboard",
-  },
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -37,6 +35,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
