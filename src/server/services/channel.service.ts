@@ -4,15 +4,6 @@ import { eventBus } from "@/server/events/event-bus";
 import type { Prisma } from "@prisma/client";
 import type { ChannelCreateInput, ChannelUpdateInput, ChannelListInput } from "./channel.schemas";
 
-export {
-  channelCreateInput,
-  channelUpdateInput,
-  channelListInput,
-  channelGetByIdInput,
-} from "./channel.schemas";
-
-export type { ChannelCreateInput, ChannelUpdateInput, ChannelListInput } from "./channel.schemas";
-
 const childLogger = logger.child({ service: "channel" });
 
 export async function listChannels(input: ChannelListInput) {

@@ -18,9 +18,9 @@ export const channelUpdateInput = z.object({
   hasDiscussionPhase: z.boolean().optional(),
   hasVoting: z.boolean().optional(),
   hasLikes: z.boolean().optional(),
-  votingCriteria: z.unknown().optional(),
-  customFields: z.unknown().optional(),
-  settings: z.unknown().optional(),
+  votingCriteria: z.record(z.string(), z.unknown()).optional().nullable(),
+  customFields: z.record(z.string(), z.unknown()).optional().nullable(),
+  settings: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export const channelListInput = z.object({

@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChannelCard } from "@/components/channels/ChannelCard";
 import { trpc } from "@/lib/trpc";
+import { useDebounce } from "@/hooks/useDebounce";
+import { usePermission } from "@/hooks/usePermission";
+import { Action } from "@/server/lib/permissions";
 
 type ChannelStatusFilter = "ACTIVE" | "ARCHIVED" | undefined;
 
@@ -19,10 +22,12 @@ const STATUS_FILTERS: { label: string; value: ChannelStatusFilter }[] = [
 export default function ChannelsPage() {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<ChannelStatusFilter>(undefined);
+  const debouncedSearch = useDebounce(search, 300);
+  const canCreateChannel = usePermission(Action.CHANNEL_CREATE);
 
   const channelsQuery = trpc.channel.list.useQuery({
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: statusFilter,
   });
 
@@ -35,12 +40,14 @@ export default function ChannelsPage() {
             Always-open spaces for continuous idea collection and discussion.
           </p>
         </div>
-        <Link href="/channels/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Channel
-          </Button>
-        </Link>
+        {canCreateChannel && (
+          <Link href="/channels/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Channel
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -96,7 +103,7 @@ export default function ChannelsPage() {
               ? "Try adjusting your filters."
               : "Get started by creating your first channel."}
           </p>
-          {!search && !statusFilter && (
+          {!search && !statusFilter && canCreateChannel && (
             <Link href="/channels/new" className="mt-4 inline-block">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />

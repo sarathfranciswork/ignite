@@ -1,7 +1,8 @@
 "use client";
 
-import * as React from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Radio } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,40 +11,39 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
+import { channelCreateInput } from "@/server/services/channel.schemas";
+import type { ChannelCreateInput } from "@/server/services/channel.schemas";
 
 export default function NewChannelPage() {
   const router = useRouter();
-  const [title, setTitle] = React.useState("");
-  const [description, setDescription] = React.useState("");
-  const [teaser, setTeaser] = React.useState("");
-  const [problemStatement, setProblemStatement] = React.useState("");
 
-  const createMutation = trpc.channel.create.useMutation();
-  const handleSuccess = React.useCallback(
-    (id: string) => {
-      router.push(`/channels/${id}`);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ChannelCreateInput>({
+    resolver: zodResolver(channelCreateInput),
+    defaultValues: {
+      title: "",
+      teaser: "",
+      description: "",
+      problemStatement: "",
     },
-    [router],
-  );
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const createMutation = trpc.channel.create.useMutation({
+    onSuccess: (data: { id: string }) => {
+      router.push(`/channels/${data.id}`);
+    },
+  });
 
-    if (!title.trim()) return;
-
-    createMutation.mutate(
-      {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        teaser: teaser.trim() || undefined,
-        problemStatement: problemStatement.trim() || undefined,
-      },
-      {
-        onSuccess: (data: { id: string }) => {
-          handleSuccess(data.id);
-        },
-      },
-    );
+  const onSubmit = (data: ChannelCreateInput) => {
+    createMutation.mutate({
+      title: data.title,
+      description: data.description || undefined,
+      teaser: data.teaser || undefined,
+      problemStatement: data.problemStatement || undefined,
+    });
   };
 
   return (
@@ -73,52 +73,59 @@ export default function NewChannelPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="title">
                 Channel Title <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="title"
+                {...register("title")}
                 placeholder="e.g., Sustainability Ideas"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
                 maxLength={200}
-                required
               />
+              {errors.title && (
+                <p className="text-sm text-red-600">{errors.title.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="teaser">Teaser</Label>
               <Input
                 id="teaser"
+                {...register("teaser")}
                 placeholder="Short description shown on channel cards"
-                value={teaser}
-                onChange={(e) => setTeaser(e.target.value)}
                 maxLength={500}
               />
+              {errors.teaser && (
+                <p className="text-sm text-red-600">{errors.teaser.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
+                {...register("description")}
                 placeholder="Detailed description of the channel..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
                 rows={4}
               />
+              {errors.description && (
+                <p className="text-sm text-red-600">{errors.description.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="problemStatement">Problem Statement (optional)</Label>
               <Textarea
                 id="problemStatement"
+                {...register("problemStatement")}
                 placeholder="Describe the problem or challenge this channel addresses..."
-                value={problemStatement}
-                onChange={(e) => setProblemStatement(e.target.value)}
                 rows={3}
               />
+              {errors.problemStatement && (
+                <p className="text-sm text-red-600">{errors.problemStatement.message}</p>
+              )}
               <p className="text-xs text-gray-400">
                 Help contributors understand the context by describing the problem space.
               </p>
@@ -136,7 +143,7 @@ export default function NewChannelPage() {
                   Cancel
                 </Button>
               </Link>
-              <Button type="submit" disabled={!title.trim() || createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create Channel"}
               </Button>
             </div>
