@@ -360,10 +360,7 @@ export async function transitionCampaign(
   const guardFailures = await evaluateTransitionGuards(campaignId, campaign.status, targetStatus);
   if (guardFailures.length > 0) {
     const messages = guardFailures.map((f) => f.message).join("; ");
-    throw new CampaignServiceError(
-      `Transition blocked: ${messages}`,
-      "GUARD_FAILED",
-    );
+    throw new CampaignServiceError(`Transition blocked: ${messages}`, "GUARD_FAILED");
   }
 
   const now = new Date();
@@ -437,10 +434,7 @@ export async function revertCampaignPhase(campaignId: string, actor: string) {
   }
 
   if (!campaign.previousStatus) {
-    throw new CampaignServiceError(
-      "No previous status to revert to",
-      "NO_PREVIOUS_STATUS",
-    );
+    throw new CampaignServiceError("No previous status to revert to", "NO_PREVIOUS_STATUS");
   }
 
   const now = new Date();

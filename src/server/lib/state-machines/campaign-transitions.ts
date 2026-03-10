@@ -90,10 +90,7 @@ export function isValidTransition(
 /**
  * Get the guards required for a specific transition.
  */
-export function getTransitionGuards(
-  from: CampaignStatus,
-  to: CampaignStatus,
-): TransitionGuardId[] {
+export function getTransitionGuards(from: CampaignStatus, to: CampaignStatus): TransitionGuardId[] {
   const key = `${from}->${to}`;
   return TRANSITION_GUARDS[key] ?? [];
 }

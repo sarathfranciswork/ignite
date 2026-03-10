@@ -82,10 +82,7 @@ async function tryAutoTransition(
 ): Promise<boolean> {
   try {
     await transitionCampaign(campaignId, targetStatus, SYSTEM_ACTOR);
-    childLogger.info(
-      { campaignId, title, targetStatus },
-      "Auto-transition succeeded",
-    );
+    childLogger.info({ campaignId, title, targetStatus }, "Auto-transition succeeded");
     return true;
   } catch (error) {
     if (error instanceof CampaignServiceError) {

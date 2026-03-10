@@ -114,11 +114,7 @@ export function CampaignPhaseControls({
           </Button>
         ))}
         {data.canRevert && data.previousStatus && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRevertClick}
-          >
+          <Button variant="outline" size="sm" onClick={handleRevertClick}>
             <Undo2 className="mr-1 h-4 w-4" />
             Revert Phase
           </Button>
@@ -146,9 +142,7 @@ export function CampaignPhaseControls({
 
       <Dialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog((prev) => ({ ...prev, open }))
-        }
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
       >
         <DialogContent onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}>
           <DialogHeader>

@@ -69,15 +69,11 @@ export function CampaignLifecycleBar({
                     isFuture && "border-gray-300 bg-white text-gray-400",
                   )}
                 >
-                  {isCompleted ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <span>{index + 1}</span>
-                  )}
+                  {isCompleted ? <Check className="h-4 w-4" /> : <span>{index + 1}</span>}
                 </div>
                 <span
                   className={cn(
-                    "mt-1.5 text-center text-xs font-medium whitespace-nowrap",
+                    "mt-1.5 whitespace-nowrap text-center text-xs font-medium",
                     isCompleted && "text-green-600",
                     isCurrent && "text-primary-600",
                     isFuture && "text-gray-400",

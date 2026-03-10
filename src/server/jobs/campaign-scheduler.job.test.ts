@@ -70,9 +70,7 @@ describe("campaign-scheduler.job", () => {
 
     it("transitions SUBMISSION campaigns past submissionCloseDate to DISCUSSION_VOTING", async () => {
       campaignFindMany
-        .mockResolvedValueOnce([
-          { id: "campaign-1", title: "Test", hasDiscussionPhase: true },
-        ])
+        .mockResolvedValueOnce([{ id: "campaign-1", title: "Test", hasDiscussionPhase: true }])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -87,9 +85,7 @@ describe("campaign-scheduler.job", () => {
 
     it("transitions SUBMISSION campaigns to EVALUATION when no discussion phase", async () => {
       campaignFindMany
-        .mockResolvedValueOnce([
-          { id: "campaign-1", title: "Test", hasDiscussionPhase: false },
-        ])
+        .mockResolvedValueOnce([{ id: "campaign-1", title: "Test", hasDiscussionPhase: false }])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]);
 
@@ -105,9 +101,7 @@ describe("campaign-scheduler.job", () => {
     it("transitions DISCUSSION_VOTING campaigns past votingCloseDate", async () => {
       campaignFindMany
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: "campaign-2", title: "Voting Campaign" },
-        ])
+        .mockResolvedValueOnce([{ id: "campaign-2", title: "Voting Campaign" }])
         .mockResolvedValueOnce([]);
 
       const result = await checkScheduledTransitions();
@@ -123,9 +117,7 @@ describe("campaign-scheduler.job", () => {
       campaignFindMany
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { id: "campaign-3", title: "Eval Campaign" },
-        ]);
+        .mockResolvedValueOnce([{ id: "campaign-3", title: "Eval Campaign" }]);
 
       const result = await checkScheduledTransitions();
       expect(result).toBe(1);

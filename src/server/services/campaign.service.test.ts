@@ -53,9 +53,7 @@ vi.mock("@/server/lib/state-machines/transition-engine", () => ({
 
 const { prisma } = await import("@/server/lib/prisma");
 const { eventBus } = await import("@/server/events/event-bus");
-const { evaluateTransitionGuards } = await import(
-  "@/server/lib/state-machines/transition-engine"
-);
+const { evaluateTransitionGuards } = await import("@/server/lib/state-machines/transition-engine");
 
 const campaignFindUnique = prisma.campaign.findUnique as unknown as Mock;
 const campaignFindMany = prisma.campaign.findMany as unknown as Mock;

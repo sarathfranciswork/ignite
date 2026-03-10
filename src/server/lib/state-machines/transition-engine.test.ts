@@ -62,7 +62,11 @@ describe("transition-engine", () => {
     });
 
     it("returns empty array for SUBMISSION -> DISCUSSION_VOTING (idea guard passes by default)", async () => {
-      const failures = await evaluateTransitionGuards("campaign-1", "SUBMISSION", "DISCUSSION_VOTING");
+      const failures = await evaluateTransitionGuards(
+        "campaign-1",
+        "SUBMISSION",
+        "DISCUSSION_VOTING",
+      );
       expect(failures).toEqual([]);
     });
 
