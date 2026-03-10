@@ -1,0 +1,164 @@
+# generated: 2026-03-10
+# project: ignite
+# project_key: NOKEY
+# tracking_system: github-issues
+# story_location: https://github.com/sarathfrancis90/ignite/issues
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story exists as GitHub Issue
+#   - ready-for-dev: Story assigned to Claude for implementation
+#   - in-progress: Claude actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed and merged
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+generated: 2026-03-10
+project: ignite
+project_key: NOKEY
+tracking_system: github-issues
+story_location: https://github.com/sarathfrancis90/ignite/issues
+
+development_status:
+  # === Phase 1: The Ideation Engine (MVP) ===
+
+  epic-1: backlog # #3
+  1-1-project-scaffold-docker-compose-platform-shell: backlog # #19
+  1-2-user-registration-authentication-profile: backlog # #20
+  1-3-rbac-middleware-permission-system: backlog # #21
+  1-4-organizational-unit-management: backlog # #22
+  1-5-user-group-administration: backlog # #23
+  1-6-health-monitoring-observability: backlog # #24
+  epic-1-retrospective: optional
+
+  epic-2: backlog # #4
+  2-1-campaign-data-model-simple-setup-pages: backlog # #25
+  2-2a-advanced-campaign-wizard-content-forms: backlog # #26
+  2-2b-advanced-campaign-wizard-process-community: backlog # #27
+  2-3-campaign-lifecycle-state-machine: backlog # #28
+  2-4-campaign-cockpit-kpis: backlog # #29
+  2-5-campaign-copy-sponsor-view: backlog # #30
+  epic-2-retrospective: optional
+
+  epic-3: backlog # #5
+  3-1-idea-submission-detail-page-campaign-list: backlog # #31
+  3-2-idea-lifecycle-state-machine-coach-qualification: backlog # #32
+  3-3-comments-mentions-moderation: backlog # #33
+  3-4-voting-likes-realtime-engagement: backlog # #34
+  3-5-community-graduation-hot-activity-stream: backlog # #35
+  epic-3-retrospective: optional
+
+  epic-4: backlog # #6
+  4-1-idea-board-table-view-filtering: backlog # #36
+  4-2-manual-buckets-smart-buckets: backlog # #37
+  4-3-idea-split-merge-bulk-actions: backlog # #38
+  4-4-dual-window-comparison-mode: backlog # #39
+  epic-4-retrospective: optional
+
+  epic-5: backlog # #7
+  5-1-evaluation-session-creation-configuration: backlog # #40
+  5-2-scorecard-evaluation-flow: backlog # #41
+  5-3-pairwise-evaluation-flow: backlog # #42
+  5-4-results-engine-bubble-chart-shortlist: backlog # #43
+  epic-5-retrospective: optional
+
+  epic-6: backlog # #8
+  6-1-channel-creation-management: backlog # #44
+  6-2-in-app-notification-center: backlog # #45
+  6-3-email-notifications-digest-system: backlog # #46
+  epic-6-retrospective: optional
+
+  epic-7: backlog # #9
+  7-1-full-text-search-explore-views: backlog # #47
+  7-2-ai-embedding-pipeline-similarity-detection: backlog # #48
+  7-3-ai-idea-enrichment-co-pilot: backlog # #49
+  7-4-ai-smart-summarization: backlog # #50
+  epic-7-retrospective: optional
+
+  epic-8: backlog # #10
+  8-1-dedicated-admin-panel: backlog # #51
+  8-2-notification-templates-platform-customization: backlog # #52
+  8-3-personalized-user-dashboard: backlog # #53
+  epic-8-retrospective: optional
+
+  # === Phase 2: Strategy & Partners ===
+
+  epic-9: backlog # #11
+  9-1-strategic-innovation-areas: backlog # #54
+  9-2-trends-database-mega-macro-micro: backlog # #55
+  9-3-technologies-database: backlog # #56
+  9-4-community-insights: backlog # #57
+  9-5-innovation-portfolios: backlog # #58
+  9-6-campaign-sia-linking-be-inspired: backlog # #59
+  9-7-web-clipper-browser-extension: backlog # #60
+  epic-9-retrospective: optional
+
+  epic-10: backlog # #12
+  10-1-organization-database-contact-management: backlog # #61
+  10-2-use-case-pipeline-task-board: backlog # #62
+  10-3-scouting-boards: backlog # #63
+  10-4-scouting-missions-partnering-campaigns: backlog # #64
+  10-5-organization-search-duplicate-detection: backlog # #65
+  epic-10-retrospective: optional
+
+  epic-11: backlog # #13
+  11-1-external-user-access-guest-submissions: backlog # #66
+  11-2-confidential-ideas-organizations: backlog # #67
+  11-3-communication-hub-segmented-email: backlog # #72
+  11-4-webhook-system-rest-api: backlog # #69
+  11-5-adhoc-oneteam-evaluation-generic-submissions: backlog # #70
+  11-6-kubernetes-helm-chart: backlog # #71
+  epic-11-retrospective: optional
+
+  # === Phase 3: Value Creation ===
+
+  epic-12: backlog # #14
+  12-1-project-data-model-process-designer: backlog # #73
+  12-2-phase-lifecycle-gatekeeper-decisions: backlog # #74
+  12-3-activity-task-management: backlog # #75
+  12-4-concepts-lightweight-phase-gate: backlog # #76
+  12-5-idea-to-project-traceability-dashboard: backlog # #77
+  epic-12-retrospective: optional
+
+  epic-13: backlog # #15
+  13-1-portfolio-analyzer: backlog # #78
+  13-2-campaign-comparison-success-factors: backlog # #79
+  13-3-excel-export-custom-reports: backlog # #80
+  13-4-partnering-organization-reports: backlog # #81
+  epic-13-retrospective: optional
+
+  # === Phase 4: Enterprise & Advanced AI ===
+
+  epic-14: backlog # #16
+  14-1-innovation-spaces-multi-tenancy: backlog # #82
+  14-2-ldap-saml-sso: backlog # #83
+  14-3-scim-user-provisioning: backlog # #84
+  14-4-2fa-session-management: backlog # #85
+  14-5-comprehensive-audit-log: backlog # #86
+  epic-14-retrospective: optional
+
+  epic-15: backlog # #17
+  15-1-crunchbase-organization-import: backlog # #87
+  15-2-microsoft-teams-integration: backlog # #88
+  15-3-slack-integration: backlog # #89
+  15-4-jira-azure-devops-sync: backlog # #90
+  15-5-bi-connectors-tableau-powerbi: backlog # #91
+  15-6-advanced-ai-predictive-scoring-scouting: backlog # #92
+  epic-15-retrospective: optional
+
+  epic-16: backlog # #18
+  16-1-white-labeling: backlog # #93
+  16-2-pwa-push-notifications: backlog # #94
+  16-3-data-residency-gdpr-ip-whitelisting: backlog # #95
+  16-4-multilingual-support-translation: backlog # #96
+  16-5-gamification-discussion-perspectives: backlog # #97
+  epic-16-retrospective: optional
