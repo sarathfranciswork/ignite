@@ -7,6 +7,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
  * The full auth config in auth.ts extends this with adapter and authorize logic.
  */
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
@@ -42,7 +43,8 @@ export const authConfig: NextAuthConfig = {
 
       // Admin routes require PLATFORM_ADMIN or INNOVATION_MANAGER role
       if (pathname.startsWith("/admin")) {
-        const role = (auth?.user as Record<string, unknown> | undefined)?.globalRole;
+        const user = auth?.user;
+        const role = user && "globalRole" in user ? user.globalRole : undefined;
         if (role !== "PLATFORM_ADMIN" && role !== "INNOVATION_MANAGER") {
           return Response.redirect(new URL("/dashboard", nextUrl.origin));
         }
