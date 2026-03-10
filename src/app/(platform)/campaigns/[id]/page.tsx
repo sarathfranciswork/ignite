@@ -6,6 +6,7 @@ import { Lightbulb, BarChart3, Settings, LayoutDashboard, MessageSquare } from "
 import { CampaignHeader } from "@/components/campaigns/CampaignHeader";
 import { CampaignLifecycleBar } from "@/components/campaigns/CampaignLifecycleBar";
 import { CampaignPhaseControls } from "@/components/campaigns/CampaignPhaseControls";
+import { CampaignCockpit } from "@/components/campaigns/CampaignCockpit";
 import { trpc } from "@/lib/trpc";
 
 const TABS = [
@@ -147,15 +148,7 @@ export default function CampaignDetailPage() {
           </div>
         )}
 
-        {activeTab === "cockpit" && (
-          <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">
-            <MessageSquare className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Cockpit</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Campaign KPI dashboard will be available in a future story.
-            </p>
-          </div>
-        )}
+        {activeTab === "cockpit" && <CampaignCockpit campaignId={campaign.id} />}
 
         {activeTab === "settings" && (
           <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">

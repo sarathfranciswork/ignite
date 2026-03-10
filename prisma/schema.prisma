@@ -332,8 +332,9 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy User @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  members   CampaignMember[]
+  createdBy    User @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  members      CampaignMember[]
+  kpiSnapshots CampaignKpiSnapshot[]
 
   @@index([status])
   @@index([submissionType])
@@ -357,4 +358,38 @@ model CampaignMember {
   @@index([campaignId])
   @@index([userId])
   @@map("campaign_members")
+}
+
+// ── KPI Snapshot Models ─────────────────────────────────────
+
+model CampaignKpiSnapshot {
+  id                String   @id @default(cuid())
+  campaignId        String   @map("campaign_id")
+  snapshotDate      DateTime @map("snapshot_date")
+
+  // Engagement metrics
+  totalViews        Int      @default(0) @map("total_views")
+  uniqueVisitors    Int      @default(0) @map("unique_visitors")
+  totalParticipants Int      @default(0) @map("total_participants")
+
+  // Idea funnel
+  ideasSubmitted    Int      @default(0) @map("ideas_submitted")
+  ideasQualified    Int      @default(0) @map("ideas_qualified")
+  ideasHot          Int      @default(0) @map("ideas_hot")
+  ideasEvaluated    Int      @default(0) @map("ideas_evaluated")
+  ideasSelected     Int      @default(0) @map("ideas_selected")
+
+  // Activity counters
+  totalComments     Int      @default(0) @map("total_comments")
+  totalVotes        Int      @default(0) @map("total_votes")
+  totalLikes        Int      @default(0) @map("total_likes")
+
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, snapshotDate])
+  @@index([campaignId])
+  @@index([snapshotDate])
+  @@map("campaign_kpi_snapshots")
 }
