@@ -45,6 +45,8 @@ model User {
   sessions            Session[]
   userGroupMembership UserGroupMembership[]
   orgUnitAssignments  UserOrgUnit[]
+  sponsoredCampaigns  Campaign[] @relation("CampaignSponsor")
+  createdCampaigns    Campaign[] @relation("CampaignCreator")
 
   @@map("users")
 }
@@ -173,4 +175,44 @@ model UserGroupMembership {
 
   @@unique([userId, groupId])
   @@map("user_group_memberships")
+}
+
+// ── Campaign Models ──────────────────────────────────────────
+
+enum CampaignStatus {
+  DRAFT
+  SEEDING
+  SUBMISSION
+  DISCUSSION_VOTING
+  EVALUATION
+  CLOSED
+
+  @@map("campaign_status")
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  title           String
+  description     String?        @db.Text
+  teaser          String?
+  bannerUrl       String?        @map("banner_url")
+  status          CampaignStatus @default(DRAFT)
+  previousStatus  CampaignStatus? @map("previous_status")
+  startDate       DateTime?      @map("start_date")
+  endDate         DateTime?      @map("end_date")
+  sponsorId       String?        @map("sponsor_id")
+  tags            String[]       @default([])
+  isConfidential  Boolean        @default(false) @map("is_confidential")
+  settings        Json           @default("{}")
+  createdById     String         @map("created_by_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  sponsor   User?  @relation("CampaignSponsor", fields: [sponsorId], references: [id], onDelete: SetNull)
+  createdBy User   @relation("CampaignCreator", fields: [createdById], references: [id])
+
+  @@index([status])
+  @@index([createdById])
+  @@index([sponsorId])
+  @@map("campaigns")
 }

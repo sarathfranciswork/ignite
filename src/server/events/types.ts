@@ -9,6 +9,7 @@ export interface EventPayload {
 export interface EventMap {
   "campaign.created": EventPayload;
   "campaign.updated": EventPayload;
+  "campaign.deleted": EventPayload;
   "campaign.phaseChanged": EventPayload;
   "idea.submitted": EventPayload;
   "idea.updated": EventPayload;
