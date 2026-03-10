@@ -38,6 +38,7 @@ export default function ChannelDetailPage() {
   }
 
   const channel = channelQuery.data;
+  if (!channel) return null;
 
   return (
     <div className="space-y-6">
