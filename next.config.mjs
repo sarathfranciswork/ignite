@@ -2,6 +2,7 @@
 const config = {
   output: "standalone",
   reactStrictMode: true,
+  poweredByHeader: false,
   eslint: {
     ignoreDuringBuilds: false,
   },
@@ -26,6 +27,10 @@ const config = {
         {
           key: "Permissions-Policy",
           value: "camera=(), microphone=(), geolocation=()",
+        },
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
         },
       ],
     },
