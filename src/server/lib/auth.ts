@@ -1,15 +1,9 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { compare } from "bcryptjs";
-import { z } from "zod";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
+import { loginInput, validateCredentials } from "@/server/services/auth.service";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -26,34 +20,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const parsed = loginSchema.safeParse(credentials);
+        const parsed = loginInput.safeParse(credentials);
         if (!parsed.success) {
           return null;
         }
 
-        const { email, password } = parsed.data;
+        const user = await validateCredentials(parsed.data.email, parsed.data.password);
 
-        const user = await prisma.user.findUnique({
-          where: { email: email.toLowerCase() },
-        });
-
-        if (!user?.password) {
-          return null;
+        if (user) {
+          logger.info({ userId: user.id }, "User authenticated via credentials");
         }
 
-        const isValid = await compare(password, user.password);
-        if (!isValid) {
-          return null;
-        }
-
-        logger.info({ userId: user.id }, "User authenticated via credentials");
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
+        return user;
       },
     }),
   ],
@@ -65,8 +43,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.id && session.user) {
-        session.user.id = token.id as string;
+      if (typeof token.id === "string" && session.user) {
+        session.user.id = token.id;
       }
       return session;
     },

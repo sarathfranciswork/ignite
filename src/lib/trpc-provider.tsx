@@ -4,7 +4,7 @@ import { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { trpc } from "./trpc";
-import { getQueryClient } from "@/server/trpc/query-client";
+import { getQueryClient } from "@/lib/query-client";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";

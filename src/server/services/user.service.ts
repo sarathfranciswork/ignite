@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
-import type { NotificationFrequency } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 export const updateProfileInput = z.object({
   name: z.string().min(1, "Name is required").max(100).optional(),
@@ -38,13 +38,13 @@ export async function getUserProfile(userId: string) {
 }
 
 export async function updateUserProfile(userId: string, input: UpdateProfileInput) {
-  const data: Record<string, unknown> = {};
+  const data: Prisma.UserUpdateInput = {};
 
   if (input.name !== undefined) data.name = input.name;
   if (input.bio !== undefined) data.bio = input.bio;
   if (input.skills !== undefined) data.skills = input.skills;
   if (input.notificationFrequency !== undefined)
-    data.notificationFrequency = input.notificationFrequency as NotificationFrequency;
+    data.notificationFrequency = input.notificationFrequency;
   if (input.image !== undefined) data.image = input.image;
 
   const user = await prisma.user.update({

@@ -7,6 +7,7 @@ import {
   UserServiceError,
 } from "@/server/services/user.service";
 
+// TODO(story-1.4): Add requirePermission middleware to all procedures
 export const userRouter = createTRPCRouter({
   getProfile: protectedProcedure.query(async ({ ctx }) => {
     try {
