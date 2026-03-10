@@ -1,0 +1,82 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// MODULE: ORGANIZATIONS (Partner Scouting)
+// ============================================================
+
+model Organization {
+  id                 String                @id @default(cuid())
+  name               String
+  description        String?
+  websiteUrl         String?
+  logoUrl            String?
+  industry           String?
+  location           String?
+  foundedYear        Int?
+  employeeCount      String? // range like "11-50"
+  fundingStage       String?
+  fundingTotal       String?
+
+  relationshipStatus OrgRelationshipStatus @default(IDENTIFIED)
+  ndaStatus          NdaStatus             @default(NONE)
+  isConfidential     Boolean               @default(false)
+  isArchived         Boolean               @default(false)
+
+  // External IDs
+  crunchbaseId       String?               @unique
+  innospotId         String?
+
+  // Custom fields
+  customFields       Json?
+
+  // Management team info (from Crunchbase)
+  managementTeam     Json?
+
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  activities         OrganizationActivity[]
+
+  @@index([relationshipStatus])
+  @@index([name])
+  @@index([websiteUrl])
+}
+
+model OrganizationActivity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  action         String // CREATED, IMPORTED, ENRICHED, UPDATED, ARCHIVED
+  changes        Json? // { field: { old: value, new: value } }
+  source         String? // "crunchbase", "manual", "enrichment_job"
+
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+}
+
+enum OrgRelationshipStatus {
+  IDENTIFIED
+  VERIFIED
+  QUALIFIED
+  EVALUATION
+  PILOT
+  PARTNERSHIP
+  ARCHIVED
+}
+
+enum NdaStatus {
+  NONE
+  REQUESTED
+  SIGNED
+  EXPIRED
+}
