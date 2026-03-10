@@ -1,8 +1,13 @@
 import { logger } from "./logger";
 
-const REDIS_AVAILABLE = !!process.env.REDIS_URL;
+const REDIS_URL_CONFIGURED = !!process.env.REDIS_URL;
 
 const childLogger = logger.child({ service: "redis" });
+
+// TODO: Implement actual Redis client connection when needed.
+// Until a real Redis client is integrated, all cache operations
+// use the in-memory fallback regardless of REDIS_URL being set.
+const redisConnected = false;
 
 interface CacheEntry {
   value: string;
@@ -32,8 +37,8 @@ function ensureCleanup(): void {
 }
 
 export async function cacheGet(key: string): Promise<string | null> {
-  if (REDIS_AVAILABLE) {
-    // TODO: Redis client integration when REDIS_URL is configured
+  if (redisConnected) {
+    // TODO: Redis client GET when connected
     return null;
   }
 
@@ -49,8 +54,8 @@ export async function cacheGet(key: string): Promise<string | null> {
 }
 
 export async function cacheSet(key: string, value: string, ttlSeconds: number): Promise<void> {
-  if (REDIS_AVAILABLE) {
-    // TODO: Redis client integration when REDIS_URL is configured
+  if (redisConnected) {
+    // TODO: Redis client SET when connected
     return;
   }
 
@@ -62,8 +67,8 @@ export async function cacheSet(key: string, value: string, ttlSeconds: number): 
 }
 
 export async function cacheDel(key: string): Promise<void> {
-  if (REDIS_AVAILABLE) {
-    // TODO: Redis client integration when REDIS_URL is configured
+  if (redisConnected) {
+    // TODO: Redis client DEL when connected
     return;
   }
 
@@ -71,8 +76,8 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 export async function cacheDelPattern(pattern: string): Promise<void> {
-  if (REDIS_AVAILABLE) {
-    // TODO: Redis client SCAN + DEL for pattern matching
+  if (redisConnected) {
+    // TODO: Redis client SCAN + DEL when connected
     return;
   }
 
@@ -89,7 +94,7 @@ export function clearMemoryCache(): void {
 }
 
 export function isRedisAvailable(): boolean {
-  return REDIS_AVAILABLE;
+  return REDIS_URL_CONFIGURED;
 }
 
-childLogger.info({ redisAvailable: REDIS_AVAILABLE }, "Cache initialized");
+childLogger.info({ redisUrlConfigured: REDIS_URL_CONFIGURED, redisConnected }, "Cache initialized");
