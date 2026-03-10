@@ -1,0 +1,2850 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ignite - Design Direction Mockups</title>
+    <style>
+      :root {
+        --primary-50: #eef2ff;
+        --primary-500: #6366f1;
+        --primary-600: #4f46e5;
+        --primary-700: #4338ca;
+        --accent-500: #f59e0b;
+        --accent-600: #d97706;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --error: #ef4444;
+        --info: #3b82f6;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-400: #9ca3af;
+        --gray-500: #6b7280;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --gray-900: #111827;
+        --gray-950: #030712;
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --radius-xl: 12px;
+        --radius-full: 9999px;
+        --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+        --shadow-sm:
+          0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+        --shadow-md:
+          0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+        --shadow-lg:
+          0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--gray-950);
+        color: var(--gray-200);
+        line-height: 1.5;
+      }
+
+      /* --- Showcase Navigation --- */
+      .showcase-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: var(--gray-900);
+        border-bottom: 1px solid var(--gray-800);
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        overflow-x: auto;
+      }
+      .showcase-nav h1 {
+        font-family: "Satoshi", system-ui, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: white;
+        white-space: nowrap;
+        margin-right: 8px;
+      }
+      .showcase-nav .sep {
+        width: 1px;
+        height: 24px;
+        background: var(--gray-700);
+        flex-shrink: 0;
+      }
+      .dir-btn {
+        padding: 6px 14px;
+        border-radius: var(--radius-full);
+        border: 1px solid var(--gray-700);
+        background: transparent;
+        color: var(--gray-300);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.15s;
+      }
+      .dir-btn:hover {
+        border-color: var(--primary-500);
+        color: white;
+      }
+      .dir-btn.active {
+        background: var(--primary-500);
+        border-color: var(--primary-500);
+        color: white;
+      }
+
+      /* --- Direction Panels --- */
+      .direction {
+        display: none;
+        margin-top: 56px;
+        min-height: calc(100vh - 56px);
+      }
+      .direction.active {
+        display: block;
+      }
+
+      .dir-header {
+        padding: 32px 40px;
+        border-bottom: 1px solid var(--gray-800);
+        background: linear-gradient(135deg, var(--gray-900), var(--gray-950));
+      }
+      .dir-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 4px;
+      }
+      .dir-header p {
+        font-size: 14px;
+        color: var(--gray-400);
+        max-width: 720px;
+      }
+      .dir-tags {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .dir-tag {
+        padding: 3px 10px;
+        border-radius: var(--radius-full);
+        background: var(--gray-800);
+        color: var(--gray-300);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      /* --- Mockup Frame --- */
+      .mockup-frame {
+        margin: 24px 40px;
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--gray-800);
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        background: var(--gray-50);
+      }
+
+      /* --- Shared Sidebar --- */
+      .sidebar {
+        width: 260px;
+        background: var(--gray-900);
+        color: var(--gray-300);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 640px;
+        border-right: 1px solid var(--gray-800);
+      }
+      .sidebar-logo {
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--gray-800);
+      }
+      .sidebar-logo .logo-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-md);
+        background: linear-gradient(
+          135deg,
+          var(--primary-500),
+          var(--accent-500)
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        color: white;
+      }
+      .sidebar-logo span {
+        font-weight: 700;
+        font-size: 16px;
+        color: white;
+      }
+      .sidebar-nav {
+        padding: 12px 8px;
+        flex: 1;
+      }
+      .nav-section {
+        margin-bottom: 16px;
+      }
+      .nav-section-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--gray-500);
+        padding: 4px 12px;
+        margin-bottom: 4px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 12px;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        color: var(--gray-400);
+        cursor: pointer;
+        transition: all 0.1s;
+      }
+      .nav-item:hover {
+        background: var(--gray-800);
+        color: white;
+      }
+      .nav-item.active {
+        background: var(--primary-500);
+        background: rgba(99, 102, 241, 0.15);
+        color: white;
+      }
+      .nav-item .icon {
+        width: 16px;
+        text-align: center;
+        font-size: 14px;
+      }
+      .nav-item .badge {
+        margin-left: auto;
+        background: var(--primary-500);
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: var(--radius-full);
+      }
+      .sidebar-user {
+        padding: 12px 16px;
+        border-top: 1px solid var(--gray-800);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-full);
+        background: var(--primary-600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .sidebar-user .name {
+        font-size: 13px;
+        color: var(--gray-300);
+      }
+      .sidebar-user .role {
+        font-size: 11px;
+        color: var(--gray-500);
+      }
+
+      /* --- Content Area Common --- */
+      .content {
+        flex: 1;
+        background: var(--gray-50);
+        overflow: hidden;
+      }
+      .app-layout {
+        display: flex;
+        height: 100%;
+        min-height: 640px;
+      }
+      .content-header {
+        padding: 20px 24px 16px;
+        border-bottom: 1px solid var(--gray-200);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .content-header h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--gray-800);
+      }
+      .breadcrumb {
+        font-size: 12px;
+        color: var(--gray-500);
+        margin-bottom: 4px;
+      }
+
+      /* --- Buttons --- */
+      .btn {
+        padding: 7px 14px;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        transition: all 0.1s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-primary {
+        background: var(--primary-500);
+        color: white;
+      }
+      .btn-primary:hover {
+        background: var(--primary-600);
+      }
+      .btn-secondary {
+        background: white;
+        color: var(--gray-700);
+        border: 1px solid var(--gray-200);
+      }
+      .btn-secondary:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-300);
+      }
+
+      /* --- Cards --- */
+      .card {
+        background: white;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--gray-200);
+        box-shadow: var(--shadow-xs);
+        transition: all 0.15s;
+      }
+      .card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+      }
+
+      /* --- Status Badges --- */
+      .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: var(--radius-full);
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .badge-active {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary-600);
+      }
+      .badge-hot {
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        color: white;
+      }
+      .badge-eval {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--info);
+      }
+      .badge-selected {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+      }
+      .badge-draft {
+        background: var(--gray-100);
+        color: var(--gray-500);
+        border: 1px solid var(--gray-200);
+      }
+
+      /* --- KPI Cards --- */
+      .kpi-card {
+        padding: 16px;
+      }
+      .kpi-label {
+        font-size: 12px;
+        color: var(--gray-500);
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      .kpi-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--gray-800);
+      }
+      .kpi-trend {
+        font-size: 12px;
+        font-weight: 500;
+        margin-top: 2px;
+      }
+      .kpi-trend.up {
+        color: var(--success);
+      }
+      .kpi-trend.down {
+        color: var(--error);
+      }
+
+      /* --- Progress Bar --- */
+      .progress-bar {
+        height: 4px;
+        background: var(--gray-200);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.3s;
+      }
+      .progress-fill.primary {
+        background: var(--primary-500);
+      }
+      .progress-fill.accent {
+        background: var(--accent-500);
+      }
+      .progress-fill.success {
+        background: var(--success);
+      }
+
+      /* --- Idea Cards --- */
+      .idea-card {
+        padding: 14px 16px;
+      }
+      .idea-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 6px;
+      }
+      .idea-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--gray-500);
+      }
+      .idea-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .vote-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-md);
+        background: white;
+        font-size: 12px;
+        color: var(--gray-500);
+        cursor: pointer;
+      }
+      .vote-btn:hover {
+        border-color: var(--primary-500);
+        color: var(--primary-500);
+      }
+
+      /* --- Campaign Cards --- */
+      .campaign-card {
+        overflow: hidden;
+      }
+      .campaign-banner {
+        height: 64px;
+        position: relative;
+      }
+      .campaign-banner.indigo {
+        background: linear-gradient(
+          135deg,
+          var(--primary-500),
+          var(--primary-700)
+        );
+      }
+      .campaign-banner.amber {
+        background: linear-gradient(
+          135deg,
+          var(--accent-500),
+          var(--accent-600)
+        );
+      }
+      .campaign-banner.emerald {
+        background: linear-gradient(135deg, #10b981, #059669);
+      }
+      .campaign-banner.blue {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+      }
+      .campaign-body {
+        padding: 14px 16px;
+      }
+      .campaign-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 4px;
+      }
+      .campaign-desc {
+        font-size: 12px;
+        color: var(--gray-500);
+        margin-bottom: 10px;
+      }
+      .campaign-stats {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: var(--gray-500);
+      }
+      .campaign-stat {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .campaign-stat strong {
+        color: var(--gray-700);
+      }
+
+      /* --- Activity Feed --- */
+      .activity-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--gray-100);
+      }
+      .activity-item:last-child {
+        border-bottom: none;
+      }
+      .activity-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-full);
+        flex-shrink: 0;
+      }
+      .activity-text {
+        font-size: 13px;
+        color: var(--gray-700);
+      }
+      .activity-text strong {
+        color: var(--gray-800);
+      }
+      .activity-time {
+        font-size: 11px;
+        color: var(--gray-400);
+        margin-top: 2px;
+      }
+
+      /* --- Table --- */
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .data-table th {
+        text-align: left;
+        padding: 8px 12px;
+        font-weight: 600;
+        color: var(--gray-500);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--gray-200);
+      }
+      .data-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--gray-100);
+        color: var(--gray-700);
+      }
+      .data-table tr:hover td {
+        background: var(--gray-50);
+      }
+
+      /* --- Evaluation Split Pane --- */
+      .eval-layout {
+        display: flex;
+        height: 100%;
+      }
+      .eval-left {
+        flex: 0.6;
+        border-right: 1px solid var(--gray-200);
+        overflow-y: auto;
+        padding: 20px 24px;
+      }
+      .eval-right {
+        flex: 0.4;
+        padding: 20px 24px;
+        background: var(--gray-50);
+      }
+      .eval-progress {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        background: white;
+        border-bottom: 1px solid var(--gray-200);
+      }
+      .eval-progress-text {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--gray-700);
+      }
+      .score-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .score-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--gray-700);
+        min-width: 100px;
+      }
+      .score-slider {
+        flex: 1;
+        height: 6px;
+        background: var(--gray-200);
+        border-radius: 3px;
+        position: relative;
+        cursor: pointer;
+      }
+      .score-slider .fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        border-radius: 3px;
+        background: var(--primary-500);
+      }
+      .score-slider .thumb {
+        position: absolute;
+        top: -5px;
+        width: 16px;
+        height: 16px;
+        border-radius: var(--radius-full);
+        background: white;
+        border: 2px solid var(--primary-500);
+        box-shadow: var(--shadow-sm);
+      }
+      .score-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--primary-600);
+        min-width: 24px;
+        text-align: right;
+      }
+
+      /* --- Direction-specific --- */
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 16px;
+      }
+      .grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .flex-col {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .pad-20 {
+        padding: 20px 24px;
+      }
+      .pad-16 {
+        padding: 16px;
+      }
+
+      /* --- Kanban Board --- */
+      .kanban {
+        display: flex;
+        gap: 16px;
+        padding: 20px 24px;
+        overflow-x: auto;
+        height: calc(100% - 60px);
+      }
+      .kanban-col {
+        min-width: 280px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .kanban-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+      }
+      .kanban-header h4 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--gray-700);
+      }
+      .kanban-count {
+        font-size: 12px;
+        color: var(--gray-400);
+        font-weight: 500;
+      }
+      .kanban-cards {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      /* --- Comparison bar --- */
+      .comparison-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: var(--gray-900);
+        border-top: 1px solid var(--gray-800);
+        padding: 10px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+      .comparison-bar span {
+        font-size: 13px;
+        color: var(--gray-400);
+      }
+      .comparison-bar .check-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--gray-300);
+        cursor: pointer;
+      }
+      .comparison-bar input[type="checkbox"] {
+        accent-color: var(--primary-500);
+      }
+
+      /* --- Graduation Meter --- */
+      .grad-meter {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .grad-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .grad-label {
+        font-size: 11px;
+        color: var(--gray-500);
+        min-width: 60px;
+      }
+      .grad-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--gray-200);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .grad-fill {
+        height: 100%;
+        border-radius: 3px;
+      }
+      .grad-fill.votes {
+        background: var(--primary-500);
+      }
+      .grad-fill.comments {
+        background: var(--info);
+      }
+      .grad-fill.views {
+        background: var(--success);
+      }
+
+      /* --- Cockpit Charts Placeholder --- */
+      .chart-placeholder {
+        background: var(--gray-50);
+        border: 1px dashed var(--gray-300);
+        border-radius: var(--radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--gray-400);
+        font-size: 13px;
+        min-height: 160px;
+      }
+
+      /* --- Responsive note --- */
+      .mobile-note {
+        display: none;
+        padding: 20px;
+        text-align: center;
+        font-size: 14px;
+        color: var(--gray-400);
+      }
+      @media (max-width: 768px) {
+        .mockup-frame {
+          margin: 16px;
+        }
+        .mobile-note {
+          display: block;
+        }
+        .app-layout {
+          flex-direction: column;
+        }
+        .sidebar {
+          width: 100%;
+          min-height: auto;
+          flex-direction: row;
+          overflow-x: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Showcase Navigation -->
+    <nav class="showcase-nav">
+      <h1>Ignite</h1>
+      <div class="sep"></div>
+      <button class="dir-btn active" onclick="showDir(0)">
+        1. Compact Linear
+      </button>
+      <button class="dir-btn" onclick="showDir(1)">2. Card Gallery</button>
+      <button class="dir-btn" onclick="showDir(2)">3. Command Center</button>
+      <button class="dir-btn" onclick="showDir(3)">4. Activity Stream</button>
+      <button class="dir-btn" onclick="showDir(4)">5. Kanban Flow</button>
+      <button class="dir-btn" onclick="showDir(5)">6. Evaluation Focus</button>
+    </nav>
+
+    <!-- DIRECTION 1: Compact Linear -->
+    <div class="direction active" id="dir-0">
+      <div class="dir-header">
+        <h2>Direction 1: Compact Linear</h2>
+        <p>
+          Dense, list-focused layout inspired by Linear. Maximum information
+          density with clean typography. Power users can scan 50+ ideas without
+          scrolling. Keyboard-first navigation with Cmd+K as primary wayfinding.
+        </p>
+        <div class="dir-tags">
+          <span class="dir-tag">High Density</span>
+          <span class="dir-tag">List View</span>
+          <span class="dir-tag">Keyboard-First</span>
+          <span class="dir-tag">Linear Inspired</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="app-layout">
+          <!-- Sidebar -->
+          <div class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">I</div>
+              <span>Ignite</span>
+            </div>
+            <div class="sidebar-nav">
+              <div class="nav-section">
+                <div class="nav-item active">
+                  <span class="icon">&#9776;</span> Dashboard
+                  <span class="badge">3</span>
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9733;</span> Campaigns
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#128270;</span> Explore
+                </div>
+              </div>
+              <div class="nav-section">
+                <div class="nav-section-label">My Work</div>
+                <div class="nav-item">
+                  <span class="icon">&#9997;</span> My Ideas
+                  <span class="badge">12</span>
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9745;</span> Evaluations
+                  <span class="badge">25</span>
+                </div>
+              </div>
+              <div class="nav-section">
+                <div class="nav-section-label">Campaigns</div>
+                <div class="nav-item">
+                  <span class="icon">&#9679;</span> Q1 Cost Reduction
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9679;</span> Green Innovation
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9675;</span> Customer UX
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-user">
+              <div class="avatar">SM</div>
+              <div>
+                <div class="name">Sarah Mitchell</div>
+                <div class="role">Innovation Manager</div>
+              </div>
+            </div>
+          </div>
+          <!-- Content -->
+          <div class="content">
+            <div class="content-header">
+              <div>
+                <div class="breadcrumb">Dashboard</div>
+                <h3>Good morning, Sarah</h3>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <button
+                  class="btn btn-secondary"
+                  style="font-size: 12px; padding: 5px 10px"
+                >
+                  Cmd+K
+                </button>
+                <button class="btn btn-primary">+ New Campaign</button>
+              </div>
+            </div>
+            <!-- KPI Row -->
+            <div class="pad-20">
+              <div class="grid-4" style="margin-bottom: 20px">
+                <div class="card kpi-card">
+                  <div class="kpi-label">Active Campaigns</div>
+                  <div class="kpi-value">4</div>
+                  <div class="kpi-trend up">+1 this month</div>
+                </div>
+                <div class="card kpi-card">
+                  <div class="kpi-label">Total Ideas</div>
+                  <div class="kpi-value">187</div>
+                  <div class="kpi-trend up">+23 this week</div>
+                </div>
+                <div class="card kpi-card">
+                  <div class="kpi-label">Pending Evaluations</div>
+                  <div class="kpi-value">25</div>
+                  <div class="kpi-trend" style="color: var(--warning)">
+                    Due in 3 days
+                  </div>
+                </div>
+                <div class="card kpi-card">
+                  <div class="kpi-label">Participation Rate</div>
+                  <div class="kpi-value">68%</div>
+                  <div class="kpi-trend up">+5% vs last quarter</div>
+                </div>
+              </div>
+              <!-- Compact Idea List -->
+              <div class="card" style="overflow: hidden">
+                <div
+                  style="
+                    padding: 12px 16px;
+                    border-bottom: 1px solid var(--gray-200);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  <h4
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: var(--gray-800);
+                    "
+                  >
+                    Recent Ideas
+                  </h4>
+                  <div style="display: flex; gap: 8px">
+                    <button
+                      class="btn btn-secondary"
+                      style="font-size: 11px; padding: 3px 8px"
+                    >
+                      All
+                    </button>
+                    <button
+                      class="btn btn-secondary"
+                      style="font-size: 11px; padding: 3px 8px"
+                    >
+                      HOT!
+                    </button>
+                    <button
+                      class="btn btn-secondary"
+                      style="font-size: 11px; padding: 3px 8px"
+                    >
+                      Needs Review
+                    </button>
+                  </div>
+                </div>
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Idea</th>
+                      <th>Campaign</th>
+                      <th>Status</th>
+                      <th>Votes</th>
+                      <th>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <strong style="color: var(--gray-800)"
+                          >Automated QC station at Line 3</strong
+                        >
+                      </td>
+                      <td style="font-size: 12px">Q1 Cost Reduction</td>
+                      <td><span class="badge-pill badge-hot">HOT!</span></td>
+                      <td>42</td>
+                      <td style="font-size: 12px; color: var(--gray-400)">
+                        2 min ago
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong style="color: var(--gray-800)"
+                          >Solar panel installation on Building C</strong
+                        >
+                      </td>
+                      <td style="font-size: 12px">Green Innovation</td>
+                      <td>
+                        <span class="badge-pill badge-active">Published</span>
+                      </td>
+                      <td>28</td>
+                      <td style="font-size: 12px; color: var(--gray-400)">
+                        15 min ago
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong style="color: var(--gray-800)"
+                          >Customer feedback widget in-app</strong
+                        >
+                      </td>
+                      <td style="font-size: 12px">Customer UX</td>
+                      <td>
+                        <span class="badge-pill badge-eval">Evaluating</span>
+                      </td>
+                      <td>19</td>
+                      <td style="font-size: 12px; color: var(--gray-400)">
+                        1 hour ago
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong style="color: var(--gray-800)"
+                          >Shared shuttle service for employees</strong
+                        >
+                      </td>
+                      <td style="font-size: 12px">Green Innovation</td>
+                      <td>
+                        <span class="badge-pill badge-active">Published</span>
+                      </td>
+                      <td>15</td>
+                      <td style="font-size: 12px; color: var(--gray-400)">
+                        2 hours ago
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong style="color: var(--gray-800)"
+                          >AI-powered demand forecasting</strong
+                        >
+                      </td>
+                      <td style="font-size: 12px">Q1 Cost Reduction</td>
+                      <td>
+                        <span class="badge-pill badge-selected">Selected</span>
+                      </td>
+                      <td>37</td>
+                      <td style="font-size: 12px; color: var(--gray-400)">
+                        Yesterday
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 2: Card Gallery -->
+    <div class="direction" id="dir-1">
+      <div class="dir-header">
+        <h2>Direction 2: Card Gallery</h2>
+        <p>
+          Spacious card-based layout inspired by Notion. Visual campaign banners
+          with gradient headers, rich idea cards with graduation meters, and
+          generous white space. Emphasizes visual scanning and campaign
+          identity.
+        </p>
+        <div class="dir-tags">
+          <span class="dir-tag">Visual-First</span>
+          <span class="dir-tag">Card Grid</span>
+          <span class="dir-tag">Spacious</span>
+          <span class="dir-tag">Notion Inspired</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="app-layout">
+          <div class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">I</div>
+              <span>Ignite</span>
+            </div>
+            <div class="sidebar-nav">
+              <div class="nav-section">
+                <div class="nav-item active">
+                  <span class="icon">&#9776;</span> Dashboard
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9733;</span> Campaigns
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#128270;</span> Explore
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-user">
+              <div class="avatar">MC</div>
+              <div>
+                <div class="name">Marco Chen</div>
+                <div class="role">Contributor</div>
+              </div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="content-header">
+              <div>
+                <div class="breadcrumb">Dashboard</div>
+                <h3>Active Campaigns</h3>
+              </div>
+              <button class="btn btn-primary">+ Submit Idea</button>
+            </div>
+            <div class="pad-20">
+              <!-- Campaign Cards -->
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="card campaign-card">
+                  <div class="campaign-banner indigo"></div>
+                  <div class="campaign-body">
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      <span class="badge-pill badge-active">Active</span>
+                      <span style="font-size: 11px; color: var(--gray-400)"
+                        >12 days left</span
+                      >
+                    </div>
+                    <div class="campaign-title">
+                      Q1 Cost Reduction Challenge
+                    </div>
+                    <div class="campaign-desc">
+                      Find innovative ways to reduce operational costs by 15%
+                      across manufacturing.
+                    </div>
+                    <div style="margin: 10px 0 8px">
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 11px;
+                          color: var(--gray-500);
+                          margin-bottom: 4px;
+                        "
+                      >
+                        <span>Participation</span><span>68%</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill primary"
+                          style="width: 68%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="campaign-stats">
+                      <div class="campaign-stat"><strong>47</strong> ideas</div>
+                      <div class="campaign-stat">
+                        <strong>312</strong> votes
+                      </div>
+                      <div class="campaign-stat">
+                        <strong>89</strong> comments
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card campaign-card">
+                  <div class="campaign-banner emerald"></div>
+                  <div class="campaign-body">
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      <span class="badge-pill badge-active">Active</span>
+                      <span style="font-size: 11px; color: var(--gray-400)"
+                        >28 days left</span
+                      >
+                    </div>
+                    <div class="campaign-title">Green Innovation Sprint</div>
+                    <div class="campaign-desc">
+                      Sustainability ideas to reduce our carbon footprint by
+                      2027.
+                    </div>
+                    <div style="margin: 10px 0 8px">
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 11px;
+                          color: var(--gray-500);
+                          margin-bottom: 4px;
+                        "
+                      >
+                        <span>Participation</span><span>42%</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill success"
+                          style="width: 42%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="campaign-stats">
+                      <div class="campaign-stat"><strong>23</strong> ideas</div>
+                      <div class="campaign-stat">
+                        <strong>156</strong> votes
+                      </div>
+                      <div class="campaign-stat">
+                        <strong>45</strong> comments
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Trending Ideas -->
+              <h4
+                style="
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: var(--gray-800);
+                  margin-bottom: 12px;
+                "
+              >
+                Trending Ideas
+              </h4>
+              <div class="grid-3">
+                <div class="card idea-card">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <span class="badge-pill badge-hot">HOT!</span>
+                    <span class="vote-btn">&#9650; 42</span>
+                  </div>
+                  <div class="idea-title">Automated QC station at Line 3</div>
+                  <div
+                    style="
+                      font-size: 12px;
+                      color: var(--gray-500);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    Could save $240K/year by reducing manual inspection from 8
+                    hours to 45 minutes.
+                  </div>
+                  <div class="grad-meter">
+                    <div class="grad-row">
+                      <span class="grad-label">Votes</span>
+                      <div class="grad-bar">
+                        <div class="grad-fill votes" style="width: 84%"></div>
+                      </div>
+                    </div>
+                    <div class="grad-row">
+                      <span class="grad-label">Comments</span>
+                      <div class="grad-bar">
+                        <div
+                          class="grad-fill comments"
+                          style="width: 72%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="grad-row">
+                      <span class="grad-label">Views</span>
+                      <div class="grad-bar">
+                        <div class="grad-fill views" style="width: 95%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card idea-card">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <span class="badge-pill badge-active">Published</span>
+                    <span class="vote-btn">&#9650; 28</span>
+                  </div>
+                  <div class="idea-title">Solar panels on Building C</div>
+                  <div
+                    style="
+                      font-size: 12px;
+                      color: var(--gray-500);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    Install 200kW solar array on unused roof. 7-year payback
+                    estimated.
+                  </div>
+                  <div class="grad-meter">
+                    <div class="grad-row">
+                      <span class="grad-label">Votes</span>
+                      <div class="grad-bar">
+                        <div class="grad-fill votes" style="width: 56%"></div>
+                      </div>
+                    </div>
+                    <div class="grad-row">
+                      <span class="grad-label">Comments</span>
+                      <div class="grad-bar">
+                        <div
+                          class="grad-fill comments"
+                          style="width: 40%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="grad-row">
+                      <span class="grad-label">Views</span>
+                      <div class="grad-bar">
+                        <div class="grad-fill views" style="width: 68%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card idea-card">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <span class="badge-pill badge-eval">Evaluating</span>
+                    <span class="vote-btn">&#9650; 19</span>
+                  </div>
+                  <div class="idea-title">Customer feedback widget</div>
+                  <div
+                    style="
+                      font-size: 12px;
+                      color: var(--gray-500);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    In-app NPS survey with AI sentiment analysis and routing to
+                    product teams.
+                  </div>
+                  <div class="grad-meter">
+                    <div class="grad-row">
+                      <span class="grad-label">Votes</span>
+                      <div class="grad-bar">
+                        <div class="grad-fill votes" style="width: 38%"></div>
+                      </div>
+                    </div>
+                    <div class="grad-row">
+                      <span class="grad-label">Comments</span>
+                      <div class="grad-bar">
+                        <div
+                          class="grad-fill comments"
+                          style="width: 62%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="grad-row">
+                      <span class="grad-label">Views</span>
+                      <div class="grad-bar">
+                        <div class="grad-fill views" style="width: 80%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 3: Command Center -->
+    <div class="direction" id="dir-2">
+      <div class="dir-header">
+        <h2>Direction 3: Command Center</h2>
+        <p>
+          Analytics-first dashboard optimized for Innovation Managers. KPI
+          prominence, funnel visualization, and campaign health at a glance. The
+          cockpit view that makes Sarah confident walking into quarterly
+          reviews.
+        </p>
+        <div class="dir-tags">
+          <span class="dir-tag">Analytics-First</span>
+          <span class="dir-tag">KPI Dashboard</span>
+          <span class="dir-tag">Manager-Optimized</span>
+          <span class="dir-tag">Cockpit View</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="app-layout">
+          <div class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">I</div>
+              <span>Ignite</span>
+            </div>
+            <div class="sidebar-nav">
+              <div class="nav-section">
+                <div class="nav-item">
+                  <span class="icon">&#9776;</span> Dashboard
+                </div>
+                <div class="nav-item active">
+                  <span class="icon">&#9733;</span> Cockpit
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#128270;</span> Campaigns
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9881;</span> Idea Board
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-user">
+              <div class="avatar">SM</div>
+              <div>
+                <div class="name">Sarah Mitchell</div>
+                <div class="role">Innovation Manager</div>
+              </div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="content-header">
+              <div>
+                <div class="breadcrumb">Cockpit > Q1 Cost Reduction</div>
+                <h3>Campaign Cockpit</h3>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <button class="btn btn-secondary">Share Link</button>
+                <button class="btn btn-secondary">Export PDF</button>
+              </div>
+            </div>
+            <div class="pad-20">
+              <!-- KPI Row -->
+              <div class="grid-4" style="margin-bottom: 20px">
+                <div
+                  class="card kpi-card"
+                  style="border-left: 3px solid var(--primary-500)"
+                >
+                  <div class="kpi-label">Ideas Submitted</div>
+                  <div class="kpi-value">47</div>
+                  <div class="kpi-trend up">+12 this week</div>
+                </div>
+                <div
+                  class="card kpi-card"
+                  style="border-left: 3px solid var(--accent-500)"
+                >
+                  <div class="kpi-label">HOT! Ideas</div>
+                  <div class="kpi-value">8</div>
+                  <div class="kpi-trend up">17% graduation rate</div>
+                </div>
+                <div
+                  class="card kpi-card"
+                  style="border-left: 3px solid var(--success)"
+                >
+                  <div class="kpi-label">Participation Rate</div>
+                  <div class="kpi-value">68%</div>
+                  <div class="kpi-trend up">+5% vs target</div>
+                </div>
+                <div
+                  class="card kpi-card"
+                  style="border-left: 3px solid var(--info)"
+                >
+                  <div class="kpi-label">Eval Completion</div>
+                  <div class="kpi-value">84%</div>
+                  <div class="kpi-trend up">On track</div>
+                </div>
+              </div>
+              <!-- Charts Row -->
+              <div class="grid-2" style="margin-bottom: 20px">
+                <div class="card" style="padding: 16px">
+                  <h4
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: var(--gray-800);
+                      margin-bottom: 12px;
+                    "
+                  >
+                    Idea Funnel
+                  </h4>
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 12px;
+                          color: var(--gray-500);
+                          min-width: 80px;
+                        "
+                        >Submitted</span
+                      >
+                      <div
+                        style="
+                          flex: 1;
+                          height: 24px;
+                          background: var(--primary-500);
+                          border-radius: 4px;
+                          display: flex;
+                          align-items: center;
+                          padding-left: 8px;
+                        "
+                      >
+                        <span
+                          style="
+                            font-size: 11px;
+                            color: white;
+                            font-weight: 600;
+                          "
+                          >47</span
+                        >
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 12px;
+                          color: var(--gray-500);
+                          min-width: 80px;
+                        "
+                        >HOT!</span
+                      >
+                      <div
+                        style="
+                          width: 35%;
+                          height: 24px;
+                          background: var(--accent-500);
+                          border-radius: 4px;
+                          display: flex;
+                          align-items: center;
+                          padding-left: 8px;
+                        "
+                      >
+                        <span
+                          style="
+                            font-size: 11px;
+                            color: white;
+                            font-weight: 600;
+                          "
+                          >8</span
+                        >
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 12px;
+                          color: var(--gray-500);
+                          min-width: 80px;
+                        "
+                        >Evaluated</span
+                      >
+                      <div
+                        style="
+                          width: 22%;
+                          height: 24px;
+                          background: var(--info);
+                          border-radius: 4px;
+                          display: flex;
+                          align-items: center;
+                          padding-left: 8px;
+                        "
+                      >
+                        <span
+                          style="
+                            font-size: 11px;
+                            color: white;
+                            font-weight: 600;
+                          "
+                          >5</span
+                        >
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 12px;
+                          color: var(--gray-500);
+                          min-width: 80px;
+                        "
+                        >Selected</span
+                      >
+                      <div
+                        style="
+                          width: 12%;
+                          height: 24px;
+                          background: var(--success);
+                          border-radius: 4px;
+                          display: flex;
+                          align-items: center;
+                          padding-left: 8px;
+                        "
+                      >
+                        <span
+                          style="
+                            font-size: 11px;
+                            color: white;
+                            font-weight: 600;
+                          "
+                          >3</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="padding: 16px">
+                  <h4
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: var(--gray-800);
+                      margin-bottom: 12px;
+                    "
+                  >
+                    Weekly Activity
+                  </h4>
+                  <div class="chart-placeholder">
+                    Recharts Area Chart: Ideas + Votes + Comments over 8 weeks
+                  </div>
+                </div>
+              </div>
+              <!-- Bottom Row -->
+              <div class="grid-2">
+                <div class="card" style="padding: 16px">
+                  <h4
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: var(--gray-800);
+                      margin-bottom: 12px;
+                    "
+                  >
+                    Top Ideas by Score
+                  </h4>
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Idea</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="font-weight: 500; color: var(--gray-800)">
+                          Automated QC station
+                        </td>
+                        <td style="font-weight: 600; color: var(--primary-600)">
+                          4.6
+                        </td>
+                        <td>
+                          <span class="badge-pill badge-selected"
+                            >Selected</span
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: 500; color: var(--gray-800)">
+                          AI demand forecasting
+                        </td>
+                        <td style="font-weight: 600; color: var(--primary-600)">
+                          4.3
+                        </td>
+                        <td>
+                          <span class="badge-pill badge-selected"
+                            >Selected</span
+                          >
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-weight: 500; color: var(--gray-800)">
+                          Supplier consolidation
+                        </td>
+                        <td style="font-weight: 600; color: var(--primary-600)">
+                          4.1
+                        </td>
+                        <td>
+                          <span class="badge-pill badge-eval">Evaluating</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="card" style="padding: 16px">
+                  <h4
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: var(--gray-800);
+                      margin-bottom: 12px;
+                    "
+                  >
+                    Evaluator Progress
+                  </h4>
+                  <div class="flex-col" style="gap: 10px">
+                    <div>
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 12px;
+                          margin-bottom: 4px;
+                        "
+                      >
+                        <span style="color: var(--gray-700); font-weight: 500"
+                          >Priya Sharma</span
+                        ><span style="color: var(--gray-500)">25/25</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill success"
+                          style="width: 100%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 12px;
+                          margin-bottom: 4px;
+                        "
+                      >
+                        <span style="color: var(--gray-700); font-weight: 500"
+                          >David Kim</span
+                        ><span style="color: var(--gray-500)">18/25</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill primary"
+                          style="width: 72%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 12px;
+                          margin-bottom: 4px;
+                        "
+                      >
+                        <span style="color: var(--gray-700); font-weight: 500"
+                          >Elena Rodriguez</span
+                        ><span style="color: var(--gray-500)">8/25</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill accent"
+                          style="width: 32%"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 4: Activity Stream -->
+    <div class="direction" id="dir-3">
+      <div class="dir-header">
+        <h2>Direction 4: Activity Stream</h2>
+        <p>
+          Feed-centric layout inspired by Slack and GitHub. The Innovation
+          Flywheel made visible as a real-time activity stream. Social proof and
+          engagement signals drive participation. "Show the pulse" principle at
+          its strongest.
+        </p>
+        <div class="dir-tags">
+          <span class="dir-tag">Feed-Centric</span>
+          <span class="dir-tag">Real-Time</span>
+          <span class="dir-tag">Social Proof</span>
+          <span class="dir-tag">Slack/GitHub Inspired</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="app-layout">
+          <div class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">I</div>
+              <span>Ignite</span>
+            </div>
+            <div class="sidebar-nav">
+              <div class="nav-section">
+                <div class="nav-item active">
+                  <span class="icon">&#9776;</span> Feed
+                  <span class="badge">7</span>
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9733;</span> Campaigns
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#128270;</span> Explore
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-user">
+              <div class="avatar">MC</div>
+              <div>
+                <div class="name">Marco Chen</div>
+                <div class="role">Contributor</div>
+              </div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="content-header">
+              <div>
+                <div class="breadcrumb">Innovation Feed</div>
+                <h3>What's Happening</h3>
+              </div>
+              <button class="btn btn-primary">+ Share an Idea</button>
+            </div>
+            <div style="display: flex">
+              <!-- Main Feed -->
+              <div style="flex: 1; padding: 20px 24px; max-width: 640px">
+                <!-- Feed Item: HOT! Graduation -->
+                <div
+                  class="card"
+                  style="
+                    padding: 16px;
+                    margin-bottom: 12px;
+                    border-left: 3px solid var(--accent-500);
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <span class="badge-pill badge-hot">HOT!</span>
+                    <span style="font-size: 12px; color: var(--gray-500)"
+                      >2 minutes ago</span
+                    >
+                  </div>
+                  <div style="font-size: 14px; color: var(--gray-700)">
+                    <strong style="color: var(--gray-800)"
+                      >Automated QC station at Line 3</strong
+                    >
+                    just reached HOT! status with 42 votes, 18 comments, and 230
+                    views.
+                  </div>
+                  <div style="display: flex; gap: 12px; margin-top: 10px">
+                    <span class="vote-btn">&#9650; 42</span>
+                    <span class="vote-btn">&#128172; 18</span>
+                    <span class="vote-btn">&#128065; 230</span>
+                  </div>
+                </div>
+                <!-- Feed Item: New Idea -->
+                <div class="card" style="padding: 16px; margin-bottom: 12px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <div
+                      class="avatar"
+                      style="
+                        width: 24px;
+                        height: 24px;
+                        font-size: 10px;
+                        background: var(--info);
+                      "
+                    >
+                      AK
+                    </div>
+                    <span style="font-size: 13px; color: var(--gray-700)"
+                      ><strong>Anna Kim</strong> submitted a new idea</span
+                    >
+                    <span
+                      style="
+                        font-size: 12px;
+                        color: var(--gray-400);
+                        margin-left: auto;
+                      "
+                      >15 min ago</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: var(--gray-800);
+                      margin-bottom: 4px;
+                    "
+                  >
+                    Electric vehicle fleet for last-mile delivery
+                  </div>
+                  <div
+                    style="
+                      font-size: 13px;
+                      color: var(--gray-500);
+                      margin-bottom: 10px;
+                    "
+                  >
+                    Replace 12 diesel vans with EVs. Estimated 40% fuel cost
+                    reduction and improved brand perception.
+                  </div>
+                  <div style="display: flex; gap: 12px">
+                    <span class="vote-btn">&#9650; 3</span>
+                    <span class="vote-btn">&#128172; 1</span>
+                  </div>
+                </div>
+                <!-- Feed Item: Comment -->
+                <div class="card" style="padding: 16px; margin-bottom: 12px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <div
+                      class="avatar"
+                      style="
+                        width: 24px;
+                        height: 24px;
+                        font-size: 10px;
+                        background: var(--success);
+                      "
+                    >
+                      PS
+                    </div>
+                    <span style="font-size: 13px; color: var(--gray-700)"
+                      ><strong>Priya Sharma</strong> commented on
+                      <strong>Solar panels on Building C</strong></span
+                    >
+                    <span
+                      style="
+                        font-size: 12px;
+                        color: var(--gray-400);
+                        margin-left: auto;
+                      "
+                      >32 min ago</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      font-size: 13px;
+                      color: var(--gray-600);
+                      padding: 8px 12px;
+                      background: var(--gray-50);
+                      border-radius: var(--radius-md);
+                      border-left: 2px solid var(--primary-500);
+                    "
+                  >
+                    "Have we checked the structural load capacity? Building C
+                    roof was reinforced in 2023, so it should be fine for the
+                    additional 15 tons."
+                  </div>
+                </div>
+                <!-- Feed Item: Evaluation Complete -->
+                <div
+                  class="card"
+                  style="
+                    padding: 16px;
+                    margin-bottom: 12px;
+                    border-left: 3px solid var(--success);
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      margin-bottom: 8px;
+                    "
+                  >
+                    <span class="badge-pill badge-selected">Milestone</span>
+                    <span style="font-size: 12px; color: var(--gray-500)"
+                      >1 hour ago</span
+                    >
+                  </div>
+                  <div style="font-size: 14px; color: var(--gray-700)">
+                    <strong style="color: var(--gray-800)"
+                      >Q1 Cost Reduction</strong
+                    >
+                    evaluation phase completed. 3 ideas selected for
+                    implementation.
+                  </div>
+                </div>
+              </div>
+              <!-- Right Sidebar -->
+              <div
+                style="
+                  width: 280px;
+                  padding: 20px;
+                  border-left: 1px solid var(--gray-200);
+                "
+              >
+                <h4
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--gray-700);
+                    margin-bottom: 12px;
+                  "
+                >
+                  Trending Now
+                </h4>
+                <div class="flex-col" style="gap: 8px; margin-bottom: 24px">
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 6px 0;
+                    "
+                  >
+                    <span
+                      style="
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: var(--gray-300);
+                      "
+                      >1</span
+                    >
+                    <div>
+                      <div
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: var(--gray-700);
+                        "
+                      >
+                        Automated QC station
+                      </div>
+                      <div style="font-size: 11px; color: var(--gray-400)">
+                        42 votes
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 6px 0;
+                    "
+                  >
+                    <span
+                      style="
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: var(--gray-300);
+                      "
+                      >2</span
+                    >
+                    <div>
+                      <div
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: var(--gray-700);
+                        "
+                      >
+                        Solar panels Building C
+                      </div>
+                      <div style="font-size: 11px; color: var(--gray-400)">
+                        28 votes
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 6px 0;
+                    "
+                  >
+                    <span
+                      style="
+                        font-size: 18px;
+                        font-weight: 700;
+                        color: var(--gray-300);
+                      "
+                      >3</span
+                    >
+                    <div>
+                      <div
+                        style="
+                          font-size: 13px;
+                          font-weight: 500;
+                          color: var(--gray-700);
+                        "
+                      >
+                        Customer feedback widget
+                      </div>
+                      <div style="font-size: 11px; color: var(--gray-400)">
+                        19 votes
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <h4
+                  style="
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: var(--gray-700);
+                    margin-bottom: 12px;
+                  "
+                >
+                  Active Campaigns
+                </h4>
+                <div class="flex-col" style="gap: 8px">
+                  <div
+                    style="
+                      padding: 8px 10px;
+                      background: var(--gray-50);
+                      border-radius: var(--radius-md);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: var(--gray-700);
+                      "
+                    >
+                      Q1 Cost Reduction
+                    </div>
+                    <div style="font-size: 11px; color: var(--gray-400)">
+                      47 ideas - 12 days left
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      padding: 8px 10px;
+                      background: var(--gray-50);
+                      border-radius: var(--radius-md);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: var(--gray-700);
+                      "
+                    >
+                      Green Innovation
+                    </div>
+                    <div style="font-size: 11px; color: var(--gray-400)">
+                      23 ideas - 28 days left
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 5: Kanban Flow -->
+    <div class="direction" id="dir-4">
+      <div class="dir-header">
+        <h2>Direction 5: Kanban Flow</h2>
+        <p>
+          Board-centric layout showing ideas flowing through lifecycle stages.
+          Drag-and-drop columns represent the innovation funnel. Ideal for the
+          Idea Board view where managers triage and categorize ideas visually.
+        </p>
+        <div class="dir-tags">
+          <span class="dir-tag">Board View</span>
+          <span class="dir-tag">Drag-and-Drop</span>
+          <span class="dir-tag">Funnel Visualization</span>
+          <span class="dir-tag">Trello/Linear Inspired</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="app-layout">
+          <div class="sidebar">
+            <div class="sidebar-logo">
+              <div class="logo-icon">I</div>
+              <span>Ignite</span>
+            </div>
+            <div class="sidebar-nav">
+              <div class="nav-section">
+                <div class="nav-item">
+                  <span class="icon">&#9776;</span> Dashboard
+                </div>
+                <div class="nav-item">
+                  <span class="icon">&#9733;</span> Campaigns
+                </div>
+                <div class="nav-item active">
+                  <span class="icon">&#9881;</span> Idea Board
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-user">
+              <div class="avatar">SM</div>
+              <div>
+                <div class="name">Sarah Mitchell</div>
+                <div class="role">Innovation Manager</div>
+              </div>
+            </div>
+          </div>
+          <div class="content">
+            <div class="content-header">
+              <div>
+                <div class="breadcrumb">
+                  Campaigns > Q1 Cost Reduction > Idea Board
+                </div>
+                <h3>Idea Board</h3>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <button class="btn btn-secondary">Filter</button>
+                <button class="btn btn-secondary">Group by Category</button>
+              </div>
+            </div>
+            <div class="kanban">
+              <!-- Column: New -->
+              <div class="kanban-col">
+                <div class="kanban-header">
+                  <h4>
+                    <span
+                      style="
+                        display: inline-block;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background: var(--primary-500);
+                        margin-right: 6px;
+                      "
+                    ></span
+                    >New
+                  </h4>
+                  <span class="kanban-count">12</span>
+                </div>
+                <div class="kanban-cards">
+                  <div class="card idea-card" style="cursor: grab">
+                    <div class="idea-title">Shared shuttle service</div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 15</span
+                      ><span class="idea-stat">&#128172; 4</span>
+                    </div>
+                  </div>
+                  <div class="card idea-card" style="cursor: grab">
+                    <div class="idea-title">Paperless invoice processing</div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 8</span
+                      ><span class="idea-stat">&#128172; 2</span>
+                    </div>
+                  </div>
+                  <div class="card idea-card" style="cursor: grab">
+                    <div class="idea-title">Bulk packaging optimization</div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 5</span
+                      ><span class="idea-stat">&#128172; 1</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Column: HOT! -->
+              <div class="kanban-col">
+                <div class="kanban-header">
+                  <h4>
+                    <span
+                      style="
+                        display: inline-block;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background: var(--accent-500);
+                        margin-right: 6px;
+                      "
+                    ></span
+                    >HOT!
+                  </h4>
+                  <span class="kanban-count">8</span>
+                </div>
+                <div class="kanban-cards">
+                  <div
+                    class="card idea-card"
+                    style="
+                      cursor: grab;
+                      border-left: 3px solid var(--accent-500);
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        margin-bottom: 6px;
+                      "
+                    >
+                      <span class="badge-pill badge-hot">HOT!</span>
+                    </div>
+                    <div class="idea-title">Automated QC station at Line 3</div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 42</span
+                      ><span class="idea-stat">&#128172; 18</span>
+                    </div>
+                  </div>
+                  <div
+                    class="card idea-card"
+                    style="
+                      cursor: grab;
+                      border-left: 3px solid var(--accent-500);
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        margin-bottom: 6px;
+                      "
+                    >
+                      <span class="badge-pill badge-hot">HOT!</span>
+                    </div>
+                    <div class="idea-title">AI demand forecasting</div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 37</span
+                      ><span class="idea-stat">&#128172; 12</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Column: Under Evaluation -->
+              <div class="kanban-col">
+                <div class="kanban-header">
+                  <h4>
+                    <span
+                      style="
+                        display: inline-block;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background: var(--info);
+                        margin-right: 6px;
+                      "
+                    ></span
+                    >Evaluating
+                  </h4>
+                  <span class="kanban-count">5</span>
+                </div>
+                <div class="kanban-cards">
+                  <div class="card idea-card" style="cursor: grab">
+                    <div class="idea-title">Customer feedback widget</div>
+                    <div style="margin: 6px 0">
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 11px;
+                          color: var(--gray-500);
+                          margin-bottom: 2px;
+                        "
+                      >
+                        <span>Eval progress</span><span>3/5</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill primary"
+                          style="width: 60%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 19</span>
+                    </div>
+                  </div>
+                  <div class="card idea-card" style="cursor: grab">
+                    <div class="idea-title">Supplier consolidation program</div>
+                    <div style="margin: 6px 0">
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 11px;
+                          color: var(--gray-500);
+                          margin-bottom: 2px;
+                        "
+                      >
+                        <span>Eval progress</span><span>5/5</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill success"
+                          style="width: 100%"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="idea-meta">
+                      <span class="idea-stat">&#9650; 24</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Column: Selected -->
+              <div class="kanban-col">
+                <div class="kanban-header">
+                  <h4>
+                    <span
+                      style="
+                        display: inline-block;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background: var(--success);
+                        margin-right: 6px;
+                      "
+                    ></span
+                    >Selected
+                  </h4>
+                  <span class="kanban-count">3</span>
+                </div>
+                <div class="kanban-cards">
+                  <div
+                    class="card idea-card"
+                    style="cursor: grab; border-left: 3px solid var(--success)"
+                  >
+                    <div class="idea-title">Automated QC station at Line 3</div>
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--success);
+                        font-weight: 500;
+                        margin-top: 4px;
+                      "
+                    >
+                      Score: 4.6/5
+                    </div>
+                  </div>
+                  <div
+                    class="card idea-card"
+                    style="cursor: grab; border-left: 3px solid var(--success)"
+                  >
+                    <div class="idea-title">AI demand forecasting</div>
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--success);
+                        font-weight: 500;
+                        margin-top: 4px;
+                      "
+                    >
+                      Score: 4.3/5
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTION 6: Evaluation Focus -->
+    <div class="direction" id="dir-5">
+      <div class="dir-header">
+        <h2>Direction 6: Evaluation Focus</h2>
+        <p>
+          Split-pane evaluation view optimized for Priya's 90-minute evaluation
+          sprint. Idea context on the left, scoring form on the right, [Done &
+          Next] momentum flow. Progress always visible. Keyboard-driven for
+          speed.
+        </p>
+        <div class="dir-tags">
+          <span class="dir-tag">Split-Pane</span>
+          <span class="dir-tag">Evaluator-Optimized</span>
+          <span class="dir-tag">Done & Next Flow</span>
+          <span class="dir-tag">Linear Triage</span>
+        </div>
+      </div>
+      <div class="mockup-frame">
+        <div class="app-layout" style="flex-direction: column">
+          <!-- Eval Progress Bar -->
+          <div class="eval-progress">
+            <div class="eval-progress-text">Evaluating: Q1 Cost Reduction</div>
+            <div style="flex: 1; margin: 0 16px">
+              <div class="progress-bar" style="height: 6px">
+                <div class="progress-fill primary" style="width: 48%"></div>
+              </div>
+            </div>
+            <div class="eval-progress-text" style="font-weight: 600">
+              12 of 25
+            </div>
+            <div
+              style="font-size: 12px; color: var(--gray-400); margin-left: 8px"
+            >
+              ~45 min remaining
+            </div>
+          </div>
+          <!-- Split Pane -->
+          <div class="eval-layout" style="flex: 1">
+            <!-- Left: Idea Content -->
+            <div class="eval-left">
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  margin-bottom: 16px;
+                "
+              >
+                <span class="badge-pill badge-hot">HOT!</span>
+                <span style="font-size: 12px; color: var(--gray-500)"
+                  >Q1 Cost Reduction &middot; Manufacturing</span
+                >
+              </div>
+              <h3
+                style="
+                  font-size: 20px;
+                  font-weight: 700;
+                  color: var(--gray-800);
+                  margin-bottom: 8px;
+                "
+              >
+                Automated QC Station at Line 3
+              </h3>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  margin-bottom: 16px;
+                "
+              >
+                <div
+                  class="avatar"
+                  style="width: 24px; height: 24px; font-size: 10px"
+                >
+                  MC
+                </div>
+                <span style="font-size: 13px; color: var(--gray-500)"
+                  >Marco Chen &middot; Operations Manager</span
+                >
+              </div>
+              <div
+                style="
+                  font-size: 14px;
+                  color: var(--gray-700);
+                  line-height: 1.6;
+                  margin-bottom: 16px;
+                "
+              >
+                <p style="margin-bottom: 12px">
+                  <strong>Problem:</strong> Manual quality control inspection at
+                  Line 3 takes 8 hours per shift and catches only 78% of
+                  defects. We're losing $240K/year in rework and customer
+                  returns.
+                </p>
+                <p style="margin-bottom: 12px">
+                  <strong>Solution:</strong> Deploy computer vision-based
+                  automated inspection station with ML model trained on our
+                  defect catalog. The system processes parts in real-time,
+                  flagging defects with 99.2% accuracy based on pilot data from
+                  our Stuttgart facility.
+                </p>
+                <p>
+                  <strong>Expected Impact:</strong> Reduce inspection time from
+                  8 hours to 45 minutes. Improve defect detection from 78% to
+                  99%+. $240K annual savings with 14-month payback.
+                </p>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 16px;
+                  padding: 12px 0;
+                  border-top: 1px solid var(--gray-200);
+                  border-bottom: 1px solid var(--gray-200);
+                  margin-bottom: 16px;
+                "
+              >
+                <div
+                  style="
+                    font-size: 13px;
+                    color: var(--gray-500);
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  &#9650;
+                  <strong style="color: var(--gray-700)">42</strong> votes
+                </div>
+                <div
+                  style="
+                    font-size: 13px;
+                    color: var(--gray-500);
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  &#128172;
+                  <strong style="color: var(--gray-700)">18</strong> comments
+                </div>
+                <div
+                  style="
+                    font-size: 13px;
+                    color: var(--gray-500);
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                  "
+                >
+                  &#128065;
+                  <strong style="color: var(--gray-700)">230</strong> views
+                </div>
+              </div>
+              <h4
+                style="
+                  font-size: 14px;
+                  font-weight: 600;
+                  color: var(--gray-800);
+                  margin-bottom: 8px;
+                "
+              >
+                Attachments
+              </h4>
+              <div style="display: flex; gap: 8px">
+                <div
+                  style="
+                    padding: 8px 12px;
+                    background: var(--gray-50);
+                    border: 1px solid var(--gray-200);
+                    border-radius: var(--radius-md);
+                    font-size: 12px;
+                    color: var(--gray-600);
+                  "
+                >
+                  pilot-results.pdf
+                </div>
+                <div
+                  style="
+                    padding: 8px 12px;
+                    background: var(--gray-50);
+                    border: 1px solid var(--gray-200);
+                    border-radius: var(--radius-md);
+                    font-size: 12px;
+                    color: var(--gray-600);
+                  "
+                >
+                  roi-calculation.xlsx
+                </div>
+              </div>
+            </div>
+            <!-- Right: Scoring Form -->
+            <div class="eval-right">
+              <h4
+                style="
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: var(--gray-800);
+                  margin-bottom: 20px;
+                "
+              >
+                Your Evaluation
+              </h4>
+              <div class="flex-col" style="gap: 20px">
+                <div>
+                  <div class="score-row">
+                    <span class="score-label">Innovation</span>
+                    <div class="score-slider">
+                      <div class="fill" style="width: 80%"></div>
+                      <div class="thumb" style="left: calc(80% - 8px)"></div>
+                    </div>
+                    <span class="score-value">4</span>
+                  </div>
+                </div>
+                <div>
+                  <div class="score-row">
+                    <span class="score-label">Feasibility</span>
+                    <div class="score-slider">
+                      <div class="fill" style="width: 90%"></div>
+                      <div class="thumb" style="left: calc(90% - 8px)"></div>
+                    </div>
+                    <span class="score-value">4.5</span>
+                  </div>
+                </div>
+                <div>
+                  <div class="score-row">
+                    <span class="score-label">Impact</span>
+                    <div class="score-slider">
+                      <div class="fill" style="width: 100%"></div>
+                      <div class="thumb" style="left: calc(100% - 16px)"></div>
+                    </div>
+                    <span class="score-value">5</span>
+                  </div>
+                </div>
+                <div>
+                  <div class="score-row">
+                    <span class="score-label">Strategic Fit</span>
+                    <div class="score-slider">
+                      <div class="fill" style="width: 70%"></div>
+                      <div class="thumb" style="left: calc(70% - 8px)"></div>
+                    </div>
+                    <span class="score-value">3.5</span>
+                  </div>
+                </div>
+                <div>
+                  <div class="score-row">
+                    <span class="score-label">Cost Efficiency</span>
+                    <div class="score-slider">
+                      <div class="fill" style="width: 90%"></div>
+                      <div class="thumb" style="left: calc(90% - 8px)"></div>
+                    </div>
+                    <span class="score-value">4.5</span>
+                  </div>
+                </div>
+                <div>
+                  <label
+                    style="
+                      font-size: 13px;
+                      font-weight: 500;
+                      color: var(--gray-700);
+                      display: block;
+                      margin-bottom: 6px;
+                    "
+                    >Comments (optional)</label
+                  >
+                  <div
+                    style="
+                      width: 100%;
+                      min-height: 80px;
+                      padding: 8px 12px;
+                      border: 1px solid var(--gray-200);
+                      border-radius: var(--radius-md);
+                      font-size: 13px;
+                      color: var(--gray-500);
+                      background: white;
+                    "
+                  >
+                    Strong ROI with proven pilot data. Recommend
+                    fast-tracking...
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 24px">
+                <button class="btn btn-secondary" style="flex: 1">
+                  &#8592; Previous
+                </button>
+                <button
+                  class="btn btn-primary"
+                  style="flex: 2; justify-content: center; font-weight: 600"
+                >
+                  Done & Next &#8594;
+                </button>
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--gray-400);
+                  text-align: center;
+                  margin-top: 8px;
+                "
+              >
+                Tab between criteria &middot; Enter for Done & Next &middot;
+                Auto-saved
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison Bar -->
+    <div class="comparison-bar">
+      <span>Compare:</span>
+      <label class="check-label"
+        ><input type="checkbox" checked /> 1. Compact Linear</label
+      >
+      <label class="check-label"
+        ><input type="checkbox" /> 2. Card Gallery</label
+      >
+      <label class="check-label"
+        ><input type="checkbox" /> 3. Command Center</label
+      >
+      <label class="check-label"
+        ><input type="checkbox" /> 4. Activity Stream</label
+      >
+      <label class="check-label"
+        ><input type="checkbox" /> 5. Kanban Flow</label
+      >
+      <label class="check-label"
+        ><input type="checkbox" /> 6. Evaluation Focus</label
+      >
+    </div>
+
+    <script>
+      function showDir(index) {
+        document.querySelectorAll(".direction").forEach((d, i) => {
+          d.classList.toggle("active", i === index);
+        });
+        document.querySelectorAll(".dir-btn").forEach((b, i) => {
+          b.classList.toggle("active", i === index);
+        });
+        window.scrollTo(0, 0);
+      }
+    </script>
+  </body>
+</html>
