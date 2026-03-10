@@ -50,6 +50,8 @@ model User {
   createdChannels     Channel[]                   @relation("ChannelCreatedBy")
   channelMemberships  ChannelMember[]
   spaceMemberships    InnovationSpaceMembership[]
+  createdOrganizations Organization[]              @relation("OrganizationCreatedBy")
+  createdContacts      Contact[]                   @relation("ContactCreatedBy")
 
   @@map("users")
 }
@@ -455,4 +457,97 @@ model ChannelMember {
   @@index([channelId])
   @@index([userId])
   @@map("channel_members")
+}
+
+// ── Organization (Partner) Models ────────────────────────────
+
+enum RelationshipStatus {
+  PROSPECT
+  ACTIVE
+  ON_HOLD
+  ENDED
+
+  @@map("relationship_status")
+}
+
+enum NdaStatus {
+  NONE
+  PENDING
+  SIGNED
+  EXPIRED
+
+  @@map("nda_status")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  website     String?
+  logoUrl     String?  @map("logo_url")
+  industry    String?
+  location    String?
+  fundingInfo String?  @map("funding_info")
+
+  // Relationship tracking
+  relationshipStatus RelationshipStatus @default(PROSPECT) @map("relationship_status")
+  ndaStatus          NdaStatus          @default(NONE) @map("nda_status")
+  isConfidential     Boolean            @default(false) @map("is_confidential")
+
+  // Metadata
+  tags      String[] @default([])
+  notes     String?  @db.Text
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  createdBy User      @relation("OrganizationCreatedBy", fields: [createdById], references: [id])
+  contacts  Contact[]
+
+  @@index([relationshipStatus])
+  @@index([industry])
+  @@index([createdById])
+  @@index([name])
+  @@map("organizations")
+}
+
+enum ContactInviteStatus {
+  NOT_INVITED
+  INVITED
+  ACCEPTED
+  DECLINED
+
+  @@map("contact_invite_status")
+}
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  email          String?
+  phone          String?
+  jobTitle       String?  @map("job_title")
+  linkedinUrl    String?  @map("linkedin_url")
+  isPrimary      Boolean  @default(false) @map("is_primary")
+  notes          String?  @db.Text
+
+  // Invite tracking
+  inviteStatus ContactInviteStatus @default(NOT_INVITED) @map("invite_status")
+  invitedAt    DateTime?           @map("invited_at")
+  invitedBy    String?             @map("invited_by")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("ContactCreatedBy", fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([createdById])
+  @@map("contacts")
 }

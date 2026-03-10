@@ -48,6 +48,13 @@ export interface EventMap {
   "channel.created": EventPayload;
   "channel.updated": EventPayload;
   "channel.archived": EventPayload;
+  "organization.created": EventPayload;
+  "organization.updated": EventPayload;
+  "organization.deleted": EventPayload;
+  "organization.contactAdded": EventPayload;
+  "organization.contactUpdated": EventPayload;
+  "organization.contactRemoved": EventPayload;
+  "organization.contactInvited": EventPayload;
 }
 
 export type EventName = keyof EventMap;
