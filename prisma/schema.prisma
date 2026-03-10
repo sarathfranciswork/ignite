@@ -1,0 +1,301 @@
+// prisma/schema.prisma
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// CORE MODELS (subset needed for Campaign-SIA feature)
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  firstName     String
+  lastName      String
+  displayName   String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  campaignRoles CampaignMember[]
+  ideas         Idea[]           @relation("IdeaContributor")
+}
+
+model InnovationSpace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns Campaign[]
+  sias      StrategicInnovationArea[]
+}
+
+// ============================================================
+// CAMPAIGN MODULE
+// ============================================================
+
+model Campaign {
+  id                    String         @id @default(cuid())
+  title                 String
+  teaser                String?
+  description           String?
+  bannerImageUrl        String?
+  status                CampaignStatus @default(DRAFT)
+  submissionType        SubmissionType @default(CALL_FOR_IDEAS)
+
+  submissionCloseDate   DateTime?
+  votingCloseDate       DateTime?
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // Relations
+  innovationSpaceId     String?
+  innovationSpace       InnovationSpace? @relation(fields: [innovationSpaceId], references: [id])
+
+  createdById           String
+
+  members               CampaignMember[]
+  ideas                 Idea[]
+  inspirations          CampaignInspiration[]
+
+  // Many-to-many Campaign-SIA linking (Story 9.6)
+  siaLinks              CampaignSiaLink[]
+
+  @@index([status])
+  @@index([innovationSpaceId])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SEEDING
+  SUBMISSION
+  DISCUSSION_VOTING
+  EVALUATION
+  CLOSED
+}
+
+enum SubmissionType {
+  CALL_FOR_IDEAS
+  CALL_FOR_PROPOSALS
+  CALL_FOR_GENERIC
+}
+
+model CampaignMember {
+  id         String       @id @default(cuid())
+  campaignId String
+  userId     String
+  role       CampaignRole
+
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime     @default(now())
+
+  @@unique([campaignId, userId, role])
+  @@index([campaignId])
+  @@index([userId])
+}
+
+enum CampaignRole {
+  MANAGER
+  SPONSOR
+  MODERATOR
+  EVALUATOR
+  SEEDING_TEAM
+  IDEA_COACH
+}
+
+// ============================================================
+// CAMPAIGN-SIA LINKING (Story 9.6 — many-to-many)
+// ============================================================
+
+model CampaignSiaLink {
+  id         String                  @id @default(cuid())
+  campaignId String
+  siaId      String
+  campaign   Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sia        StrategicInnovationArea @relation(fields: [siaId], references: [id], onDelete: Cascade)
+  createdAt  DateTime                @default(now())
+
+  @@unique([campaignId, siaId])
+  @@index([campaignId])
+  @@index([siaId])
+}
+
+// ============================================================
+// CAMPAIGN INSPIRATIONS (direct trend/tech/insight links)
+// ============================================================
+
+model CampaignInspiration {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type        String   // "TREND", "TECHNOLOGY", "INSIGHT"
+  targetId    String   // FK to trend, technology, or insight
+  isEditorial Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([targetId])
+}
+
+// ============================================================
+// STRATEGY MODULE: SIAs, Trends, Technologies, Insights
+// ============================================================
+
+model StrategicInnovationArea {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  imageUrl        String?
+  isActive        Boolean  @default(true)
+
+  innovationSpaceId String?
+  innovationSpace   InnovationSpace? @relation(fields: [innovationSpaceId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  campaignLinks   CampaignSiaLink[]
+  trends          TrendSiaLink[]
+  technologies    TechSiaLink[]
+}
+
+model Trend {
+  id                String    @id @default(cuid())
+  title             String
+  description       String?
+  imageUrl          String?
+  sourceUrl         String?
+  type              TrendType @default(MICRO)
+  isConfidential    Boolean   @default(false)
+  isArchived        Boolean   @default(false)
+  businessRelevance Float?
+
+  parentId          String?
+  parent            Trend?    @relation("TrendHierarchy", fields: [parentId], references: [id])
+  children          Trend[]   @relation("TrendHierarchy")
+
+  createdById       String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sias              TrendSiaLink[]
+  insights          TrendInsightLink[]
+  ideaLinks         IdeaTrendLink[]
+}
+
+enum TrendType {
+  MEGA
+  MACRO
+  MICRO
+}
+
+model TrendSiaLink {
+  id      String                  @id @default(cuid())
+  trendId String
+  siaId   String
+  trend   Trend                   @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  sia     StrategicInnovationArea @relation(fields: [siaId], references: [id], onDelete: Cascade)
+
+  @@unique([trendId, siaId])
+}
+
+model Technology {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  imageUrl       String?
+  sourceUrl      String?
+  maturityLevel  String?
+  isConfidential Boolean  @default(false)
+  isArchived     Boolean  @default(false)
+
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sias           TechSiaLink[]
+}
+
+model TechSiaLink {
+  id     String                  @id @default(cuid())
+  techId String
+  siaId  String
+  tech   Technology              @relation(fields: [techId], references: [id], onDelete: Cascade)
+  sia    StrategicInnovationArea @relation(fields: [siaId], references: [id], onDelete: Cascade)
+
+  @@unique([techId, siaId])
+}
+
+model Insight {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  imageUrl    String?
+  sourceUrl   String?
+  insightType String?
+
+  createdById String
+  campaignId  String?
+  isEditorial Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trendLinks  TrendInsightLink[]
+}
+
+model TrendInsightLink {
+  id        String  @id @default(cuid())
+  trendId   String
+  insightId String
+  trend     Trend   @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  insight   Insight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+  @@unique([trendId, insightId])
+}
+
+// ============================================================
+// IDEAS MODULE (subset for idea-trend linking)
+// ============================================================
+
+model Idea {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+
+  contributorId String
+  contributor   User   @relation("IdeaContributor", fields: [contributorId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trendLinks  IdeaTrendLink[]
+
+  @@index([campaignId])
+}
+
+model IdeaTrendLink {
+  id      String @id @default(cuid())
+  ideaId  String
+  trendId String
+  idea    Idea   @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  trend   Trend  @relation(fields: [trendId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([ideaId, trendId])
+}
