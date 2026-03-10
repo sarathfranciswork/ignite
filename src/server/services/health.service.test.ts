@@ -44,13 +44,35 @@ beforeEach(() => {
 });
 
 describe("checkDatabase", () => {
-  it("returns ok when database is reachable", async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ "?column?": 1 }]);
+  it("returns ok when critical tables exist", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { table_name: "users" },
+      { table_name: "accounts" },
+      { table_name: "campaigns" },
+    ]);
 
     const result = await checkDatabase();
     expect(result.status).toBe("ok");
     expect(result.latency_ms).toBeDefined();
     expect(result.error).toBeUndefined();
+  });
+
+  it("returns error when critical users table is missing", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { table_name: "accounts" },
+    ]);
+
+    const result = await checkDatabase();
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Critical table 'users' not found");
+  });
+
+  it("returns error when no tables exist (migrations not run)", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([]);
+
+    const result = await checkDatabase();
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Critical table 'users' not found");
   });
 
   it("returns error when database is unreachable", async () => {
@@ -165,7 +187,7 @@ describe("checkS3", () => {
 
 describe("performHealthCheck", () => {
   it("returns ok when all checks pass", async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ "?column?": 1 }]);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ table_name: "users" }, { table_name: "accounts" }, { table_name: "campaigns" }]);
     vi.mocked(isRedisAvailable).mockReturnValue(false);
 
     const result = await performHealthCheck();
@@ -190,7 +212,7 @@ describe("performHealthCheck", () => {
   });
 
   it("returns degraded when optional service is down", async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ "?column?": 1 }]);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ table_name: "users" }, { table_name: "accounts" }, { table_name: "campaigns" }]);
     vi.mocked(isRedisAvailable).mockReturnValue(true);
     vi.mocked(cacheSet).mockRejectedValue(new Error("Redis down"));
 
@@ -201,7 +223,7 @@ describe("performHealthCheck", () => {
   });
 
   it("includes memory and cpu info", async () => {
-    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ "?column?": 1 }]);
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ table_name: "users" }, { table_name: "accounts" }, { table_name: "campaigns" }]);
     vi.mocked(isRedisAvailable).mockReturnValue(false);
 
     const result = await performHealthCheck();

@@ -49,9 +49,30 @@ export interface HealthCheckResult {
 export async function checkDatabase(): Promise<SubCheckResult> {
   try {
     const start = performance.now();
-    await prisma.$queryRaw`SELECT 1`;
+
+    // Verify connectivity AND that migrations have been applied by checking
+    // for the existence of critical tables (not just SELECT 1)
+    const tables = await prisma.$queryRaw<Array<{ table_name: string }>>`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_type = 'BASE TABLE'
+        AND table_name IN ('users', 'accounts', 'campaigns')
+    `;
+
     const latency_ms = Math.round(performance.now() - start);
-    healthLogger.debug({ latency_ms }, "Database check passed");
+    const foundTables = tables.map((t) => t.table_name);
+
+    if (!foundTables.includes("users")) {
+      healthLogger.warn({ foundTables }, "Critical table 'users' missing — migrations may not have run");
+      return {
+        status: "error",
+        latency_ms,
+        error: "Critical table 'users' not found. Run prisma migrate deploy.",
+      };
+    }
+
+    healthLogger.debug({ latency_ms, tableCount: foundTables.length }, "Database check passed");
     return { status: "ok", latency_ms };
   } catch (e) {
     const error = e instanceof Error ? e.message : "Database connection failed";
