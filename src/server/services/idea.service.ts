@@ -2,7 +2,22 @@ import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
 import type { Prisma, IdeaStatus } from "@prisma/client";
-import type { IdeaCreateInput, IdeaUpdateInput, IdeaListInput } from "./idea.schemas";
+import {
+  isValidIdeaTransition,
+  getValidIdeaTransitions,
+  canArchiveIdea,
+  canUnarchiveIdea,
+  IDEA_STATUS_LABELS,
+} from "@/server/lib/state-machines/idea-transitions";
+import type {
+  IdeaCreateInput,
+  IdeaUpdateInput,
+  IdeaListInput,
+  IdeaTransitionInput,
+  IdeaArchiveInput,
+  IdeaUnarchiveInput,
+  IdeaCoachQualifyInput,
+} from "./idea.schemas";
 
 export {
   ideaCreateInput,
@@ -11,9 +26,22 @@ export {
   ideaGetByIdInput,
   ideaSubmitInput,
   ideaDeleteInput,
+  ideaTransitionInput,
+  ideaGetTransitionsInput,
+  ideaArchiveInput,
+  ideaUnarchiveInput,
+  ideaCoachQualifyInput,
 } from "./idea.schemas";
 
-export type { IdeaCreateInput, IdeaUpdateInput, IdeaListInput } from "./idea.schemas";
+export type {
+  IdeaCreateInput,
+  IdeaUpdateInput,
+  IdeaListInput,
+  IdeaTransitionInput,
+  IdeaArchiveInput,
+  IdeaUnarchiveInput,
+  IdeaCoachQualifyInput,
+} from "./idea.schemas";
 
 const childLogger = logger.child({ service: "idea" });
 
@@ -484,6 +512,347 @@ export async function deleteIdea(ideaId: string, actor: string) {
   childLogger.info({ ideaId, campaignId: idea.campaignId }, "Idea deleted");
 
   return { id: ideaId };
+}
+
+/**
+ * Standard include for fetching idea with campaign feature toggles.
+ */
+const ideaWithCampaignToggles = {
+  id: true,
+  status: true,
+  previousStatus: true,
+  campaignId: true,
+  contributorId: true,
+  campaign: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      hasQualificationPhase: true,
+      hasDiscussionPhase: true,
+      hasIdeaCoach: true,
+    },
+  },
+} as const;
+
+/**
+ * Standard include for full idea response.
+ */
+const ideaFullInclude = {
+  contributor: {
+    select: { id: true, name: true, email: true, image: true },
+  },
+  coAuthors: {
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, image: true },
+      },
+    },
+  },
+  campaign: {
+    select: { id: true, title: true, status: true },
+  },
+} as const;
+
+/**
+ * Get valid transitions for an idea.
+ */
+export async function getIdeaValidTransitions(ideaId: string) {
+  const idea = await prisma.idea.findUnique({
+    where: { id: ideaId },
+    select: ideaWithCampaignToggles,
+  });
+
+  if (!idea) {
+    throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+  }
+
+  const toggles = {
+    hasQualificationPhase: idea.campaign.hasQualificationPhase,
+    hasDiscussionPhase: idea.campaign.hasDiscussionPhase,
+  };
+
+  const transitions = getValidIdeaTransitions(idea.status, toggles, idea.campaign.status);
+
+  return {
+    ideaId: idea.id,
+    currentStatus: idea.status,
+    currentStatusLabel: IDEA_STATUS_LABELS[idea.status],
+    validTransitions: transitions.map((status) => ({
+      status,
+      label: IDEA_STATUS_LABELS[status],
+    })),
+    canArchive: canArchiveIdea(idea.status),
+    canUnarchive: canUnarchiveIdea(idea.status),
+  };
+}
+
+/**
+ * Transition an idea to a new status via the state machine.
+ * Status changes ONLY go through this function — never direct prisma.update({ status }).
+ */
+export async function transitionIdea(input: IdeaTransitionInput, actor: string) {
+  const idea = await prisma.idea.findUnique({
+    where: { id: input.id },
+    select: ideaWithCampaignToggles,
+  });
+
+  if (!idea) {
+    throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+  }
+
+  const targetStatus = input.targetStatus as IdeaStatus;
+  const toggles = {
+    hasQualificationPhase: idea.campaign.hasQualificationPhase,
+    hasDiscussionPhase: idea.campaign.hasDiscussionPhase,
+  };
+
+  const valid = isValidIdeaTransition(idea.status, targetStatus, toggles, idea.campaign.status);
+
+  if (!valid) {
+    throw new IdeaServiceError(
+      `Cannot transition idea from ${IDEA_STATUS_LABELS[idea.status]} to ${IDEA_STATUS_LABELS[targetStatus]}`,
+      "INVALID_TRANSITION",
+    );
+  }
+
+  const updated = await prisma.idea.update({
+    where: { id: input.id },
+    data: {
+      previousStatus: idea.status,
+      status: targetStatus,
+    },
+    include: ideaFullInclude,
+  });
+
+  eventBus.emit("idea.transitioned", {
+    entity: "idea",
+    entityId: input.id,
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      campaignId: idea.campaignId,
+      previousStatus: idea.status,
+      newStatus: targetStatus,
+    },
+  });
+
+  childLogger.info({ ideaId: input.id, from: idea.status, to: targetStatus }, "Idea transitioned");
+
+  return serializeIdea(updated);
+}
+
+/**
+ * Archive an idea with a reason. Can be done by Innovation Manager.
+ */
+export async function archiveIdea(input: IdeaArchiveInput, actor: string) {
+  const idea = await prisma.idea.findUnique({
+    where: { id: input.id },
+    select: { id: true, status: true, campaignId: true },
+  });
+
+  if (!idea) {
+    throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+  }
+
+  if (!canArchiveIdea(idea.status)) {
+    throw new IdeaServiceError(
+      `Cannot archive idea in ${IDEA_STATUS_LABELS[idea.status]} status`,
+      "INVALID_STATUS",
+    );
+  }
+
+  const updated = await prisma.idea.update({
+    where: { id: input.id },
+    data: {
+      previousStatus: idea.status,
+      status: "ARCHIVED",
+    },
+    include: ideaFullInclude,
+  });
+
+  eventBus.emit("idea.archived", {
+    entity: "idea",
+    entityId: input.id,
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      campaignId: idea.campaignId,
+      previousStatus: idea.status,
+      reason: input.reason,
+    },
+  });
+
+  childLogger.info(
+    { ideaId: input.id, previousStatus: idea.status, reason: input.reason },
+    "Idea archived",
+  );
+
+  return serializeIdea(updated);
+}
+
+/**
+ * Unarchive an idea, restoring it to its previous status.
+ */
+export async function unarchiveIdea(input: IdeaUnarchiveInput, actor: string) {
+  const idea = await prisma.idea.findUnique({
+    where: { id: input.id },
+    select: { id: true, status: true, previousStatus: true, campaignId: true },
+  });
+
+  if (!idea) {
+    throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+  }
+
+  if (!canUnarchiveIdea(idea.status)) {
+    throw new IdeaServiceError("Only archived ideas can be unarchived", "INVALID_STATUS");
+  }
+
+  if (!idea.previousStatus) {
+    throw new IdeaServiceError(
+      "Cannot unarchive: no previous status recorded",
+      "NO_PREVIOUS_STATUS",
+    );
+  }
+
+  const restoreStatus = idea.previousStatus;
+
+  const updated = await prisma.idea.update({
+    where: { id: input.id },
+    data: {
+      previousStatus: "ARCHIVED",
+      status: restoreStatus,
+    },
+    include: ideaFullInclude,
+  });
+
+  eventBus.emit("idea.unarchived", {
+    entity: "idea",
+    entityId: input.id,
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      campaignId: idea.campaignId,
+      restoredStatus: restoreStatus,
+    },
+  });
+
+  childLogger.info({ ideaId: input.id, restoredStatus: restoreStatus }, "Idea unarchived");
+
+  return serializeIdea(updated);
+}
+
+/**
+ * Coach qualification: approve, reject, or request changes on an idea in QUALIFICATION status.
+ * Only available when the campaign has Idea Coach enabled (hasIdeaCoach).
+ */
+export async function coachQualifyIdea(input: IdeaCoachQualifyInput, actor: string) {
+  const idea = await prisma.idea.findUnique({
+    where: { id: input.id },
+    select: ideaWithCampaignToggles,
+  });
+
+  if (!idea) {
+    throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+  }
+
+  if (idea.status !== "QUALIFICATION") {
+    throw new IdeaServiceError(
+      "Coach qualification is only available for ideas in Qualification status",
+      "INVALID_STATUS",
+    );
+  }
+
+  if (!idea.campaign.hasIdeaCoach) {
+    throw new IdeaServiceError("Idea Coach is not enabled for this campaign", "COACH_NOT_ENABLED");
+  }
+
+  const eventTimestamp = new Date().toISOString();
+  const baseEventPayload = {
+    entity: "idea" as const,
+    entityId: input.id,
+    actor,
+    timestamp: eventTimestamp,
+    metadata: {
+      campaignId: idea.campaignId,
+      decision: input.decision,
+      feedback: input.feedback,
+    },
+  };
+
+  switch (input.decision) {
+    case "APPROVE": {
+      // Determine next status based on campaign toggles
+      const toggles = {
+        hasQualificationPhase: idea.campaign.hasQualificationPhase,
+        hasDiscussionPhase: idea.campaign.hasDiscussionPhase,
+      };
+
+      const nextStatuses = getValidIdeaTransitions("QUALIFICATION", toggles, idea.campaign.status);
+
+      if (nextStatuses.length === 0) {
+        throw new IdeaServiceError(
+          "No valid transition available from Qualification status given current campaign phase",
+          "NO_VALID_TRANSITION",
+        );
+      }
+
+      // Prefer COMMUNITY_DISCUSSION if available, otherwise take the first valid status
+      const targetStatus = nextStatuses.includes("COMMUNITY_DISCUSSION")
+        ? "COMMUNITY_DISCUSSION"
+        : nextStatuses[0]!;
+
+      const updated = await prisma.idea.update({
+        where: { id: input.id },
+        data: {
+          previousStatus: "QUALIFICATION",
+          status: targetStatus,
+        },
+        include: ideaFullInclude,
+      });
+
+      eventBus.emit("idea.coachQualified", baseEventPayload);
+
+      childLogger.info({ ideaId: input.id, targetStatus }, "Idea approved by coach");
+
+      return serializeIdea(updated);
+    }
+
+    case "REJECT": {
+      const updated = await prisma.idea.update({
+        where: { id: input.id },
+        data: {
+          previousStatus: "QUALIFICATION",
+          status: "ARCHIVED",
+        },
+        include: ideaFullInclude,
+      });
+
+      eventBus.emit("idea.coachRejected", baseEventPayload);
+
+      childLogger.info({ ideaId: input.id }, "Idea rejected by coach");
+
+      return serializeIdea(updated);
+    }
+
+    case "REQUEST_CHANGES": {
+      // Idea stays in QUALIFICATION, feedback is communicated via the event
+      const current = await prisma.idea.findUnique({
+        where: { id: input.id },
+        include: ideaFullInclude,
+      });
+
+      if (!current) {
+        throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+      }
+
+      eventBus.emit("idea.coachRequestedChanges", baseEventPayload);
+
+      childLogger.info({ ideaId: input.id }, "Coach requested changes on idea");
+
+      return serializeIdea(current);
+    }
+  }
 }
 
 export class IdeaServiceError extends Error {
