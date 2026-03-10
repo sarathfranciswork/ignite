@@ -332,13 +332,47 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy User @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  members   CampaignMember[]
+  createdBy    User             @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  members      CampaignMember[]
+  kpiSnapshots KpiSnapshot[]
 
   @@index([status])
   @@index([submissionType])
   @@index([createdById])
   @@map("campaigns")
+}
+
+model KpiSnapshot {
+  id           String   @id @default(cuid())
+  campaignId   String   @map("campaign_id")
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+
+  // Engagement KPIs
+  invitedCount     Int @default(0) @map("invited_count")
+  browsedCount     Int @default(0) @map("browsed_count")
+  participantCount Int @default(0) @map("participant_count")
+
+  // Content KPIs
+  ideaCount    Int @default(0) @map("idea_count")
+  commentCount Int @default(0) @map("comment_count")
+  voteCount    Int @default(0) @map("vote_count")
+  likeCount    Int @default(0) @map("like_count")
+
+  // Funnel KPIs
+  submittedCount Int @default(0) @map("submitted_count")
+  qualifiedCount Int @default(0) @map("qualified_count")
+  hotCount       Int @default(0) @map("hot_count")
+  evaluatedCount Int @default(0) @map("evaluated_count")
+  selectedCount  Int @default(0) @map("selected_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, snapshotDate])
+  @@index([campaignId])
+  @@index([snapshotDate])
+  @@map("kpi_snapshots")
 }
 
 model CampaignMember {

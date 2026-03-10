@@ -24,6 +24,8 @@ export const Action = {
   CAMPAIGN_MANAGE: "campaign.manage",
   CAMPAIGN_TRANSITION: "campaign.transition",
   CAMPAIGN_ASSIGN_ROLES: "campaign.assignRoles",
+  CAMPAIGN_VIEW_KPIS: "campaign.viewKpis",
+  CAMPAIGN_EXPORT_KPIS: "campaign.exportKpis",
 
   // Channel management
   CHANNEL_CREATE: "channel.create",
@@ -85,6 +87,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.USER_READ_ANY,
     Action.CAMPAIGN_CREATE,
     Action.CAMPAIGN_READ,
+    Action.CAMPAIGN_VIEW_KPIS,
+    Action.CAMPAIGN_EXPORT_KPIS,
     Action.CHANNEL_CREATE,
     Action.CHANNEL_READ,
     Action.IDEA_CREATE,
@@ -118,6 +122,8 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.CAMPAIGN_MANAGE,
     Action.CAMPAIGN_TRANSITION,
     Action.CAMPAIGN_ASSIGN_ROLES,
+    Action.CAMPAIGN_VIEW_KPIS,
+    Action.CAMPAIGN_EXPORT_KPIS,
     Action.IDEA_READ,
     Action.IDEA_UPDATE_ANY,
     Action.IDEA_DELETE_ANY,
@@ -128,6 +134,7 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
   ],
   CAMPAIGN_COACH: [
     Action.CAMPAIGN_READ,
+    Action.CAMPAIGN_VIEW_KPIS,
     Action.IDEA_READ,
     Action.IDEA_UPDATE_ANY,
     Action.IDEA_TRANSITION,

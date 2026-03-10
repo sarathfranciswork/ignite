@@ -26,11 +26,20 @@ import {
   setCampaignMembers,
   listCampaignMembers,
 } from "@/server/services/campaign-member.service";
+import {
+  cockpitGetInput,
+  cockpitActivityInput,
+  cockpitExportInput,
+  getCampaignCockpit,
+  getCampaignActivity,
+  exportCockpitData,
+  KpiServiceError,
+} from "@/server/services/kpi.service";
 
 function handleCampaignError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
 
-  if (error instanceof CampaignServiceError) {
+  if (error instanceof CampaignServiceError || error instanceof KpiServiceError) {
     const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "FORBIDDEN"> = {
       CAMPAIGN_NOT_FOUND: "NOT_FOUND",
       INVALID_TRANSITION: "BAD_REQUEST",
@@ -147,5 +156,53 @@ export const campaignRouter = createTRPCRouter({
     .input(campaignMemberListInput)
     .query(async ({ input }) => {
       return listCampaignMembers(input);
+    }),
+
+  getCockpit: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.CAMPAIGN_VIEW_KPIS,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(cockpitGetInput)
+    .query(async ({ input }) => {
+      try {
+        return await getCampaignCockpit(input);
+      } catch (error) {
+        handleCampaignError(error);
+      }
+    }),
+
+  getCockpitActivity: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.CAMPAIGN_VIEW_KPIS,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(cockpitActivityInput)
+    .query(async ({ input }) => {
+      try {
+        return await getCampaignActivity(input);
+      } catch (error) {
+        handleCampaignError(error);
+      }
+    }),
+
+  exportCockpit: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.CAMPAIGN_EXPORT_KPIS,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(cockpitExportInput)
+    .query(async ({ input }) => {
+      try {
+        return await exportCockpitData(input);
+      } catch (error) {
+        handleCampaignError(error);
+      }
     }),
 });
