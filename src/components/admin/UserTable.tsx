@@ -1,24 +1,14 @@
 "use client";
 
 import * as React from "react";
-import {
-  Search,
-  Plus,
-  ChevronDown,
-  MoreHorizontal,
-  UserX,
-  UserCheck,
-  Shield,
-  Building2,
-  Users,
-} from "lucide-react";
+import { Search, Plus, Building2, Users, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-// ── Types ──────────────────────────────────────────────────
+import { UserRowActions } from "@/components/admin/UserRowActions";
+import { BulkRoleDropdown } from "@/components/admin/BulkRoleDropdown";
 
 interface OrgUnitRef {
   orgUnit: { id: string; name: string };
@@ -279,7 +269,7 @@ export function UserTable({
                 </td>
                 <td className="px-4 py-3">
                   <UserRowActions
-                    user={user}
+                    isActive={user.isActive}
                     onEdit={() => onEditUser(user)}
                     onToggleActive={() => onToggleActive(user.id, !user.isActive)}
                   />
@@ -305,115 +295,6 @@ export function UserTable({
             {isLoading ? "Loading..." : "Load More"}
           </Button>
         </div>
-      )}
-    </div>
-  );
-}
-
-// ── Subcomponents ──────────────────────────────────────────
-
-function UserRowActions({
-  user,
-  onEdit,
-  onToggleActive,
-}: {
-  user: UserItem;
-  onEdit: () => void;
-  onToggleActive: () => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <div className="relative">
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(!open)}>
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-            onKeyDown={() => {}}
-            role="button"
-            tabIndex={-1}
-            aria-label="Close menu"
-          />
-          <div className="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-            <button
-              onClick={() => {
-                setOpen(false);
-                onEdit();
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Shield className="h-4 w-4" />
-              Edit User
-            </button>
-            <button
-              onClick={() => {
-                setOpen(false);
-                onToggleActive();
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              {user.isActive ? (
-                <>
-                  <UserX className="h-4 w-4 text-red-500" />
-                  <span className="text-red-600">Deactivate</span>
-                </>
-              ) : (
-                <>
-                  <UserCheck className="h-4 w-4 text-green-500" />
-                  <span className="text-green-600">Reactivate</span>
-                </>
-              )}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function BulkRoleDropdown({
-  onSelect,
-}: {
-  onSelect: (role: "PLATFORM_ADMIN" | "INNOVATION_MANAGER" | "MEMBER") => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <div className="relative">
-      <Button variant="secondary" size="sm" onClick={() => setOpen(!open)}>
-        <Shield className="mr-1 h-3.5 w-3.5" />
-        Assign Role
-        <ChevronDown className="ml-1 h-3.5 w-3.5" />
-      </Button>
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-            onKeyDown={() => {}}
-            role="button"
-            tabIndex={-1}
-            aria-label="Close menu"
-          />
-          <div className="absolute left-0 z-20 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-            {(["PLATFORM_ADMIN", "INNOVATION_MANAGER", "MEMBER"] as const).map((role) => (
-              <button
-                key={role}
-                onClick={() => {
-                  setOpen(false);
-                  onSelect(role);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                {ROLE_LABELS[role]}
-              </button>
-            ))}
-          </div>
-        </>
       )}
     </div>
   );

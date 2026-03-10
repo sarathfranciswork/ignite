@@ -1,58 +1,22 @@
-import { z } from "zod";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
 import type { Prisma } from "@prisma/client";
+import type { GroupListInput, GroupCreateInput, GroupUpdateInput } from "./admin.schemas";
+
+export {
+  groupListInput,
+  groupCreateInput,
+  groupUpdateInput,
+  groupDeleteInput,
+  groupGetByIdInput,
+  groupAddMemberInput,
+  groupRemoveMemberInput,
+  groupAddMembersInput,
+} from "./admin.schemas";
+export type { GroupListInput, GroupCreateInput, GroupUpdateInput } from "./admin.schemas";
 
 const childLogger = logger.child({ service: "group" });
-
-// ── Input Schemas ──────────────────────────────────────────
-
-export const groupListInput = z.object({
-  cursor: z.string().cuid().optional(),
-  limit: z.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-});
-
-export const groupCreateInput = z.object({
-  name: z.string().min(1, "Name is required").max(200, "Name must be 200 characters or less"),
-  description: z.string().max(500, "Description must be 500 characters or less").optional(),
-});
-
-export const groupUpdateInput = z.object({
-  id: z.string().cuid(),
-  name: z.string().min(1).max(200).optional(),
-  description: z.string().max(500).optional().nullable(),
-});
-
-export const groupDeleteInput = z.object({
-  id: z.string().cuid(),
-});
-
-export const groupGetByIdInput = z.object({
-  id: z.string().cuid(),
-});
-
-export const groupAddMemberInput = z.object({
-  groupId: z.string().cuid(),
-  userId: z.string().cuid(),
-});
-
-export const groupRemoveMemberInput = z.object({
-  groupId: z.string().cuid(),
-  userId: z.string().cuid(),
-});
-
-export const groupAddMembersInput = z.object({
-  groupId: z.string().cuid(),
-  userIds: z.array(z.string().cuid()).min(1).max(100),
-});
-
-export type GroupListInput = z.infer<typeof groupListInput>;
-export type GroupCreateInput = z.infer<typeof groupCreateInput>;
-export type GroupUpdateInput = z.infer<typeof groupUpdateInput>;
-
-// ── Service Functions ──────────────────────────────────────
 
 export async function listGroups(input: GroupListInput) {
   const where: Prisma.UserGroupWhereInput = {};
@@ -234,12 +198,13 @@ export async function deleteGroup(id: string, actorId: string) {
     throw new GroupServiceError("Group not found", "GROUP_NOT_FOUND");
   }
 
-  // Delete memberships first, then the group
-  await prisma.userGroupMembership.deleteMany({
-    where: { groupId: id },
-  });
-
-  await prisma.userGroup.delete({ where: { id } });
+  // Delete memberships and group atomically
+  await prisma.$transaction([
+    prisma.userGroupMembership.deleteMany({
+      where: { groupId: id },
+    }),
+    prisma.userGroup.delete({ where: { id } }),
+  ]);
 
   childLogger.info({ groupId: id, actorId }, "Group deleted");
 
@@ -297,14 +262,14 @@ export async function addMembers(groupId: string, userIds: string[], actorId: st
     throw new GroupServiceError("Group not found", "GROUP_NOT_FOUND");
   }
 
-  await prisma.userGroupMembership.createMany({
+  const result = await prisma.userGroupMembership.createMany({
     data: userIds.map((userId) => ({ userId, groupId })),
     skipDuplicates: true,
   });
 
-  childLogger.info({ groupId, count: userIds.length, actorId }, "Members added to group");
+  childLogger.info({ groupId, count: result.count, actorId }, "Members added to group");
 
-  return { groupId, added: userIds.length };
+  return { groupId, added: result.count };
 }
 
 export async function removeMember(groupId: string, userId: string, actorId: string) {
@@ -330,8 +295,6 @@ export async function removeMember(groupId: string, userId: string, actorId: str
     metadata: { userId, groupId },
   });
 }
-
-// ── Error Class ────────────────────────────────────────────
 
 export class GroupServiceError extends Error {
   constructor(
