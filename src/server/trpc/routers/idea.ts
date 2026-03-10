@@ -8,12 +8,22 @@ import {
   ideaGetByIdInput,
   ideaSubmitInput,
   ideaDeleteInput,
+  ideaTransitionInput,
+  ideaGetTransitionsInput,
+  ideaArchiveInput,
+  ideaUnarchiveInput,
+  ideaCoachQualifyInput,
   listIdeas,
   getIdeaById,
   createIdea,
   updateIdea,
   submitIdea,
   deleteIdea,
+  transitionIdea,
+  getIdeaValidTransitions,
+  archiveIdea,
+  unarchiveIdea,
+  coachQualifyIdea,
   IdeaServiceError,
 } from "@/server/services/idea.service";
 
@@ -26,6 +36,10 @@ function handleIdeaError(error: unknown): never {
       CAMPAIGN_NOT_FOUND: "NOT_FOUND",
       CAMPAIGN_NOT_ACCEPTING: "BAD_REQUEST",
       INVALID_STATUS: "BAD_REQUEST",
+      INVALID_TRANSITION: "BAD_REQUEST",
+      NO_VALID_TRANSITION: "BAD_REQUEST",
+      NO_PREVIOUS_STATUS: "BAD_REQUEST",
+      COACH_NOT_ENABLED: "BAD_REQUEST",
       NOT_AUTHORIZED: "FORBIDDEN",
     };
 
@@ -96,6 +110,61 @@ export const ideaRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await deleteIdea(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  getValidTransitions: protectedProcedure
+    .use(requirePermission(Action.IDEA_READ))
+    .input(ideaGetTransitionsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getIdeaValidTransitions(input.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  transition: protectedProcedure
+    .use(requirePermission(Action.IDEA_TRANSITION))
+    .input(ideaTransitionInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await transitionIdea(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  archive: protectedProcedure
+    .use(requirePermission(Action.IDEA_MODERATE))
+    .input(ideaArchiveInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await archiveIdea(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  unarchive: protectedProcedure
+    .use(requirePermission(Action.IDEA_MODERATE))
+    .input(ideaUnarchiveInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await unarchiveIdea(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  coachQualify: protectedProcedure
+    .use(requirePermission(Action.IDEA_TRANSITION))
+    .input(ideaCoachQualifyInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await coachQualifyIdea(input, ctx.session.user.id);
       } catch (error) {
         handleIdeaError(error);
       }

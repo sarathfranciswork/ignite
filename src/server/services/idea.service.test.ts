@@ -6,6 +6,11 @@ import {
   updateIdea,
   submitIdea,
   deleteIdea,
+  transitionIdea,
+  getIdeaValidTransitions,
+  archiveIdea,
+  unarchiveIdea,
+  coachQualifyIdea,
   IdeaServiceError,
 } from "./idea.service";
 
@@ -428,6 +433,381 @@ describe("idea.service", () => {
 
       await expect(updateIdea({ id: "nonexistent", title: "X" }, "user-1")).rejects.toMatchObject({
         code: "IDEA_NOT_FOUND",
+      });
+    });
+  });
+
+  describe("transitionIdea", () => {
+    const mockIdeaWithCampaignToggles = {
+      id: "idea-1",
+      status: "QUALIFICATION" as const,
+      previousStatus: "DRAFT" as const,
+      campaignId: "campaign-1",
+      contributorId: "user-1",
+      campaign: {
+        id: "campaign-1",
+        title: "Test Campaign",
+        status: "DISCUSSION_VOTING" as const,
+        hasQualificationPhase: true,
+        hasDiscussionPhase: true,
+        hasIdeaCoach: true,
+      },
+    };
+
+    it("transitions idea to valid target status", async () => {
+      ideaFindUnique.mockResolvedValue(mockIdeaWithCampaignToggles);
+      const transitionedIdea = {
+        ...mockIdea,
+        status: "COMMUNITY_DISCUSSION" as const,
+        previousStatus: "QUALIFICATION" as const,
+      };
+      ideaUpdate.mockResolvedValue(transitionedIdea);
+
+      const result = await transitionIdea(
+        { id: "idea-1", targetStatus: "COMMUNITY_DISCUSSION" },
+        "user-1",
+      );
+
+      expect(result.status).toBe("COMMUNITY_DISCUSSION");
+      expect(ideaUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "idea-1" },
+          data: expect.objectContaining({
+            status: "COMMUNITY_DISCUSSION",
+            previousStatus: "QUALIFICATION",
+          }),
+        }),
+      );
+      expect(mockEmit).toHaveBeenCalledWith(
+        "idea.transitioned",
+        expect.objectContaining({
+          entityId: "idea-1",
+          metadata: expect.objectContaining({
+            previousStatus: "QUALIFICATION",
+            newStatus: "COMMUNITY_DISCUSSION",
+          }),
+        }),
+      );
+    });
+
+    it("throws INVALID_TRANSITION for invalid target status", async () => {
+      ideaFindUnique.mockResolvedValue(mockIdeaWithCampaignToggles);
+
+      await expect(
+        transitionIdea({ id: "idea-1", targetStatus: "IMPLEMENTED" }, "user-1"),
+      ).rejects.toMatchObject({
+        code: "INVALID_TRANSITION",
+      });
+    });
+
+    it("throws IDEA_NOT_FOUND when idea does not exist", async () => {
+      ideaFindUnique.mockResolvedValue(null);
+
+      await expect(
+        transitionIdea({ id: "nonexistent", targetStatus: "COMMUNITY_DISCUSSION" }, "user-1"),
+      ).rejects.toMatchObject({
+        code: "IDEA_NOT_FOUND",
+      });
+    });
+
+    it("respects campaign phase ceiling", async () => {
+      // Campaign is in SUBMISSION, idea can't advance past QUALIFICATION
+      ideaFindUnique.mockResolvedValue({
+        ...mockIdeaWithCampaignToggles,
+        campaign: {
+          ...mockIdeaWithCampaignToggles.campaign,
+          status: "SUBMISSION" as const,
+        },
+      });
+
+      await expect(
+        transitionIdea({ id: "idea-1", targetStatus: "COMMUNITY_DISCUSSION" }, "user-1"),
+      ).rejects.toMatchObject({
+        code: "INVALID_TRANSITION",
+      });
+    });
+  });
+
+  describe("getIdeaValidTransitions", () => {
+    it("returns valid transitions for an idea", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "QUALIFICATION" as const,
+        previousStatus: "DRAFT" as const,
+        campaignId: "campaign-1",
+        contributorId: "user-1",
+        campaign: {
+          id: "campaign-1",
+          title: "Test Campaign",
+          status: "DISCUSSION_VOTING" as const,
+          hasQualificationPhase: true,
+          hasDiscussionPhase: true,
+          hasIdeaCoach: true,
+        },
+      });
+
+      const result = await getIdeaValidTransitions("idea-1");
+
+      expect(result.ideaId).toBe("idea-1");
+      expect(result.currentStatus).toBe("QUALIFICATION");
+      expect(result.currentStatusLabel).toBe("Qualification");
+      expect(result.validTransitions).toEqual(
+        expect.arrayContaining([expect.objectContaining({ status: "COMMUNITY_DISCUSSION" })]),
+      );
+      expect(result.canArchive).toBe(true);
+      expect(result.canUnarchive).toBe(false);
+    });
+
+    it("throws IDEA_NOT_FOUND when idea does not exist", async () => {
+      ideaFindUnique.mockResolvedValue(null);
+
+      await expect(getIdeaValidTransitions("nonexistent")).rejects.toMatchObject({
+        code: "IDEA_NOT_FOUND",
+      });
+    });
+  });
+
+  describe("archiveIdea", () => {
+    it("archives an idea with reason", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "QUALIFICATION" as const,
+        campaignId: "campaign-1",
+      });
+      const archivedIdea = {
+        ...mockIdea,
+        status: "ARCHIVED" as const,
+        previousStatus: "QUALIFICATION" as const,
+      };
+      ideaUpdate.mockResolvedValue(archivedIdea);
+
+      const result = await archiveIdea(
+        { id: "idea-1", reason: "Not aligned with strategy" },
+        "user-1",
+      );
+
+      expect(result.status).toBe("ARCHIVED");
+      expect(ideaUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "ARCHIVED",
+            previousStatus: "QUALIFICATION",
+          }),
+        }),
+      );
+      expect(mockEmit).toHaveBeenCalledWith(
+        "idea.archived",
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            reason: "Not aligned with strategy",
+          }),
+        }),
+      );
+    });
+
+    it("throws when idea is already IMPLEMENTED", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "IMPLEMENTED" as const,
+        campaignId: "campaign-1",
+      });
+
+      await expect(archiveIdea({ id: "idea-1", reason: "Test" }, "user-1")).rejects.toMatchObject({
+        code: "INVALID_STATUS",
+      });
+    });
+
+    it("throws when idea is already ARCHIVED", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "ARCHIVED" as const,
+        campaignId: "campaign-1",
+      });
+
+      await expect(archiveIdea({ id: "idea-1", reason: "Test" }, "user-1")).rejects.toMatchObject({
+        code: "INVALID_STATUS",
+      });
+    });
+  });
+
+  describe("unarchiveIdea", () => {
+    it("unarchives an idea to previous status", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "ARCHIVED" as const,
+        previousStatus: "COMMUNITY_DISCUSSION" as const,
+        campaignId: "campaign-1",
+      });
+      const unarchivedIdea = {
+        ...mockIdea,
+        status: "COMMUNITY_DISCUSSION" as const,
+        previousStatus: "ARCHIVED" as const,
+      };
+      ideaUpdate.mockResolvedValue(unarchivedIdea);
+
+      const result = await unarchiveIdea({ id: "idea-1" }, "user-1");
+
+      expect(result.status).toBe("COMMUNITY_DISCUSSION");
+      expect(ideaUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "COMMUNITY_DISCUSSION",
+            previousStatus: "ARCHIVED",
+          }),
+        }),
+      );
+      expect(mockEmit).toHaveBeenCalledWith(
+        "idea.unarchived",
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            restoredStatus: "COMMUNITY_DISCUSSION",
+          }),
+        }),
+      );
+    });
+
+    it("throws when idea is not archived", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "DRAFT" as const,
+        previousStatus: null,
+        campaignId: "campaign-1",
+      });
+
+      await expect(unarchiveIdea({ id: "idea-1" }, "user-1")).rejects.toMatchObject({
+        code: "INVALID_STATUS",
+      });
+    });
+
+    it("throws when no previous status recorded", async () => {
+      ideaFindUnique.mockResolvedValue({
+        id: "idea-1",
+        status: "ARCHIVED" as const,
+        previousStatus: null,
+        campaignId: "campaign-1",
+      });
+
+      await expect(unarchiveIdea({ id: "idea-1" }, "user-1")).rejects.toMatchObject({
+        code: "NO_PREVIOUS_STATUS",
+      });
+    });
+  });
+
+  describe("coachQualifyIdea", () => {
+    const mockQualificationIdea = {
+      id: "idea-1",
+      status: "QUALIFICATION" as const,
+      previousStatus: "DRAFT" as const,
+      campaignId: "campaign-1",
+      contributorId: "user-1",
+      campaign: {
+        id: "campaign-1",
+        title: "Test Campaign",
+        status: "DISCUSSION_VOTING" as const,
+        hasQualificationPhase: true,
+        hasDiscussionPhase: true,
+        hasIdeaCoach: true,
+      },
+    };
+
+    it("approves idea and transitions to COMMUNITY_DISCUSSION", async () => {
+      ideaFindUnique.mockResolvedValue(mockQualificationIdea);
+      const approvedIdea = {
+        ...mockIdea,
+        status: "COMMUNITY_DISCUSSION" as const,
+        previousStatus: "QUALIFICATION" as const,
+      };
+      ideaUpdate.mockResolvedValue(approvedIdea);
+
+      const result = await coachQualifyIdea(
+        { id: "idea-1", decision: "APPROVE", feedback: "Great idea!" },
+        "coach-1",
+      );
+
+      expect(result.status).toBe("COMMUNITY_DISCUSSION");
+      expect(mockEmit).toHaveBeenCalledWith(
+        "idea.coachQualified",
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            decision: "APPROVE",
+            feedback: "Great idea!",
+          }),
+        }),
+      );
+    });
+
+    it("rejects idea and archives it", async () => {
+      ideaFindUnique.mockResolvedValue(mockQualificationIdea);
+      const rejectedIdea = {
+        ...mockIdea,
+        status: "ARCHIVED" as const,
+        previousStatus: "QUALIFICATION" as const,
+      };
+      ideaUpdate.mockResolvedValue(rejectedIdea);
+
+      const result = await coachQualifyIdea(
+        { id: "idea-1", decision: "REJECT", feedback: "Not viable" },
+        "coach-1",
+      );
+
+      expect(result.status).toBe("ARCHIVED");
+      expect(mockEmit).toHaveBeenCalledWith(
+        "idea.coachRejected",
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            decision: "REJECT",
+          }),
+        }),
+      );
+    });
+
+    it("requests changes and keeps idea in QUALIFICATION", async () => {
+      // First call returns the idea with campaign toggles, second returns the full idea
+      ideaFindUnique.mockResolvedValueOnce(mockQualificationIdea).mockResolvedValueOnce(mockIdea);
+
+      const result = await coachQualifyIdea(
+        { id: "idea-1", decision: "REQUEST_CHANGES", feedback: "Please add more detail" },
+        "coach-1",
+      );
+
+      expect(result.id).toBe("idea-1");
+      expect(mockEmit).toHaveBeenCalledWith(
+        "idea.coachRequestedChanges",
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            decision: "REQUEST_CHANGES",
+            feedback: "Please add more detail",
+          }),
+        }),
+      );
+    });
+
+    it("throws when idea is not in QUALIFICATION status", async () => {
+      ideaFindUnique.mockResolvedValue({
+        ...mockQualificationIdea,
+        status: "COMMUNITY_DISCUSSION" as const,
+      });
+
+      await expect(
+        coachQualifyIdea({ id: "idea-1", decision: "APPROVE", feedback: "Good" }, "coach-1"),
+      ).rejects.toMatchObject({
+        code: "INVALID_STATUS",
+      });
+    });
+
+    it("throws when idea coach is not enabled for campaign", async () => {
+      ideaFindUnique.mockResolvedValue({
+        ...mockQualificationIdea,
+        campaign: {
+          ...mockQualificationIdea.campaign,
+          hasIdeaCoach: false,
+        },
+      });
+
+      await expect(
+        coachQualifyIdea({ id: "idea-1", decision: "APPROVE", feedback: "Good" }, "coach-1"),
+      ).rejects.toMatchObject({
+        code: "COACH_NOT_ENABLED",
       });
     });
   });
