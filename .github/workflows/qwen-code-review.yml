@@ -1,0 +1,148 @@
+name: Qwen Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+# Prevent overlapping reviews on the same PR
+concurrency:
+  group: qwen-review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qwen-review:
+    # Only review PRs created by Qwen (qwen/ branch prefix)
+    if: startsWith(github.event.pull_request.head.ref, 'qwen/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check review iteration count
+        id: check-iterations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Count only CHANGES_REQUESTED reviews from bots (not approvals/comments)
+          REVIEW_COUNT=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+            --jq '[.[] | select(.user.type == "Bot" and .state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
+          echo "review_count=${REVIEW_COUNT}" >> "$GITHUB_OUTPUT"
+          if [ "$REVIEW_COUNT" -ge 3 ]; then
+            echo "max_reached=true" >> "$GITHUB_OUTPUT"
+            echo "Max review iterations (3) reached for PR #${{ github.event.pull_request.number }}"
+          else
+            echo "max_reached=false" >> "$GITHUB_OUTPUT"
+            echo "Review iteration $((REVIEW_COUNT + 1)) of 3 for PR #${{ github.event.pull_request.number }}"
+          fi
+
+      - name: Verify Qwen LLM endpoint
+        if: steps.check-iterations.outputs.max_reached != 'true'
+        id: llm_check
+        run: |
+          set +e
+          HEALTH=$(curl -sf --max-time 15 "${{ secrets.QWEN_API_BASE }}/models" 2>/dev/null)
+          if [ $? -eq 0 ] && echo "$HEALTH" | jq -e '.data | length > 0' > /dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fallback to Claude review if Qwen unavailable
+        if: steps.llm_check.outputs.available == 'false' && steps.check-iterations.outputs.max_reached != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Qwen endpoint unavailable. Claude code review will handle this PR."
+          # Claude's code-review.yml reviews ALL PRs, so it will pick this up too
+
+      - name: Run Qwen Code Review
+        if: steps.check-iterations.outputs.max_reached != 'true' && steps.llm_check.outputs.available == 'true'
+        env:
+          LLM_BASE_URL: ${{ secrets.QWEN_API_BASE }}
+          LLM_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          LLM_MODEL: "qwen3-coder-next:q4_K_M"
+          MAX_ITERATIONS: "15"
+          REPO_ROOT: ${{ github.workspace }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+
+          # Get PR diff for context
+          PR_DIFF=$(gh pr diff "$PR_NUM" 2>/dev/null | head -1000 || echo "")
+          PR_DESC=$(gh pr view "$PR_NUM" --json title,body --jq '"\(.title)\n\n\(.body)"' 2>/dev/null || echo "")
+
+          # Build system prompt
+          cat > /tmp/system_prompt.txt << 'SYSTEM_EOF'
+          You are a code reviewer for the Ignite innovation management platform.
+          You have access to tools: bash, read_file, write_file, edit_file, list_files, search_files.
+          Review the PR thoroughly against project standards.
+          SYSTEM_EOF
+
+          # Build review prompt
+          cat > /tmp/user_prompt.txt << PROMPT_EOF
+          Review PR #${PR_NUM} in this repository thoroughly.
+
+          Before reviewing, read these files for context:
+          - Use read_file on CLAUDE.md for coding standards
+          - If it exists, read _bmad-output/project-context.md for architectural rules
+
+          ## REVIEW PROCESS
+
+          ### Step 1: Understand the Changes
+          - Use bash to get the PR diff: gh pr diff ${PR_NUM}
+          - Use bash to read the PR description: gh pr view ${PR_NUM}
+          - Understand what issue this PR addresses
+
+          ### Step 2: Review Against Standards
+          Check for:
+          - **Code quality**: Clean, readable, follows CLAUDE.md conventions
+          - **Type safety**: Proper typing, no \`any\` types (if TypeScript)
+          - **Security**: No hardcoded secrets, proper input validation
+          - **Performance**: No unnecessary work, efficient algorithms
+          - **Tests**: New features have tests, existing tests aren't broken
+          - **Architecture**: Follows established project patterns
+          - **Logger API**: pino uses \`logger.info({data}, "message")\` — object FIRST, message SECOND
+
+          ### Step 3: Provide Feedback
+          **If issues found:**
+          - Use bash to submit a review requesting changes with specific feedback:
+            gh pr review ${PR_NUM} --request-changes --body "@qwen Please fix the issues: <list issues>"
+
+          **If code looks good:**
+          - Use bash to post a comment: gh pr comment ${PR_NUM} --body "Code review: LGTM. All standards met."
+          - Use bash to enable auto-merge: gh pr merge ${PR_NUM} --squash --auto
+
+          ## PR Description:
+          ${PR_DESC}
+
+          ## PR Diff (first 1000 lines):
+          ${PR_DIFF}
+
+          ## IMPORTANT
+          - Be constructive and specific in feedback
+          - Only request changes for real issues, not style nitpicks
+          - If the PR is generally good with minor suggestions, enable auto-merge with a comment
+          - ALWAYS enable auto-merge (gh pr merge --squash --auto) when the code looks good
+          PROMPT_EOF
+
+          # Run agent
+          python3 .github/scripts/qwen-agent.py /tmp/system_prompt.txt /tmp/user_prompt.txt
+
+      - name: Auto-merge on max review iterations
+        if: steps.check-iterations.outputs.max_reached == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Max review iterations (3) reached. Enabling auto-merge to prevent infinite loop."
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Auto-merge enabled after 3 review iterations. Review cycles exhausted."
+          gh pr merge ${{ github.event.pull_request.number }} --squash --auto || \
+            echo "Could not enable auto-merge. PR may require manual merge."
