@@ -87,6 +87,13 @@ export const Action = {
   SEARCH_SAVE: "search.save",
   SEARCH_DELETE_OWN: "search.delete.own",
 
+  // Scouting board management
+  SCOUTING_BOARD_CREATE: "scoutingBoard.create",
+  SCOUTING_BOARD_READ: "scoutingBoard.read",
+  SCOUTING_BOARD_UPDATE: "scoutingBoard.update",
+  SCOUTING_BOARD_DELETE: "scoutingBoard.delete",
+  SCOUTING_BOARD_SHARE: "scoutingBoard.share",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -144,6 +151,11 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.ORGANIZATION_UPDATE,
     Action.ORGANIZATION_DELETE,
     Action.ORGANIZATION_MANAGE_CONTACTS,
+    Action.SCOUTING_BOARD_CREATE,
+    Action.SCOUTING_BOARD_READ,
+    Action.SCOUTING_BOARD_UPDATE,
+    Action.SCOUTING_BOARD_DELETE,
+    Action.SCOUTING_BOARD_SHARE,
     Action.USE_CASE_CREATE,
     Action.USE_CASE_READ,
     Action.USE_CASE_UPDATE,
@@ -174,6 +186,11 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.EVALUATION_PARTICIPATE,
     Action.NOTIFICATION_READ_OWN,
     Action.ORGANIZATION_READ,
+    Action.SCOUTING_BOARD_CREATE,
+    Action.SCOUTING_BOARD_READ,
+    Action.SCOUTING_BOARD_UPDATE,
+    Action.SCOUTING_BOARD_DELETE,
+    Action.SCOUTING_BOARD_SHARE,
     Action.USE_CASE_READ,
     Action.SEARCH_GLOBAL,
     Action.SEARCH_SAVE,
