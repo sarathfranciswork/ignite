@@ -13,7 +13,9 @@ import {
   ideaArchiveInput,
   ideaUnarchiveInput,
   ideaCoachQualifyInput,
+  ideaBoardListInput,
   listIdeas,
+  listIdeasForBoard,
   getIdeaById,
   createIdea,
   updateIdea,
@@ -58,6 +60,13 @@ export const ideaRouter = createTRPCRouter({
     .input(ideaListInput)
     .query(async ({ input }) => {
       return listIdeas(input);
+    }),
+
+  listForBoard: protectedProcedure
+    .use(requirePermission<{ campaignId: string }>(Action.IDEA_READ, (input) => input.campaignId))
+    .input(ideaBoardListInput)
+    .query(async ({ input }) => {
+      return listIdeasForBoard(input);
     }),
 
   getById: protectedProcedure

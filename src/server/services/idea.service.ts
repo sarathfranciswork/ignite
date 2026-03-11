@@ -17,6 +17,7 @@ import type {
   IdeaArchiveInput,
   IdeaUnarchiveInput,
   IdeaCoachQualifyInput,
+  IdeaBoardListInput,
 } from "./idea.schemas";
 
 export {
@@ -31,6 +32,7 @@ export {
   ideaArchiveInput,
   ideaUnarchiveInput,
   ideaCoachQualifyInput,
+  ideaBoardListInput,
 } from "./idea.schemas";
 
 export type {
@@ -41,6 +43,7 @@ export type {
   IdeaArchiveInput,
   IdeaUnarchiveInput,
   IdeaCoachQualifyInput,
+  IdeaBoardListInput,
 } from "./idea.schemas";
 
 const childLogger = logger.child({ service: "idea" });
@@ -853,6 +856,68 @@ export async function coachQualifyIdea(input: IdeaCoachQualifyInput, actor: stri
       return serializeIdea(current);
     }
   }
+}
+
+/**
+ * List ideas for a board view with configurable sorting and cursor-based pagination.
+ */
+export async function listIdeasForBoard(input: IdeaBoardListInput) {
+  const where: Prisma.IdeaWhereInput = {
+    campaignId: input.campaignId,
+  };
+
+  if (input.status) {
+    where.status = input.status;
+  }
+
+  if (input.tag) {
+    where.tags = { has: input.tag };
+  }
+
+  if (input.category) {
+    where.category = input.category;
+  }
+
+  if (input.search) {
+    where.OR = [
+      { title: { contains: input.search, mode: "insensitive" } },
+      { teaser: { contains: input.search, mode: "insensitive" } },
+    ];
+  }
+
+  const orderBy: Prisma.IdeaOrderByWithRelationInput = {
+    [input.sortField]: input.sortDirection,
+  };
+
+  const items = await prisma.idea.findMany({
+    where,
+    include: {
+      contributor: {
+        select: { id: true, name: true, email: true, image: true },
+      },
+      coAuthors: {
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+        },
+      },
+    },
+    take: input.limit + 1,
+    ...(input.cursor ? { skip: 1, cursor: { id: input.cursor } } : {}),
+    orderBy,
+  });
+
+  let nextCursor: string | undefined;
+  if (items.length > input.limit) {
+    const next = items.pop();
+    nextCursor = next?.id;
+  }
+
+  return {
+    items: items.map(serializeIdea),
+    nextCursor,
+  };
 }
 
 export class IdeaServiceError extends Error {
