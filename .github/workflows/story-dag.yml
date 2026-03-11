@@ -8,10 +8,16 @@ name: DAG Story Dispatcher
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      closed_issue_number:
+        description: "Issue number that was just closed/merged"
+        required: true
+        type: string
 
 jobs:
   dispatch-next:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -31,6 +37,14 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # Handle workflow_dispatch: issue number passed directly
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ISSUE_NUM="${{ github.event.inputs.closed_issue_number }}"
+            echo "issue_number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch for issue #$ISSUE_NUM"
+            exit 0
+          fi
+
           # Match "Closes #N", "Fixes #N", "Resolves #N" (case-insensitive)
           ISSUE_NUM=$(echo "$PR_BODY" | grep -oiP '(closes|fixes|resolves)\s*#\K[0-9]+' | head -1)
 
