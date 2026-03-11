@@ -174,10 +174,7 @@ describe("upsertVote", () => {
       updatedAt: now,
     });
 
-    const result = await upsertVote(
-      { ideaId: "idea-1", criterionId: "overall", score: 4 },
-      userId,
-    );
+    const result = await upsertVote({ ideaId: "idea-1", criterionId: "overall", score: 4 }, userId);
 
     expect(result.score).toBe(4);
     expect(mockEmit).toHaveBeenCalledWith(
@@ -247,9 +244,9 @@ describe("deleteVote", () => {
   it("throws when vote not found", async () => {
     voteFindUnique.mockResolvedValueOnce(null);
 
-    await expect(
-      deleteVote({ ideaId: "idea-1", criterionId: "overall" }, userId),
-    ).rejects.toThrow("Vote not found");
+    await expect(deleteVote({ ideaId: "idea-1", criterionId: "overall" }, userId)).rejects.toThrow(
+      "Vote not found",
+    );
   });
 });
 

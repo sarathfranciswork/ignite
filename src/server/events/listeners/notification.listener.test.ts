@@ -48,7 +48,9 @@ const campaignMemberFindMany = prisma.campaignMember.findMany as unknown as Mock
 const ideaFollowFindMany = prisma.ideaFollow.findMany as unknown as Mock;
 const notificationCreateMany = prisma.notification.createMany as unknown as Mock;
 
-const handlers = (eventBus as unknown as { _handlers: Record<string, ((...args: unknown[]) => Promise<void>)[]> })._handlers;
+const handlers = (
+  eventBus as unknown as { _handlers: Record<string, ((...args: unknown[]) => Promise<void>)[]> }
+)._handlers;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -88,10 +90,7 @@ describe("notification listener", () => {
         campaign: { title: "Test Campaign" },
       });
 
-      campaignMemberFindMany.mockResolvedValue([
-        { userId: "manager-1" },
-        { userId: "manager-2" },
-      ]);
+      campaignMemberFindMany.mockResolvedValue([{ userId: "manager-1" }, { userId: "manager-2" }]);
 
       notificationCreateMany.mockResolvedValue({ count: 2 });
 
@@ -221,10 +220,7 @@ describe("notification listener", () => {
         status: "SUBMISSION",
       });
 
-      campaignMemberFindMany.mockResolvedValue([
-        { userId: "member-1" },
-        { userId: "member-2" },
-      ]);
+      campaignMemberFindMany.mockResolvedValue([{ userId: "member-1" }, { userId: "member-2" }]);
 
       notificationCreateMany.mockResolvedValue({ count: 2 });
 
@@ -254,10 +250,7 @@ describe("notification listener", () => {
     it("notifies followers of the idea", async () => {
       const handler = await registerAndGetHandler("comment.created");
 
-      ideaFollowFindMany.mockResolvedValue([
-        { userId: "follower-1" },
-        { userId: "follower-2" },
-      ]);
+      ideaFollowFindMany.mockResolvedValue([{ userId: "follower-1" }, { userId: "follower-2" }]);
 
       ideaFindUnique.mockResolvedValue({
         id: "idea-1",

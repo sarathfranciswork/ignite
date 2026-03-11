@@ -105,15 +105,10 @@ function CriterionRow({
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-700">{label}</span>
         <span className="text-xs text-gray-400">
-          {averageScore > 0
-            ? `${averageScore.toFixed(1)} avg (${totalVoters})`
-            : "No votes yet"}
+          {averageScore > 0 ? `${averageScore.toFixed(1)} avg (${totalVoters})` : "No votes yet"}
         </span>
       </div>
-      <div
-        className="flex gap-0.5"
-        onMouseLeave={() => setHoveredStar(0)}
-      >
+      <div className="flex gap-0.5" onMouseLeave={() => setHoveredStar(0)}>
         {[1, 2, 3, 4, 5].map((star) => {
           const filled = hoveredStar > 0 ? star <= hoveredStar : star <= (userScore ?? 0);
           return (

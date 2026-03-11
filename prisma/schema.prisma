@@ -41,29 +41,30 @@ model User {
   createdAt             DateTime              @default(now()) @map("created_at")
   updatedAt             DateTime              @updatedAt @map("updated_at")
 
-  accounts              Account[]
-  sessions              Session[]
-  userGroupMembership   UserGroupMembership[]
-  orgUnitAssignments    UserOrgUnit[]
-  createdCampaigns      Campaign[]                  @relation("CampaignCreatedBy")
-  campaignMemberships   CampaignMember[]
-  createdChannels       Channel[]                   @relation("ChannelCreatedBy")
-  channelMemberships    ChannelMember[]
-  spaceMemberships      InnovationSpaceMembership[]
-  contributedIdeas      Idea[]                      @relation("IdeaContributor")
-  coAuthoredIdeas       IdeaCoAuthor[]
-  comments              Comment[]                   @relation("CommentAuthor")
-  commentMentions       CommentMention[]            @relation("CommentMentioned")
-  ideaLikes             IdeaLike[]
-  ideaVotes             IdeaVote[]
-  ideaFollows           IdeaFollow[]
-  orgManagerAssignments OrganizationManager[]
-  linkedContacts        Contact[]
-  ownedUseCases         UseCase[]             @relation("UseCaseOwner")
-  createdUseCases       UseCase[]             @relation("UseCaseCreatedBy")
+  accounts               Account[]
+  sessions               Session[]
+  userGroupMembership    UserGroupMembership[]
+  orgUnitAssignments     UserOrgUnit[]
+  createdCampaigns       Campaign[]                  @relation("CampaignCreatedBy")
+  campaignMemberships    CampaignMember[]
+  createdChannels        Channel[]                   @relation("ChannelCreatedBy")
+  channelMemberships     ChannelMember[]
+  spaceMemberships       InnovationSpaceMembership[]
+  contributedIdeas       Idea[]                      @relation("IdeaContributor")
+  coAuthoredIdeas        IdeaCoAuthor[]
+  comments               Comment[]                   @relation("CommentAuthor")
+  commentMentions        CommentMention[]            @relation("CommentMentioned")
+  ideaLikes              IdeaLike[]
+  ideaVotes              IdeaVote[]
+  ideaFollows            IdeaFollow[]
+  orgManagerAssignments  OrganizationManager[]
+  linkedContacts         Contact[]
+  ownedUseCases          UseCase[]                   @relation("UseCaseOwner")
+  createdUseCases        UseCase[]                   @relation("UseCaseCreatedBy")
   useCaseTeamMemberships UseCaseTeamMember[]
-  assignedUseCaseTasks  UseCaseTask[]         @relation("UseCaseTaskAssignee")
-  notifications         Notification[]
+  assignedUseCaseTasks   UseCaseTask[]               @relation("UseCaseTaskAssignee")
+  notifications          Notification[]
+  savedSearches          SavedSearch[]
 
   @@map("users")
 }
@@ -704,9 +705,9 @@ model Organization {
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
 
-  managers  OrganizationManager[]
-  contacts  Contact[]
-  useCases  UseCaseOrganization[]
+  managers OrganizationManager[]
+  contacts Contact[]
+  useCases UseCaseOrganization[]
 
   @@index([relationshipStatus])
   @@index([name])
@@ -780,17 +781,17 @@ enum UseCaseTeamRole {
 }
 
 model UseCase {
-  id                 String        @id @default(cuid())
+  id                 String         @id @default(cuid())
   title              String
-  problemDescription String?       @map("problem_description") @db.Text
-  suggestedSolution  String?       @map("suggested_solution") @db.Text
-  benefit            String?       @db.Text
-  status             UseCaseStatus @default(IDENTIFIED)
+  problemDescription String?        @map("problem_description") @db.Text
+  suggestedSolution  String?        @map("suggested_solution") @db.Text
+  benefit            String?        @db.Text
+  status             UseCaseStatus  @default(IDENTIFIED)
   previousStatus     UseCaseStatus? @map("previous_status")
-  ownerId            String        @map("owner_id")
-  createdById        String        @map("created_by_id")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
+  ownerId            String         @map("owner_id")
+  createdById        String         @map("created_by_id")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   owner         User                  @relation("UseCaseOwner", fields: [ownerId], references: [id])
   createdBy     User                  @relation("UseCaseCreatedBy", fields: [createdById], references: [id])
@@ -835,16 +836,16 @@ model UseCaseOrganization {
 }
 
 model UseCaseTask {
-  id          String             @id @default(cuid())
-  useCaseId   String             @map("use_case_id")
+  id          String            @id @default(cuid())
+  useCaseId   String            @map("use_case_id")
   title       String
-  description String?            @db.Text
-  status      UseCaseTaskStatus  @default(OPEN)
-  assigneeId  String?            @map("assignee_id")
-  dueDate     DateTime?          @map("due_date")
-  sortOrder   Int                @default(0) @map("sort_order")
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
+  description String?           @db.Text
+  status      UseCaseTaskStatus @default(OPEN)
+  assigneeId  String?           @map("assignee_id")
+  dueDate     DateTime?         @map("due_date")
+  sortOrder   Int               @default(0) @map("sort_order")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
 
   useCase  UseCase @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
   assignee User?   @relation("UseCaseTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -853,6 +854,22 @@ model UseCaseTask {
   @@index([assigneeId])
   @@index([useCaseId, status])
   @@map("use_case_tasks")
+}
+
+// ── Saved Search Models ───────────────────────────────────────
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String
+  query     String
+  filters   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_searches")
 }
 
 // ── SSO Configuration Models ──────────────────────────────────

@@ -101,7 +101,10 @@ export async function markAsRead(userId: string, input: NotificationMarkReadInpu
   }
 
   if (notification.userId !== userId) {
-    throw new NotificationServiceError("NOT_AUTHORIZED", "Not authorized to modify this notification");
+    throw new NotificationServiceError(
+      "NOT_AUTHORIZED",
+      "Not authorized to modify this notification",
+    );
   }
 
   const updated = await prisma.notification.update({

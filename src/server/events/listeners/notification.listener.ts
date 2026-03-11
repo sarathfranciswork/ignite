@@ -45,9 +45,7 @@ async function getIdeaFollowers(ideaId: string, excludeUserId?: string): Promise
     select: { userId: true },
   });
 
-  return follows
-    .map((f) => f.userId)
-    .filter((uid) => uid !== excludeUserId);
+  return follows.map((f) => f.userId).filter((uid) => uid !== excludeUserId);
 }
 
 export function registerNotificationListeners() {

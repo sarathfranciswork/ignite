@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { Search, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/notifications/NotificationCenter";
+import { CommandPalette } from "@/components/shared/CommandPalette";
 
 interface HeaderProps {
   sidebarCollapsed: boolean;
@@ -69,12 +69,9 @@ export function Header({ sidebarCollapsed, onMobileMenuToggle }: HeaderProps) {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Search */}
-      <div className="hidden w-64 md:block">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input placeholder="Search... (Ctrl+K)" className="pl-9" readOnly aria-label="Search" />
-        </div>
+      {/* Search - Command Palette trigger */}
+      <div className="hidden md:block">
+        <CommandPalette />
       </div>
 
       {/* Notifications */}
