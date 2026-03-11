@@ -518,6 +518,9 @@ model Idea {
   // Full-text search vector (populated via database trigger)
   searchVector Unsupported("tsvector")? @map("search_vector")
 
+  // AI embedding vector (384-dim, populated async via embedding job)
+  embedding Unsupported("vector(384)")? @map("embedding")
+
   // Engagement counters (denormalized for performance)
   likesCount    Int @default(0) @map("likes_count")
   commentsCount Int @default(0) @map("comments_count")

@@ -94,6 +94,10 @@ export const Action = {
   SCOUTING_BOARD_DELETE: "scoutingBoard.delete",
   SCOUTING_BOARD_SHARE: "scoutingBoard.share",
 
+  // AI features
+  AI_VIEW_STATUS: "ai.viewStatus",
+  AI_FIND_SIMILAR: "ai.findSimilar",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -166,6 +170,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SEARCH_GLOBAL,
     Action.SEARCH_SAVE,
     Action.SEARCH_DELETE_OWN,
+    Action.AI_VIEW_STATUS,
+    Action.AI_FIND_SIMILAR,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -195,6 +201,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SEARCH_GLOBAL,
     Action.SEARCH_SAVE,
     Action.SEARCH_DELETE_OWN,
+    Action.AI_VIEW_STATUS,
+    Action.AI_FIND_SIMILAR,
   ],
 } as const;
 

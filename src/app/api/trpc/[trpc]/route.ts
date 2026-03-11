@@ -4,10 +4,12 @@ import { createTRPCContext } from "@/server/trpc/trpc";
 import { registerNotificationListeners } from "@/server/events/listeners/notification.listener";
 import { registerGraduationListeners } from "@/server/events/listeners/graduation.listener";
 import { registerActivityListeners } from "@/server/events/listeners/activity.listener";
+import { registerEmbeddingListeners } from "@/server/events/listeners/embedding.listener";
 
 registerNotificationListeners();
 registerGraduationListeners();
 registerActivityListeners();
+registerEmbeddingListeners();
 
 function handler(req: Request) {
   return fetchRequestHandler({
