@@ -23,6 +23,7 @@ import { FollowButton } from "@/components/ideas/FollowButton";
 import { VotingWidget } from "@/components/ideas/VotingWidget";
 import { GraduationProgress } from "@/components/ideas/GraduationProgress";
 import { ActivityFeed } from "@/components/ideas/ActivityFeed";
+import { SimilarIdeas } from "@/components/ideas/SimilarIdeas";
 import {
   Dialog,
   DialogContent,
@@ -270,6 +271,8 @@ export function IdeaDetail({ ideaId }: IdeaDetailProps) {
       {!isDraft && <VotingWidget ideaId={idea.id} />}
 
       {idea.status === "COMMUNITY_DISCUSSION" && <GraduationProgress ideaId={idea.id} />}
+
+      {!isDraft && <SimilarIdeas ideaId={idea.id} />}
 
       <IdeaDiscussion ideaId={idea.id} />
 
