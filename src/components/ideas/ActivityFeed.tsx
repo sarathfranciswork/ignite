@@ -26,51 +26,51 @@ interface ActivityFeedProps {
 }
 
 const EVENT_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
-  "idea.submitted": {
+  IDEA_SUBMITTED: {
     icon: <Send className="h-3.5 w-3.5" />,
     color: "bg-blue-100 text-blue-600",
   },
-  "idea.transitioned": {
+  IDEA_TRANSITIONED: {
     icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
     color: "bg-purple-100 text-purple-600",
   },
-  "idea.statusChanged": {
+  IDEA_STATUS_CHANGED: {
     icon: <Flame className="h-3.5 w-3.5" />,
     color: "bg-orange-100 text-orange-600",
   },
-  "idea.archived": {
+  IDEA_ARCHIVED: {
     icon: <Archive className="h-3.5 w-3.5" />,
     color: "bg-gray-100 text-gray-600",
   },
-  "idea.unarchived": {
+  IDEA_UNARCHIVED: {
     icon: <RotateCcw className="h-3.5 w-3.5" />,
     color: "bg-green-100 text-green-600",
   },
-  "comment.created": {
+  COMMENT_CREATED: {
     icon: <MessageCircle className="h-3.5 w-3.5" />,
     color: "bg-sky-100 text-sky-600",
   },
-  "idea.liked": {
+  IDEA_LIKED: {
     icon: <Heart className="h-3.5 w-3.5" />,
     color: "bg-pink-100 text-pink-600",
   },
-  "idea.voted": {
+  IDEA_VOTED: {
     icon: <Star className="h-3.5 w-3.5" />,
     color: "bg-amber-100 text-amber-600",
   },
-  "idea.followed": {
+  IDEA_FOLLOWED: {
     icon: <Bell className="h-3.5 w-3.5" />,
     color: "bg-indigo-100 text-indigo-600",
   },
-  "idea.coachQualified": {
+  IDEA_COACH_QUALIFIED: {
     icon: <CheckCircle className="h-3.5 w-3.5" />,
     color: "bg-green-100 text-green-600",
   },
-  "idea.coachRejected": {
+  IDEA_COACH_REJECTED: {
     icon: <XCircle className="h-3.5 w-3.5" />,
     color: "bg-red-100 text-red-600",
   },
-  "idea.coachRequestedChanges": {
+  IDEA_COACH_REQUESTED_CHANGES: {
     icon: <AlertCircle className="h-3.5 w-3.5" />,
     color: "bg-yellow-100 text-yellow-600",
   },

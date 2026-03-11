@@ -41,20 +41,16 @@ vi.mock("@/server/events/event-bus", () => ({
   },
 }));
 
-vi.mock("@/server/lib/state-machines/idea-transitions", () => ({
-  isValidIdeaTransition: vi.fn(),
+const mockTransitionIdea = vi.fn();
+vi.mock("@/server/services/idea.service", () => ({
+  transitionIdea: (...args: unknown[]) => mockTransitionIdea(...args),
 }));
 
 const { prisma } = await import("@/server/lib/prisma");
-const { eventBus } = await import("@/server/events/event-bus");
-const { isValidIdeaTransition } = await import("@/server/lib/state-machines/idea-transitions");
 
 const ideaFindUnique = prisma.idea.findUnique as unknown as Mock;
-const ideaUpdate = prisma.idea.update as unknown as Mock;
 const commentFindMany = prisma.comment.findMany as unknown as Mock;
 const voteFindMany = prisma.ideaVote.findMany as unknown as Mock;
-const mockEmit = eventBus.emit as unknown as Mock;
-const mockIsValidTransition = isValidIdeaTransition as unknown as Mock;
 
 const baseCampaign = {
   hasCommunityGraduation: true,
@@ -194,29 +190,14 @@ describe("checkAndGraduateIdea", () => {
       },
     });
 
-    mockIsValidTransition.mockReturnValueOnce(true);
-    ideaUpdate.mockResolvedValueOnce({});
+    mockTransitionIdea.mockResolvedValueOnce({});
 
     const result = await checkAndGraduateIdea("idea-1", "actor-1");
 
     expect(result).toBe(true);
-    expect(ideaUpdate).toHaveBeenCalledWith({
-      where: { id: "idea-1" },
-      data: {
-        previousStatus: "COMMUNITY_DISCUSSION",
-        status: "HOT",
-      },
-    });
-    expect(mockEmit).toHaveBeenCalledWith(
-      "idea.statusChanged",
-      expect.objectContaining({
-        entity: "idea",
-        entityId: "idea-1",
-        metadata: expect.objectContaining({
-          newStatus: "HOT",
-          reason: "community_graduation",
-        }),
-      }),
+    expect(mockTransitionIdea).toHaveBeenCalledWith(
+      { id: "idea-1", targetStatus: "HOT" },
+      "actor-1",
     );
   });
 
@@ -232,7 +213,7 @@ describe("checkAndGraduateIdea", () => {
     const result = await checkAndGraduateIdea("idea-1", "actor-1");
 
     expect(result).toBe(false);
-    expect(ideaUpdate).not.toHaveBeenCalled();
+    expect(mockTransitionIdea).not.toHaveBeenCalled();
   });
 
   it("does not graduate when idea is not in COMMUNITY_DISCUSSION", async () => {
@@ -269,11 +250,13 @@ describe("checkAndGraduateIdea", () => {
       campaign: { ...baseCampaign },
     });
 
-    mockIsValidTransition.mockReturnValueOnce(false);
+    // transitionIdea throws when transition is invalid
+    mockTransitionIdea.mockRejectedValueOnce(
+      new Error("Cannot transition idea from Community Discussion to Hot"),
+    );
 
     const result = await checkAndGraduateIdea("idea-1", "actor-1");
 
     expect(result).toBe(false);
-    expect(ideaUpdate).not.toHaveBeenCalled();
   });
 });

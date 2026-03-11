@@ -1,6 +1,6 @@
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, ActivityEventType } from "@prisma/client";
 import type { ActivityListInput, ActivityListByCampaignInput } from "./activity.schemas";
 
 export { activityListInput, activityListByCampaignInput } from "./activity.schemas";
@@ -22,7 +22,7 @@ interface CreateActivityInput {
   ideaId: string;
   campaignId: string;
   actorId: string;
-  eventType: string;
+  eventType: ActivityEventType;
   title: string;
   body?: string;
   metadata?: Record<string, unknown>;
@@ -33,7 +33,7 @@ function serializeActivityEvent(event: {
   ideaId: string;
   campaignId: string;
   actorId: string;
-  eventType: string;
+  eventType: ActivityEventType;
   title: string;
   body: string | null;
   metadata: unknown;

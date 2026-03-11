@@ -1,7 +1,7 @@
 import { eventBus } from "@/server/events/event-bus";
 import { logger } from "@/server/lib/logger";
 import { prisma } from "@/server/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, ActivityEventType } from "@prisma/client";
 
 const childLogger = logger.child({ service: "activity-listener" });
 
@@ -13,7 +13,7 @@ interface ActivityRecord {
   ideaId: string;
   campaignId: string;
   actorId: string;
-  eventType: string;
+  eventType: ActivityEventType;
   title: string;
   body?: string;
   metadata?: Record<string, unknown>;
@@ -62,7 +62,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.submitted",
+      eventType: "IDEA_SUBMITTED",
       title: "Idea submitted",
       body: `Idea "${payload.metadata?.title as string}" was submitted`,
       metadata: payload.metadata,
@@ -80,7 +80,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.transitioned",
+      eventType: "IDEA_TRANSITIONED",
       title: "Status changed",
       body: `Status changed from ${previousStatus} to ${newStatus}`,
       metadata: payload.metadata,
@@ -98,7 +98,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.statusChanged",
+      eventType: "IDEA_STATUS_CHANGED",
       title: newStatus === "HOT" ? "Graduated to HOT!" : "Status changed",
       body:
         reason === "community_graduation"
@@ -116,7 +116,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.archived",
+      eventType: "IDEA_ARCHIVED",
       title: "Idea archived",
       body: payload.metadata?.reason
         ? `Archived: ${payload.metadata.reason as string}`
@@ -133,7 +133,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.unarchived",
+      eventType: "IDEA_UNARCHIVED",
       title: "Idea restored",
       body: `Idea restored to ${payload.metadata?.restoredStatus as string}`,
       metadata: payload.metadata,
@@ -151,7 +151,7 @@ export function registerActivityListeners() {
       ideaId,
       campaignId,
       actorId: payload.actor,
-      eventType: "comment.created",
+      eventType: "COMMENT_CREATED",
       title: isReply ? "Reply added" : "Comment added",
       body: isReply ? "A reply was added to the discussion" : "A new comment was added",
       metadata: payload.metadata,
@@ -167,7 +167,7 @@ export function registerActivityListeners() {
         ideaId: payload.entityId,
         campaignId: resolved,
         actorId: payload.actor,
-        eventType: "idea.liked",
+        eventType: "IDEA_LIKED",
         title: "Idea liked",
       });
       return;
@@ -177,7 +177,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.liked",
+      eventType: "IDEA_LIKED",
       title: "Idea liked",
     });
   });
@@ -191,7 +191,7 @@ export function registerActivityListeners() {
         ideaId: payload.entityId,
         campaignId: resolved,
         actorId: payload.actor,
-        eventType: "idea.voted",
+        eventType: "IDEA_VOTED",
         title: "Vote cast",
         metadata: payload.metadata,
       });
@@ -202,7 +202,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.voted",
+      eventType: "IDEA_VOTED",
       title: "Vote cast",
       metadata: payload.metadata,
     });
@@ -217,7 +217,7 @@ export function registerActivityListeners() {
         ideaId: payload.entityId,
         campaignId: resolved,
         actorId: payload.actor,
-        eventType: "idea.followed",
+        eventType: "IDEA_FOLLOWED",
         title: "Started following",
       });
       return;
@@ -227,7 +227,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.followed",
+      eventType: "IDEA_FOLLOWED",
       title: "Started following",
     });
   });
@@ -240,7 +240,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.coachQualified",
+      eventType: "IDEA_COACH_QUALIFIED",
       title: "Approved by coach",
       body: "Idea was approved by an idea coach",
       metadata: payload.metadata,
@@ -255,7 +255,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.coachRejected",
+      eventType: "IDEA_COACH_REJECTED",
       title: "Rejected by coach",
       body: "Idea was rejected by an idea coach",
       metadata: payload.metadata,
@@ -270,7 +270,7 @@ export function registerActivityListeners() {
       ideaId: payload.entityId,
       campaignId,
       actorId: payload.actor,
-      eventType: "idea.coachRequestedChanges",
+      eventType: "IDEA_COACH_REQUESTED_CHANGES",
       title: "Changes requested",
       body: "An idea coach requested changes",
       metadata: payload.metadata,

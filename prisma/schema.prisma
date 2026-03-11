@@ -353,10 +353,11 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy    User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  members      CampaignMember[]
-  kpiSnapshots CampaignKpiSnapshot[]
-  ideas        Idea[]
+  createdBy       User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  members         CampaignMember[]
+  kpiSnapshots    CampaignKpiSnapshot[]
+  ideas           Idea[]
+  activityEvents  ActivityEvent[]
 
   @@index([status])
   @@index([submissionType])
@@ -1093,19 +1094,37 @@ model Notification {
 
 // ── Activity Stream Models ──────────────────────────────────
 
-model ActivityEvent {
-  id         String   @id @default(cuid())
-  ideaId     String   @map("idea_id")
-  campaignId String   @map("campaign_id")
-  actorId    String   @map("actor_id")
-  eventType  String   @map("event_type")
-  title      String
-  body       String?  @db.Text
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
+enum ActivityEventType {
+  IDEA_SUBMITTED
+  IDEA_TRANSITIONED
+  IDEA_STATUS_CHANGED
+  IDEA_ARCHIVED
+  IDEA_UNARCHIVED
+  COMMENT_CREATED
+  IDEA_LIKED
+  IDEA_VOTED
+  IDEA_FOLLOWED
+  IDEA_COACH_QUALIFIED
+  IDEA_COACH_REJECTED
+  IDEA_COACH_REQUESTED_CHANGES
 
-  idea     Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
-  actor    User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  @@map("activity_event_type")
+}
+
+model ActivityEvent {
+  id         String            @id @default(cuid())
+  ideaId     String            @map("idea_id")
+  campaignId String            @map("campaign_id")
+  actorId    String            @map("actor_id")
+  eventType  ActivityEventType @map("event_type")
+  title      String
+  body       String?           @db.Text
+  metadata   Json?
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  idea     Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  actor    User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([ideaId, createdAt])
   @@index([campaignId, createdAt])
