@@ -59,6 +59,10 @@ model User {
   ideaFollows           IdeaFollow[]
   orgManagerAssignments OrganizationManager[]
   linkedContacts        Contact[]
+  ownedUseCases         UseCase[]             @relation("UseCaseOwner")
+  createdUseCases       UseCase[]             @relation("UseCaseCreatedBy")
+  useCaseTeamMemberships UseCaseTeamMember[]
+  assignedUseCaseTasks  UseCaseTask[]         @relation("UseCaseTaskAssignee")
 
   @@map("users")
 }
@@ -699,8 +703,9 @@ model Organization {
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
 
-  managers OrganizationManager[]
-  contacts Contact[]
+  managers  OrganizationManager[]
+  contacts  Contact[]
+  useCases  UseCaseOrganization[]
 
   @@index([relationshipStatus])
   @@index([name])
@@ -743,6 +748,110 @@ model Contact {
   @@index([organizationId])
   @@index([linkedUserId])
   @@map("contacts")
+}
+
+// ── Use Case Pipeline Models ──────────────────────────────────
+
+enum UseCaseStatus {
+  IDENTIFIED
+  QUALIFICATION
+  EVALUATION
+  PILOT
+  PARTNERSHIP
+  ARCHIVED
+
+  @@map("use_case_status")
+}
+
+enum UseCaseTaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+
+  @@map("use_case_task_status")
+}
+
+enum UseCaseTeamRole {
+  LEAD
+  MEMBER
+
+  @@map("use_case_team_role")
+}
+
+model UseCase {
+  id                 String        @id @default(cuid())
+  title              String
+  problemDescription String?       @map("problem_description") @db.Text
+  suggestedSolution  String?       @map("suggested_solution") @db.Text
+  benefit            String?       @db.Text
+  status             UseCaseStatus @default(IDENTIFIED)
+  previousStatus     UseCaseStatus? @map("previous_status")
+  ownerId            String        @map("owner_id")
+  createdById        String        @map("created_by_id")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  owner         User                  @relation("UseCaseOwner", fields: [ownerId], references: [id])
+  createdBy     User                  @relation("UseCaseCreatedBy", fields: [createdById], references: [id])
+  teamMembers   UseCaseTeamMember[]
+  organizations UseCaseOrganization[]
+  tasks         UseCaseTask[]
+
+  @@index([status])
+  @@index([ownerId])
+  @@index([createdById])
+  @@map("use_cases")
+}
+
+model UseCaseTeamMember {
+  id         String          @id @default(cuid())
+  useCaseId  String          @map("use_case_id")
+  userId     String          @map("user_id")
+  role       UseCaseTeamRole @default(MEMBER)
+  assignedAt DateTime        @default(now()) @map("assigned_at")
+
+  useCase UseCase @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([useCaseId, userId])
+  @@index([useCaseId])
+  @@index([userId])
+  @@map("use_case_team_members")
+}
+
+model UseCaseOrganization {
+  id             String @id @default(cuid())
+  useCaseId      String @map("use_case_id")
+  organizationId String @map("organization_id")
+
+  useCase      UseCase      @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([useCaseId, organizationId])
+  @@index([useCaseId])
+  @@index([organizationId])
+  @@map("use_case_organizations")
+}
+
+model UseCaseTask {
+  id          String             @id @default(cuid())
+  useCaseId   String             @map("use_case_id")
+  title       String
+  description String?            @db.Text
+  status      UseCaseTaskStatus  @default(OPEN)
+  assigneeId  String?            @map("assignee_id")
+  dueDate     DateTime?          @map("due_date")
+  sortOrder   Int                @default(0) @map("sort_order")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  useCase  UseCase @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("UseCaseTaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([useCaseId])
+  @@index([assigneeId])
+  @@index([useCaseId, status])
+  @@map("use_case_tasks")
 }
 
 // ── SSO Configuration Models ──────────────────────────────────

@@ -9,6 +9,7 @@ import { ideaRouter } from "./idea";
 import { organizationRouter } from "./organization";
 import { spaceRouter } from "./space";
 import { ssoRouter } from "./sso";
+import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
 
 export const appRouter = createTRPCRouter({
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   organization: organizationRouter,
   space: spaceRouter,
   sso: ssoRouter,
+  useCase: useCaseRouter,
   user: userRouter,
 });
 
