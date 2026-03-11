@@ -171,10 +171,7 @@ export async function checkAndGraduateIdea(ideaId: string, actor: string): Promi
   try {
     await transitionIdea({ id: ideaId, targetStatus: "HOT" }, actor);
   } catch (error) {
-    childLogger.info(
-      { ideaId, error },
-      "HOT transition not valid — graduation skipped",
-    );
+    childLogger.info({ ideaId, error }, "HOT transition not valid — graduation skipped");
     return false;
   }
 
