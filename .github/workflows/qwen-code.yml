@@ -223,6 +223,14 @@ jobs:
           - Use `list_files` to explore the codebase structure
           - Use `search_files` to find code patterns
 
+          ## EXECUTION DISCIPLINE
+          - You have a LIMITED number of iterations. Do NOT waste them all on research.
+          - Spend at most 8-10 iterations reading/exploring the codebase.
+          - Then START IMPLEMENTING. Write code files, don't just read them.
+          - If you don't have enough context, make reasonable assumptions and implement.
+          - ALWAYS create the feature branch FIRST (Step 1), then explore, then implement.
+          - ALWAYS create the PR LAST (Step 5), even if implementation is partial.
+
           ## CRITICAL RULES
           - NEVER recreate project scaffolding if it already exists
           - NEVER modify CLAUDE.md, settings.json, or lock files unless explicitly told to

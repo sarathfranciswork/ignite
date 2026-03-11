@@ -347,9 +347,13 @@ def run_agent(system_prompt: str, user_prompt: str) -> str:
         {"role": "user", "content": user_prompt},
     ]
 
+    files_written = set()
+    files_edited = set()
+
     for iteration in range(1, MAX_ITERATIONS + 1):
         print(f"\n{'='*60}")
         print(f"  Iteration {iteration}/{MAX_ITERATIONS}")
+        print(f"  Files created: {len(files_written)} | Files edited: {len(files_edited)}")
         print(f"{'='*60}")
 
         try:
@@ -385,6 +389,13 @@ def run_agent(system_prompt: str, user_prompt: str) -> str:
                 print(f"\n  Tool: {fn_name}({args_preview})")
 
                 output = execute_tool(fn_name, fn_args)
+
+                # Track file modifications
+                if fn_name == "write_file" and not output.startswith("Error"):
+                    files_written.add(fn_args.get("path", ""))
+                elif fn_name == "edit_file" and not output.startswith("Error"):
+                    files_edited.add(fn_args.get("path", ""))
+
                 output_preview = output[:500]
                 if len(output) > 500:
                     output_preview += f"... ({len(output)} chars total)"
@@ -406,6 +417,11 @@ def run_agent(system_prompt: str, user_prompt: str) -> str:
                 print(f"\n  Agent completed after {iteration} iterations.")
                 return content
 
+    print(f"\nWARNING: Agent hit max iterations ({MAX_ITERATIONS})")
+    print(f"Files created: {len(files_written)} | Files edited: {len(files_edited)}")
+    if not files_written and not files_edited:
+        print("ERROR: No files were modified. Agent failed to implement.")
+        sys.exit(1)
     return f"Agent stopped: max iterations ({MAX_ITERATIONS}) reached"
 
 
