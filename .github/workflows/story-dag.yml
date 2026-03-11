@@ -92,9 +92,10 @@ jobs:
 
             echo "Next in epic: Story $NEXT_STORY_ID (#$NEXT_ISSUE) - $NEXT_TITLE"
 
-            gh issue edit "$NEXT_ISSUE" --remove-label "claude-code" 2>/dev/null || true
-            sleep 2
-            gh issue edit "$NEXT_ISSUE" --add-label "claude-code"
+            # Add label for tracking (may not trigger workflow in exported repos)
+            gh issue edit "$NEXT_ISSUE" --add-label "claude-code" 2>/dev/null || true
+            # Trigger Claude workflow directly via workflow_dispatch (reliable)
+            gh workflow run claude.yml --ref main -f issue_number="$NEXT_ISSUE" 2>/dev/null || true
 
             COMMENT_BODY="## DAG Chain: Next Story in Epic
 
@@ -197,9 +198,10 @@ jobs:
 
               echo "Epic $EPIC_ID ($EPIC_NAME_NEW) is now READY. Triggering first story: $FIRST_STORY_ID (#$FIRST_STORY)"
 
-              gh issue edit "$FIRST_STORY" --remove-label "claude-code" 2>/dev/null || true
-              sleep 2
-              gh issue edit "$FIRST_STORY" --add-label "claude-code"
+              # Add label for tracking (may not trigger workflow in exported repos)
+              gh issue edit "$FIRST_STORY" --add-label "claude-code" 2>/dev/null || true
+              # Trigger Claude workflow directly via workflow_dispatch (reliable)
+              gh workflow run claude.yml --ref main -f issue_number="$FIRST_STORY" 2>/dev/null || true
 
               COMMENT_BODY="## DAG Chain: New Epic Unlocked
 

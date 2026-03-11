@@ -205,9 +205,8 @@ jobs:
                 EPIC_NAME=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
                 echo "Unsticking Epic $EPIC_ID: triggering Story $S_ID (#$NEXT_STORY)"
 
-                gh issue edit "$NEXT_STORY" --remove-label "claude-code" 2>/dev/null || true
-                sleep 2
-                gh issue edit "$NEXT_STORY" --add-label "claude-code"
+                gh issue edit "$NEXT_STORY" --add-label "claude-code" 2>/dev/null || true
+                gh workflow run claude.yml --ref main -f issue_number="$NEXT_STORY" 2>/dev/null || true
                 gh issue comment "$NEXT_STORY" --body "## Orchestration: DAG Lane Recovery
 
           Epic $EPIC_ID ($EPIC_NAME) lane was stuck. Triggering Story $S_ID automatically.
@@ -234,9 +233,8 @@ jobs:
               EPIC_NAME=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
               echo "Starting ready Epic $EPIC_ID ($EPIC_NAME): Story $S_ID (#$FIRST_OPEN_STORY)"
 
-              gh issue edit "$FIRST_OPEN_STORY" --remove-label "claude-code" 2>/dev/null || true
-              sleep 2
-              gh issue edit "$FIRST_OPEN_STORY" --add-label "claude-code"
+              gh issue edit "$FIRST_OPEN_STORY" --add-label "claude-code" 2>/dev/null || true
+              gh workflow run claude.yml --ref main -f issue_number="$FIRST_OPEN_STORY" 2>/dev/null || true
               gh issue comment "$FIRST_OPEN_STORY" --body "## Orchestration: New Epic Unlocked
 
           All dependencies for **Epic $EPIC_ID ($EPIC_NAME)** are met. Starting first story.
@@ -339,9 +337,8 @@ jobs:
             ATTEMPT=$((RETRY_COUNT + 1))
             echo "Retrying story #$ISSUE_NUM (attempt $ATTEMPT/${{ env.MAX_RETRIES }})"
 
-            gh issue edit "$ISSUE_NUM" --remove-label "claude-code" || true
-            sleep 2
-            gh issue edit "$ISSUE_NUM" --add-label "claude-code" || true
+            gh issue edit "$ISSUE_NUM" --add-label "claude-code" 2>/dev/null || true
+            gh workflow run claude.yml --ref main -f issue_number="$ISSUE_NUM" 2>/dev/null || true
             gh issue comment "$ISSUE_NUM" --body "## Orchestration: Retry (Attempt $ATTEMPT/${{ env.MAX_RETRIES }})
 
           Previous Claude run failed. Retrying automatically.
