@@ -25,7 +25,7 @@ permissions:
   contents: read
 
 env:
-  PROD_URL: https://ignite-app-132793395302.us-central1.run.app
+  PROD_URL: https://ignite-app-756107880925.us-central1.run.app
   AUDIT_MODE: ${{ github.event.inputs.audit_mode || 'development' }}
 
 jobs:

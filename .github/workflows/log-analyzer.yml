@@ -8,9 +8,9 @@
 #
 # Prerequisites:
 #   - The GitHub Actions service account (ignite-github-actions) needs
-#     the `roles/logging.viewer` IAM role on GCP project ignite-489804.
+#     the `roles/logging.viewer` IAM role on GCP project innovation-labs-489916.
 #     This must be granted manually via:
-#       gcloud projects add-iam-policy-binding ignite-489804 \
+#       gcloud projects add-iam-policy-binding innovation-labs-489916 \
 #         --member="serviceAccount:<SA_EMAIL>" \
 #         --role="roles/logging.viewer"
 #
@@ -37,7 +37,7 @@ concurrency:
 env:
   CLOUD_RUN_SERVICE: ignite-app
   CLOUD_RUN_REGION: us-central1
-  GCP_PROJECT: ignite-489804
+  GCP_PROJECT: innovation-labs-489916
 
 jobs:
   analyze-logs:
@@ -405,7 +405,7 @@ jobs:
           | **Severity** | {pattern['severity']} |
           | **First Seen** | {pattern['sample_timestamp']} |
           | **Service** | ignite-app (us-central1) |
-          | **Project** | ignite-489804 |
+          | **Project** | innovation-labs-489916 |
 
           ### Sample Log Entry
           ```
@@ -413,7 +413,7 @@ jobs:
           ```
           {stack_section}
           ### Investigation Steps
-          1. Check Cloud Run logs: [View in Cloud Console](https://console.cloud.google.com/run/detail/us-central1/ignite-app/logs?project=ignite-489804)
+          1. Check Cloud Run logs: [View in Cloud Console](https://console.cloud.google.com/run/detail/us-central1/ignite-app/logs?project=innovation-labs-489916)
           2. Check recent deployments for related changes
           3. Review error pattern and identify root cause
 

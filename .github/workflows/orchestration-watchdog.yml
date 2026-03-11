@@ -20,7 +20,7 @@ permissions:
   actions: read
 
 env:
-  PRODUCTION_URL: https://ignite-app-132793395302.us-central1.run.app
+  PRODUCTION_URL: https://ignite-app-756107880925.us-central1.run.app
   MAX_RETRIES: 3
   CLAUDE_RUN_TIMEOUT_MINUTES: 45
   PR_AUTO_MERGE_HOURS: 2
