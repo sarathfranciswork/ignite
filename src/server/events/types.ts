@@ -26,6 +26,10 @@ export interface EventMap {
   "idea.coachRejected": EventPayload;
   "idea.coachRequestedChanges": EventPayload;
   "idea.voted": EventPayload;
+  "idea.liked": EventPayload;
+  "idea.unliked": EventPayload;
+  "idea.followed": EventPayload;
+  "idea.unfollowed": EventPayload;
   "comment.created": EventPayload;
   "comment.updated": EventPayload;
   "comment.deleted": EventPayload;
