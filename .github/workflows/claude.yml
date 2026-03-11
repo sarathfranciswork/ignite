@@ -9,11 +9,17 @@ on:
     types: [labeled]
   pull_request_review:
     types: [submitted]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to process"
+        required: true
+        type: string
 
 # Per-issue concurrency: allows parallel work on different issues
 # but prevents duplicate runs for the same issue
 concurrency:
-  group: claude-code-${{ github.event.issue.number || github.event.pull_request.number || 'default' }}
+  group: claude-code-${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number || 'default' }}
   cancel-in-progress: false
 
 jobs:
@@ -22,7 +28,8 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude-code')
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude-code') ||
+      (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -44,12 +51,14 @@ jobs:
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "issue_comment" ]; then
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "number=${{ github.event.inputs.issue_number }}" >> "$GITHUB_OUTPUT"
           else
             echo "number=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check main branch CI health
-        if: github.event_name == 'issues' && github.event.action == 'labeled'
+        if: (github.event_name == 'issues' && github.event.action == 'labeled') || github.event_name == 'workflow_dispatch'
         id: main_health
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,9 +74,10 @@ jobs:
 
       - name: Validate story dependencies (DAG)
         if: >-
-          github.event_name == 'issues' &&
+          ((github.event_name == 'issues' &&
           github.event.action == 'labeled' &&
-          github.event.label.name == 'claude-code' &&
+          github.event.label.name == 'claude-code') ||
+          github.event_name == 'workflow_dispatch') &&
           steps.issue.outputs.number != ''
         id: validate
         env:
