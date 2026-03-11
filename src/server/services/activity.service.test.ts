@@ -39,7 +39,7 @@ const baseActivity = {
   ideaId: "idea-1",
   campaignId: "campaign-1",
   actorId: "user-1",
-  eventType: "idea.submitted",
+  eventType: "IDEA_SUBMITTED",
   title: "Idea submitted",
   body: "Test idea was submitted",
   metadata: null,
@@ -59,7 +59,7 @@ describe("createActivityEvent", () => {
       ideaId: "idea-1",
       campaignId: "campaign-1",
       actorId: "user-1",
-      eventType: "idea.submitted",
+      eventType: "IDEA_SUBMITTED",
       title: "Idea submitted",
       body: "Test idea was submitted",
     });
@@ -69,7 +69,7 @@ describe("createActivityEvent", () => {
         ideaId: "idea-1",
         campaignId: "campaign-1",
         actorId: "user-1",
-        eventType: "idea.submitted",
+        eventType: "IDEA_SUBMITTED",
       }),
     });
     expect(result).toEqual(baseActivity);

@@ -1,6 +1,6 @@
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
-import { eventBus } from "@/server/events/event-bus";
+import { transitionIdea } from "@/server/services/idea.service";
 import { differenceInDays } from "date-fns";
 
 const childLogger = logger.child({ service: "graduation" });
@@ -167,42 +167,16 @@ export async function checkAndGraduateIdea(ideaId: string, actor: string): Promi
     return false;
   }
 
-  // Verify HOT is a valid target from COMMUNITY_DISCUSSION
-  const { isValidIdeaTransition } = await import("@/server/lib/state-machines/idea-transitions");
-
-  const toggles = {
-    hasQualificationPhase: idea.campaign.hasQualificationPhase,
-    hasDiscussionPhase: idea.campaign.hasDiscussionPhase,
-  };
-
-  if (!isValidIdeaTransition("COMMUNITY_DISCUSSION", "HOT", toggles, idea.campaign.status)) {
+  // Use the state machine transition function — never direct prisma.update({ status })
+  try {
+    await transitionIdea({ id: ideaId, targetStatus: "HOT" }, actor);
+  } catch (error) {
     childLogger.info(
-      { ideaId, campaignStatus: idea.campaign.status },
-      "HOT transition not valid for current campaign phase",
+      { ideaId, error },
+      "HOT transition not valid — graduation skipped",
     );
     return false;
   }
-
-  await prisma.idea.update({
-    where: { id: ideaId },
-    data: {
-      previousStatus: "COMMUNITY_DISCUSSION",
-      status: "HOT",
-    },
-  });
-
-  eventBus.emit("idea.statusChanged", {
-    entity: "idea",
-    entityId: ideaId,
-    actor,
-    timestamp: new Date().toISOString(),
-    metadata: {
-      campaignId: idea.campaignId,
-      previousStatus: "COMMUNITY_DISCUSSION",
-      newStatus: "HOT",
-      reason: "community_graduation",
-    },
-  });
 
   childLogger.info(
     { ideaId, campaignId: idea.campaignId },
