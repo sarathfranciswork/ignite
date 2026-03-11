@@ -14,7 +14,7 @@ ISSUE_NUMBER=""
 TARGET_STATUS=""
 
 # Parse repo info from GitHub Actions environment or defaults
-REPO_FULL="${GITHUB_REPOSITORY:-sarathfrancis90/ignite}"
+REPO_FULL="${GITHUB_REPOSITORY:-sarathfranciswork/ignite}"
 REPO_OWNER="${REPO_FULL%%/*}"
 REPO_NAME="${REPO_FULL##*/}"
 

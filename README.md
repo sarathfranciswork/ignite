@@ -1,6 +1,6 @@
 # Ignite
 
-[![CI/CD](https://github.com/sarathfrancis90/ignite/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/sarathfrancis90/ignite/actions/workflows/ci-cd.yml)
+[![CI/CD](https://github.com/sarathfranciswork/ignite/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/sarathfranciswork/ignite/actions/workflows/ci-cd.yml)
 
 Open-source innovation management platform for idea generation, evaluation, and implementation. A comprehensive alternative to HYPE Enterprise.
 
@@ -35,7 +35,7 @@ Open-source innovation management platform for idea generation, evaluation, and 
 ```bash
 # Prerequisites: Node.js 20+, Docker
 
-git clone https://github.com/sarathfrancis90/ignite.git
+git clone https://github.com/sarathfranciswork/ignite.git
 cd ignite
 npm install
 cp .env.example .env

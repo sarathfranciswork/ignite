@@ -10,7 +10,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/sarathfrancis90/ignite.git
+git clone https://github.com/sarathfranciswork/ignite.git
 cd ignite
 
 # Install dependencies

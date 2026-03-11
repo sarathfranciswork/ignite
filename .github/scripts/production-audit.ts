@@ -349,7 +349,7 @@ async function main(): Promise<void> {
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
       userAgent:
-        "IgniteAuditBot/1.0 (Production Audit; +https://github.com/sarathfrancis90/ignite)",
+        "IgniteAuditBot/1.0 (Production Audit; +https://github.com/sarathfranciswork/ignite)",
     });
 
     // Audit each route sequentially (to avoid overwhelming the server)

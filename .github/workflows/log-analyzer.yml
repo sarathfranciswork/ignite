@@ -270,7 +270,7 @@ jobs:
         if: steps.analyze.outputs.analysis_ok == 'true' && steps.analyze.outputs.actionable_count != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: sarathfrancis90/ignite
+          REPO: sarathfranciswork/ignite
         run: |
           cat << 'ISSUE_SCRIPT' > /tmp/create_issues.py
           import json
@@ -333,7 +333,7 @@ jobs:
 
           def main():
               import os
-              repo = os.environ.get("REPO", "sarathfrancis90/ignite")
+              repo = os.environ.get("REPO", "sarathfranciswork/ignite")
 
               with open("/tmp/analysis.json", "r") as f:
                   patterns = json.load(f)
@@ -449,7 +449,7 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: sarathfrancis90/ignite
+          REPO: sarathfranciswork/ignite
         run: |
           # Determine overall status
           AUTH_OK="${{ steps.auth_check.outputs.auth_ok }}"
