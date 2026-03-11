@@ -65,6 +65,8 @@ model User {
   assignedUseCaseTasks   UseCaseTask[]               @relation("UseCaseTaskAssignee")
   notifications          Notification[]
   savedSearches          SavedSearch[]
+  createdScoutingBoards  ScoutingBoard[]             @relation("ScoutingBoardCreator")
+  scoutingBoardShares    ScoutingBoardShare[]
 
   @@map("users")
 }
@@ -705,9 +707,10 @@ model Organization {
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
 
-  managers OrganizationManager[]
-  contacts Contact[]
-  useCases UseCaseOrganization[]
+  managers           OrganizationManager[]
+  contacts           Contact[]
+  useCases           UseCaseOrganization[]
+  scoutingBoardCards ScoutingBoardCard[]
 
   @@index([relationshipStatus])
   @@index([name])
@@ -870,6 +873,100 @@ model SavedSearch {
 
   @@index([userId])
   @@map("saved_searches")
+}
+
+// ── Scouting Board Models ────────────────────────────────────
+
+enum ScoutingBoardColumnType {
+  TEXT
+  NUMBER
+  SELECT
+  DATE
+
+  @@map("scouting_board_column_type")
+}
+
+enum ScoutingBoardShareRole {
+  VIEWER
+  EDITOR
+
+  @@map("scouting_board_share_role")
+}
+
+model ScoutingBoard {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  createdById String   @map("created_by_id")
+  isArchived  Boolean  @default(false) @map("is_archived")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User                  @relation("ScoutingBoardCreator", fields: [createdById], references: [id])
+  columns   ScoutingBoardColumn[]
+  cards     ScoutingBoardCard[]
+  shares    ScoutingBoardShare[]
+
+  @@index([createdById])
+  @@index([isArchived])
+  @@map("scouting_boards")
+}
+
+model ScoutingBoardColumn {
+  id        String                  @id @default(cuid())
+  boardId   String                  @map("board_id")
+  name      String
+  type      ScoutingBoardColumnType @default(TEXT)
+  color     String?
+  sortOrder Int                     @default(0) @map("sort_order")
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  board ScoutingBoard       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards ScoutingBoardCard[]
+
+  @@index([boardId])
+  @@index([boardId, sortOrder])
+  @@map("scouting_board_columns")
+}
+
+model ScoutingBoardCard {
+  id             String   @id @default(cuid())
+  boardId        String   @map("board_id")
+  columnId       String   @map("column_id")
+  organizationId String   @map("organization_id")
+  notes          String?  @db.Text
+  sortOrder      Int      @default(0) @map("sort_order")
+  isArchived     Boolean  @default(false) @map("is_archived")
+  customValues   Json?    @map("custom_values")
+  addedAt        DateTime @default(now()) @map("added_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  board        ScoutingBoard       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column       ScoutingBoardColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, organizationId])
+  @@index([boardId])
+  @@index([columnId])
+  @@index([organizationId])
+  @@index([boardId, columnId, sortOrder])
+  @@map("scouting_board_cards")
+}
+
+model ScoutingBoardShare {
+  id      String                 @id @default(cuid())
+  boardId String                 @map("board_id")
+  userId  String                 @map("user_id")
+  role    ScoutingBoardShareRole @default(VIEWER)
+  sharedAt DateTime              @default(now()) @map("shared_at")
+
+  board ScoutingBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+  @@index([boardId])
+  @@index([userId])
+  @@map("scouting_board_shares")
 }
 
 // ── SSO Configuration Models ──────────────────────────────────

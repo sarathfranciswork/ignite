@@ -95,6 +95,13 @@ export interface EventMap {
   "useCaseTask.deleted": EventPayload;
   "search.saved": EventPayload;
   "search.deleted": EventPayload;
+  "scoutingBoard.created": EventPayload;
+  "scoutingBoard.updated": EventPayload;
+  "scoutingBoard.deleted": EventPayload;
+  "scoutingBoard.shared": EventPayload;
+  "scoutingBoard.cardAdded": EventPayload;
+  "scoutingBoard.cardRemoved": EventPayload;
+  "scoutingBoard.cardMoved": EventPayload;
 }
 
 export type EventName = keyof EventMap;

@@ -11,6 +11,7 @@ import { organizationRouter } from "./organization";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
 import { ssoRouter } from "./sso";
+import { scoutingBoardRouter } from "./scouting-board";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
 
@@ -25,6 +26,7 @@ export const appRouter = createTRPCRouter({
   notification: notificationRouter,
   organization: organizationRouter,
   search: searchRouter,
+  scoutingBoard: scoutingBoardRouter,
   space: spaceRouter,
   sso: ssoRouter,
   useCase: useCaseRouter,
