@@ -67,6 +67,7 @@ model User {
   savedSearches          SavedSearch[]
   createdScoutingBoards  ScoutingBoard[]             @relation("ScoutingBoardCreator")
   scoutingBoardShares    ScoutingBoardShare[]
+  activityEvents         ActivityEvent[]
 
   @@map("users")
 }
@@ -528,11 +529,12 @@ model Idea {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  coAuthors IdeaCoAuthor[]
-  comments  Comment[]
-  likes     IdeaLike[]
-  votes     IdeaVote[]
-  followers IdeaFollow[]
+  coAuthors      IdeaCoAuthor[]
+  comments       Comment[]
+  likes          IdeaLike[]
+  votes          IdeaVote[]
+  followers      IdeaFollow[]
+  activityEvents ActivityEvent[]
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1087,4 +1089,26 @@ model Notification {
   @@index([userId, createdAt])
   @@index([entityType, entityId])
   @@map("notifications")
+}
+
+// ── Activity Stream Models ──────────────────────────────────
+
+model ActivityEvent {
+  id         String   @id @default(cuid())
+  ideaId     String   @map("idea_id")
+  campaignId String   @map("campaign_id")
+  actorId    String   @map("actor_id")
+  eventType  String   @map("event_type")
+  title      String
+  body       String?  @db.Text
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  idea     Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  actor    User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([ideaId, createdAt])
+  @@index([campaignId, createdAt])
+  @@index([actorId])
+  @@map("activity_events")
 }
