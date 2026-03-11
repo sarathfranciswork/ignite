@@ -5,6 +5,8 @@ import {
   markAsRead,
   markAllAsRead,
   createNotification,
+  getNotificationPreferences,
+  updateNotificationPreferences,
   NotificationServiceError,
 } from "./notification.service";
 
@@ -17,6 +19,10 @@ vi.mock("@/server/lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    user: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -51,6 +57,8 @@ const notificationCount = prisma.notification.count as unknown as Mock;
 const notificationCreate = prisma.notification.create as unknown as Mock;
 const notificationUpdate = prisma.notification.update as unknown as Mock;
 const notificationUpdateMany = prisma.notification.updateMany as unknown as Mock;
+const userFindUnique = prisma.user.findUnique as unknown as Mock;
+const userUpdate = prisma.user.update as unknown as Mock;
 const mockEmit = eventBus.emit as unknown as Mock;
 
 const userId = "user-1";
@@ -239,5 +247,51 @@ describe("createNotification", () => {
         entityId: "notif-new",
       }),
     );
+  });
+});
+
+describe("getNotificationPreferences", () => {
+  it("returns the user notification frequency", async () => {
+    userFindUnique.mockResolvedValue({ notificationFrequency: "DAILY" });
+
+    const result = await getNotificationPreferences(userId);
+
+    expect(result.frequency).toBe("DAILY");
+    expect(userFindUnique).toHaveBeenCalledWith({
+      where: { id: userId },
+      select: { notificationFrequency: true },
+    });
+  });
+
+  it("throws USER_NOT_FOUND when user does not exist", async () => {
+    userFindUnique.mockResolvedValue(null);
+
+    await expect(getNotificationPreferences("missing-user")).rejects.toThrow(
+      NotificationServiceError,
+    );
+    await expect(getNotificationPreferences("missing-user")).rejects.toThrow("User not found");
+  });
+});
+
+describe("updateNotificationPreferences", () => {
+  it("updates the user notification frequency", async () => {
+    userFindUnique.mockResolvedValue({ id: userId });
+    userUpdate.mockResolvedValue({ notificationFrequency: "WEEKLY" });
+
+    const result = await updateNotificationPreferences(userId, { frequency: "WEEKLY" });
+
+    expect(result.frequency).toBe("WEEKLY");
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: userId },
+      data: { notificationFrequency: "WEEKLY" },
+    });
+  });
+
+  it("throws USER_NOT_FOUND when user does not exist", async () => {
+    userFindUnique.mockResolvedValue(null);
+
+    await expect(
+      updateNotificationPreferences("missing-user", { frequency: "DAILY" }),
+    ).rejects.toThrow(NotificationServiceError);
   });
 });

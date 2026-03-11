@@ -1,6 +1,7 @@
 import { eventBus } from "@/server/events/event-bus";
 import { logger } from "@/server/lib/logger";
 import { prisma } from "@/server/lib/prisma";
+import { enqueueEmail } from "@/server/jobs/email-queue";
 import type { NotificationType } from "@prisma/client";
 
 const childLogger = logger.child({ service: "notification-listener" });
@@ -22,18 +23,34 @@ async function createNotifications(targets: NotificationTarget[]) {
   if (targets.length === 0) return;
 
   try {
-    await prisma.notification.createMany({
-      data: targets.map((t) => ({
-        userId: t.userId,
-        type: t.type,
-        title: t.title,
-        body: t.body,
-        entityType: t.entityType,
-        entityId: t.entityId,
-      })),
-    });
+    const created = await prisma.$transaction(
+      targets.map((t) =>
+        prisma.notification.create({
+          data: {
+            userId: t.userId,
+            type: t.type,
+            title: t.title,
+            body: t.body,
+            entityType: t.entityType,
+            entityId: t.entityId,
+          },
+        }),
+      ),
+    );
 
     childLogger.info({ count: targets.length }, "Notifications created via listener");
+
+    for (const notification of created) {
+      enqueueEmail({
+        notificationId: notification.id,
+        userId: notification.userId,
+        type: notification.type,
+        title: notification.title,
+        body: notification.body,
+        entityType: notification.entityType,
+        entityId: notification.entityId,
+      });
+    }
   } catch (error) {
     childLogger.error({ error }, "Failed to create notifications");
   }

@@ -5,18 +5,21 @@ import type {
   NotificationListInput,
   NotificationMarkReadInput,
   NotificationCreateInput,
+  NotificationPreferencesInput,
 } from "./notification.schemas";
 
 export {
   notificationListInput,
   notificationMarkReadInput,
   notificationCreateInput,
+  notificationPreferencesInput,
 } from "./notification.schemas";
 
 export type {
   NotificationListInput,
   NotificationMarkReadInput,
   NotificationCreateInput,
+  NotificationPreferencesInput,
 } from "./notification.schemas";
 
 const childLogger = logger.child({ service: "notification" });
@@ -152,4 +155,40 @@ export async function createNotification(input: NotificationCreateInput) {
   });
 
   return serializeNotification(notification);
+}
+
+export async function getNotificationPreferences(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { notificationFrequency: true },
+  });
+
+  if (!user) {
+    throw new NotificationServiceError("USER_NOT_FOUND", "User not found");
+  }
+
+  return { frequency: user.notificationFrequency };
+}
+
+export async function updateNotificationPreferences(
+  userId: string,
+  input: NotificationPreferencesInput,
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new NotificationServiceError("USER_NOT_FOUND", "User not found");
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { notificationFrequency: input.frequency },
+  });
+
+  childLogger.info({ userId, frequency: input.frequency }, "Notification preferences updated");
+
+  return { frequency: input.frequency };
 }

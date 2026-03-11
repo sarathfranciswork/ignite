@@ -4,10 +4,13 @@ import { Action } from "@/server/lib/permissions";
 import {
   notificationListInput,
   notificationMarkReadInput,
+  notificationPreferencesInput,
   listNotifications,
   getUnreadCount,
   markAsRead,
   markAllAsRead,
+  getNotificationPreferences,
+  updateNotificationPreferences,
   NotificationServiceError,
 } from "@/server/services/notification.service";
 
@@ -63,5 +66,28 @@ export const notificationRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const userId = ctx.session.user.id;
       return markAllAsRead(userId);
+    }),
+
+  getPreferences: protectedProcedure
+    .use(requirePermission(Action.NOTIFICATION_READ_OWN))
+    .query(async ({ ctx }) => {
+      try {
+        const userId = ctx.session.user.id;
+        return await getNotificationPreferences(userId);
+      } catch (error) {
+        handleNotificationError(error);
+      }
+    }),
+
+  updatePreferences: protectedProcedure
+    .use(requirePermission(Action.NOTIFICATION_READ_OWN))
+    .input(notificationPreferencesInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const userId = ctx.session.user.id;
+        return await updateNotificationPreferences(userId, input);
+      } catch (error) {
+        handleNotificationError(error);
+      }
     }),
 });
