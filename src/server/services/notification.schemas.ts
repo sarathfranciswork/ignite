@@ -30,6 +30,13 @@ export const notificationCreateInput = z.object({
   entityId: z.string().min(1),
 });
 
+export const notificationFrequencyEnum = z.enum(["IMMEDIATE", "DAILY", "WEEKLY"]);
+
+export const notificationPreferencesInput = z.object({
+  frequency: notificationFrequencyEnum,
+});
+
 export type NotificationListInput = z.infer<typeof notificationListInput>;
 export type NotificationMarkReadInput = z.infer<typeof notificationMarkReadInput>;
 export type NotificationCreateInput = z.infer<typeof notificationCreateInput>;
+export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesInput>;
