@@ -98,18 +98,40 @@ jobs:
           TRIGGERED_ISSUES=""
           TRIGGERED_COUNT=0
 
+          # ── Helper: Resolve agent for an epic ──
+          resolve_agent() {
+            local epic_id="$1"
+            local agent=$(jq -r --arg ep "$epic_id" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+            echo "$agent"
+          }
+
+          get_agent_workflow() {
+            local agent="$1"
+            jq -r --arg a "$agent" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE"
+          }
+
+          get_agent_label() {
+            local agent="$1"
+            jq -r --arg a "$agent" '.config.agents[$a].label // "claude-code"' "$DAG_FILE"
+          }
+
           # ── Step 1: Trigger next story in same epic (if any) ──
           if [ "$NEXT_INDEX" -lt "$EPIC_LENGTH" ]; then
             NEXT_ISSUE=$(echo "$EPIC_STORIES" | jq ".[$NEXT_INDEX]")
             NEXT_STORY_ID=$(jq -r --argjson num "$NEXT_ISSUE" '.stories[($num | tostring)].id' "$DAG_FILE")
             NEXT_TITLE=$(jq -r --argjson num "$NEXT_ISSUE" '.stories[($num | tostring)].title' "$DAG_FILE")
 
-            echo "Next in epic: Story $NEXT_STORY_ID (#$NEXT_ISSUE) - $NEXT_TITLE"
+            # Resolve which agent handles this epic
+            AGENT=$(resolve_agent "$STORY_EPIC")
+            AGENT_WORKFLOW=$(get_agent_workflow "$AGENT")
+            AGENT_LABEL=$(get_agent_label "$AGENT")
+
+            echo "Next in epic: Story $NEXT_STORY_ID (#$NEXT_ISSUE) - $NEXT_TITLE [Agent: $AGENT]"
 
             # Add label for tracking (may not trigger workflow in exported repos)
-            gh issue edit "$NEXT_ISSUE" --add-label "claude-code" 2>/dev/null || true
-            # Trigger Claude workflow directly via workflow_dispatch (reliable)
-            gh workflow run claude.yml --ref main -f issue_number="$NEXT_ISSUE" 2>/dev/null || true
+            gh issue edit "$NEXT_ISSUE" --add-label "$AGENT_LABEL" 2>/dev/null || true
+            # Trigger agent workflow directly via workflow_dispatch (reliable)
+            gh workflow run "$AGENT_WORKFLOW" --ref main -f issue_number="$NEXT_ISSUE" 2>/dev/null || true
 
             COMMENT_BODY="## DAG Chain: Next Story in Epic
 
@@ -117,7 +139,7 @@ jobs:
 
           Triggering next story in **Epic $STORY_EPIC ($EPIC_NAME)**: **$NEXT_STORY_ID - $NEXT_TITLE**
 
-          Assigning to Claude for autonomous development."
+          Assigning to **${AGENT^}** for autonomous development."
             gh issue comment "$NEXT_ISSUE" --body "$COMMENT_BODY"
 
             TRIGGERED_ISSUES="$NEXT_ISSUE"
@@ -210,12 +232,17 @@ jobs:
               FIRST_TITLE=$(jq -r --argjson num "$FIRST_STORY" '.stories[($num | tostring)].title' "$DAG_FILE")
               EPIC_NAME_NEW=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
 
-              echo "Epic $EPIC_ID ($EPIC_NAME_NEW) is now READY. Triggering first story: $FIRST_STORY_ID (#$FIRST_STORY)"
+              # Resolve which agent handles this epic
+              EPIC_AGENT=$(resolve_agent "$EPIC_ID")
+              EPIC_WORKFLOW=$(get_agent_workflow "$EPIC_AGENT")
+              EPIC_LABEL=$(get_agent_label "$EPIC_AGENT")
+
+              echo "Epic $EPIC_ID ($EPIC_NAME_NEW) is now READY. Triggering first story: $FIRST_STORY_ID (#$FIRST_STORY) [Agent: $EPIC_AGENT]"
 
               # Add label for tracking (may not trigger workflow in exported repos)
-              gh issue edit "$FIRST_STORY" --add-label "claude-code" 2>/dev/null || true
-              # Trigger Claude workflow directly via workflow_dispatch (reliable)
-              gh workflow run claude.yml --ref main -f issue_number="$FIRST_STORY" 2>/dev/null || true
+              gh issue edit "$FIRST_STORY" --add-label "$EPIC_LABEL" 2>/dev/null || true
+              # Trigger agent workflow directly via workflow_dispatch (reliable)
+              gh workflow run "$EPIC_WORKFLOW" --ref main -f issue_number="$FIRST_STORY" 2>/dev/null || true
 
               COMMENT_BODY="## DAG Chain: New Epic Unlocked
 
@@ -223,7 +250,7 @@ jobs:
 
           Starting first story: **$FIRST_STORY_ID - $FIRST_TITLE**
 
-          Assigning to Claude for autonomous development."
+          Assigning to **${EPIC_AGENT^}** for autonomous development."
               gh issue comment "$FIRST_STORY" --body "$COMMENT_BODY"
 
               TRIGGERED_ISSUES="$TRIGGERED_ISSUES $FIRST_STORY"

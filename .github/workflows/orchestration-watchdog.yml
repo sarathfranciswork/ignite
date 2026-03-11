@@ -77,12 +77,16 @@ jobs:
               STATE=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].state // "OPEN"')
               HAS_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code")')
 
+              HAS_QWEN_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "qwen-code")')
+
               if [ "$STATE" = "CLOSED" ]; then
                 EPIC_CLOSED=$((EPIC_CLOSED + 1))
                 CLOSED_COUNT=$((CLOSED_COUNT + 1))
-              elif [ "$HAS_LABEL" = "true" ]; then
+              elif [ "$HAS_LABEL" = "true" ] || [ "$HAS_QWEN_LABEL" = "true" ]; then
                 S_ID=$(jq -r --argjson num "$S_ISSUE" '.stories[($num | tostring)].id' "$DAG_FILE")
-                EPIC_ACTIVE="$S_ID (#$S_ISSUE)"
+                AGENT_TAG=""
+                if [ "$HAS_QWEN_LABEL" = "true" ]; then AGENT_TAG=" [Qwen]"; fi
+                EPIC_ACTIVE="$S_ID (#$S_ISSUE)${AGENT_TAG}"
                 ACTIVE_STORIES="$ACTIVE_STORIES $S_ISSUE"
                 ACTIVE_COUNT=$((ACTIVE_COUNT + 1))
               fi
@@ -162,9 +166,9 @@ jobs:
             FIRST_OPEN_STORY=""
             for S_ISSUE in $(jq -r --arg ep "$EPIC_ID" '.epics[$ep].stories[]' "$DAG_FILE"); do
               STATE=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].state // "OPEN"')
-              HAS_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code")')
+              HAS_ANY_AGENT_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code" or . == "qwen-code")')
 
-              if [ "$STATE" = "CLOSED" ] || [ "$HAS_LABEL" = "true" ]; then
+              if [ "$STATE" = "CLOSED" ] || [ "$HAS_ANY_AGENT_LABEL" = "true" ]; then
                 EPIC_STARTED=true
                 break
               fi
@@ -180,8 +184,8 @@ jobs:
               NEXT_STORY=""
               for S_ISSUE in $(jq -r --arg ep "$EPIC_ID" '.epics[$ep].stories[]' "$DAG_FILE"); do
                 STATE=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].state // "OPEN"')
-                HAS_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code")')
-                if [ "$STATE" = "OPEN" ] && [ "$HAS_LABEL" != "true" ]; then
+                HAS_ANY_AGENT_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code" or . == "qwen-code")')
+                if [ "$STATE" = "OPEN" ] && [ "$HAS_ANY_AGENT_LABEL" != "true" ]; then
                   # Verify its predecessor in the epic is closed
                   EPIC_STORIES_JSON=$(jq --arg ep "$EPIC_ID" '.epics[$ep].stories' "$DAG_FILE")
                   S_INDEX=$(echo "$EPIC_STORIES_JSON" | jq --argjson num "$S_ISSUE" 'to_entries[] | select(.value == $num) | .key')
@@ -203,14 +207,21 @@ jobs:
               if [ -n "$NEXT_STORY" ]; then
                 S_ID=$(jq -r --argjson num "$NEXT_STORY" '.stories[($num | tostring)].id' "$DAG_FILE")
                 EPIC_NAME=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
-                echo "Unsticking Epic $EPIC_ID: triggering Story $S_ID (#$NEXT_STORY)"
 
-                gh issue edit "$NEXT_STORY" --add-label "claude-code" 2>/dev/null || true
-                gh workflow run claude.yml --ref main -f issue_number="$NEXT_STORY" 2>/dev/null || true
+                # Resolve agent for this epic
+                HEAL_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+                HEAL_WORKFLOW=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+                HEAL_LABEL=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+
+                echo "Unsticking Epic $EPIC_ID: triggering Story $S_ID (#$NEXT_STORY) [Agent: $HEAL_AGENT]"
+
+                gh issue edit "$NEXT_STORY" --add-label "$HEAL_LABEL" 2>/dev/null || true
+                gh workflow run "$HEAL_WORKFLOW" --ref main -f issue_number="$NEXT_STORY" 2>/dev/null || true
                 gh issue comment "$NEXT_STORY" --body "## Orchestration: DAG Lane Recovery
 
           Epic $EPIC_ID ($EPIC_NAME) lane was stuck. Triggering Story $S_ID automatically.
 
+          **Agent:** ${HEAL_AGENT^}
           **Trigger:** Orchestration Watchdog (self-healing)" || true
 
                 TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
@@ -231,14 +242,21 @@ jobs:
             if [ "$DEPS_MET" = true ] && [ -n "$FIRST_OPEN_STORY" ]; then
               S_ID=$(jq -r --argjson num "$FIRST_OPEN_STORY" '.stories[($num | tostring)].id' "$DAG_FILE")
               EPIC_NAME=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
-              echo "Starting ready Epic $EPIC_ID ($EPIC_NAME): Story $S_ID (#$FIRST_OPEN_STORY)"
 
-              gh issue edit "$FIRST_OPEN_STORY" --add-label "claude-code" 2>/dev/null || true
-              gh workflow run claude.yml --ref main -f issue_number="$FIRST_OPEN_STORY" 2>/dev/null || true
+              # Resolve agent for this epic
+              READY_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+              READY_WORKFLOW=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+              READY_LABEL=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+
+              echo "Starting ready Epic $EPIC_ID ($EPIC_NAME): Story $S_ID (#$FIRST_OPEN_STORY) [Agent: $READY_AGENT]"
+
+              gh issue edit "$FIRST_OPEN_STORY" --add-label "$READY_LABEL" 2>/dev/null || true
+              gh workflow run "$READY_WORKFLOW" --ref main -f issue_number="$FIRST_OPEN_STORY" 2>/dev/null || true
               gh issue comment "$FIRST_OPEN_STORY" --body "## Orchestration: New Epic Unlocked
 
           All dependencies for **Epic $EPIC_ID ($EPIC_NAME)** are met. Starting first story.
 
+          **Agent:** ${READY_AGENT^}
           **Trigger:** Orchestration Watchdog (self-healing)" || true
 
               TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
@@ -252,7 +270,7 @@ jobs:
       # ══════════════════════════════════════════════════════════
       # 3. Check Active Claude Runs for Timeouts/Failures
       # ══════════════════════════════════════════════════════════
-      - name: "Check Claude workflow runs"
+      - name: "Check agent workflow runs"
         id: claude_runs
         if: steps.dag_health.outputs.active_count != '0'
         env:
@@ -261,8 +279,10 @@ jobs:
           set +e
           ACTIVE_STORIES="${{ steps.dag_health.outputs.active_stories }}"
 
-          # Check for in-progress Claude Code workflow runs
-          RUNS=$(gh run list --workflow=claude.yml --status=in_progress --json databaseId,createdAt,status --limit 10 2>/dev/null || echo "[]")
+          # Check for in-progress Claude AND Qwen workflow runs
+          CLAUDE_RUNS=$(gh run list --workflow=claude.yml --status=in_progress --json databaseId,createdAt,status --limit 10 2>/dev/null || echo "[]")
+          QWEN_RUNS=$(gh run list --workflow=qwen-code.yml --status=in_progress --json databaseId,createdAt,status --limit 10 2>/dev/null || echo "[]")
+          RUNS=$(echo "$CLAUDE_RUNS $QWEN_RUNS" | jq -s 'add')
           RUN_COUNT=$(echo "$RUNS" | jq 'length')
 
           TIMEOUT_RUNS=""
@@ -292,8 +312,10 @@ jobs:
             echo "claude_running=false" >> "$GITHUB_OUTPUT"
             echo "has_timeouts=false" >> "$GITHUB_OUTPUT"
 
-            # Check for recently failed runs
-            RECENT=$(gh run list --workflow=claude.yml --json databaseId,conclusion,status --limit 10 2>/dev/null || echo "[]")
+            # Check for recently failed runs (both Claude and Qwen)
+            CLAUDE_RECENT=$(gh run list --workflow=claude.yml --json databaseId,conclusion,status --limit 10 2>/dev/null || echo "[]")
+            QWEN_RECENT=$(gh run list --workflow=qwen-code.yml --json databaseId,conclusion,status --limit 10 2>/dev/null || echo "[]")
+            RECENT=$(echo "$CLAUDE_RECENT $QWEN_RECENT" | jq -s 'add')
             FAILED=$(echo "$RECENT" | jq -r '[.[] | select(.status != "in_progress" and .conclusion == "failure")][0].databaseId // empty')
 
             if [ -n "$FAILED" ]; then
@@ -335,14 +357,26 @@ jobs:
             fi
 
             ATTEMPT=$((RETRY_COUNT + 1))
-            echo "Retrying story #$ISSUE_NUM (attempt $ATTEMPT/${{ env.MAX_RETRIES }})"
 
-            gh issue edit "$ISSUE_NUM" --add-label "claude-code" 2>/dev/null || true
-            gh workflow run claude.yml --ref main -f issue_number="$ISSUE_NUM" 2>/dev/null || true
+            # Determine which agent to use for retry based on epic assignment
+            STORY_EPIC=$(jq -r --argjson num "$ISSUE_NUM" '.stories[($num | tostring)].epic // empty' ".github/story-dag.json" 2>/dev/null || echo "")
+            if [ -n "$STORY_EPIC" ]; then
+              RETRY_AGENT=$(jq -r --arg ep "$STORY_EPIC" '.config.epic_agents[$ep] // .config.default_agent // "claude"' ".github/story-dag.json")
+            else
+              RETRY_AGENT="claude"
+            fi
+            RETRY_WORKFLOW=$(jq -r --arg a "$RETRY_AGENT" '.config.agents[$a].workflow // "claude.yml"' ".github/story-dag.json")
+            RETRY_LABEL=$(jq -r --arg a "$RETRY_AGENT" '.config.agents[$a].label // "claude-code"' ".github/story-dag.json")
+
+            echo "Retrying story #$ISSUE_NUM (attempt $ATTEMPT/${{ env.MAX_RETRIES }}) [Agent: $RETRY_AGENT]"
+
+            gh issue edit "$ISSUE_NUM" --add-label "$RETRY_LABEL" 2>/dev/null || true
+            gh workflow run "$RETRY_WORKFLOW" --ref main -f issue_number="$ISSUE_NUM" 2>/dev/null || true
             gh issue comment "$ISSUE_NUM" --body "## Orchestration: Retry (Attempt $ATTEMPT/${{ env.MAX_RETRIES }})
 
-          Previous Claude run failed. Retrying automatically.
+          Previous run failed. Retrying automatically.
 
+          **Agent:** ${RETRY_AGENT^}
           **Failed Run:** ${{ steps.claude_runs.outputs.failed_run }}" || true
           done
 
@@ -361,11 +395,11 @@ jobs:
 
           PR_ISSUES=""
           PR_ACTIONS=""
-          PR_COUNT=$(echo "$OPEN_PRS" | jq '[.[] | select(.headRefName | startswith("claude/"))] | length')
+          PR_COUNT=$(echo "$OPEN_PRS" | jq '[.[] | select(.headRefName | startswith("claude/") or startswith("qwen/"))] | length')
 
           echo "open_pr_count=$PR_COUNT" >> "$GITHUB_OUTPUT"
 
-          echo "$OPEN_PRS" | jq -c '.[] | select(.headRefName | startswith("claude/"))' | while read -r PR; do
+          echo "$OPEN_PRS" | jq -c '.[] | select(.headRefName | startswith("claude/") or startswith("qwen/"))' | while read -r PR; do
             PR_NUM=$(echo "$PR" | jq -r '.number')
             PR_CREATED=$(echo "$PR" | jq -r '.createdAt')
             PR_TITLE=$(echo "$PR" | jq -r '.title')

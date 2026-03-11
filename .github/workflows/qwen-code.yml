@@ -1,0 +1,239 @@
+name: Qwen Code
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to process"
+        required: true
+        type: string
+
+# Per-issue concurrency: allows parallel work on different issues
+# but prevents duplicate runs for the same issue
+concurrency:
+  group: qwen-code-${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.issue_number || 'default' }}
+  cancel-in-progress: false
+
+jobs:
+  qwen:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@qwen')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@qwen')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@qwen')) ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'qwen-code') ||
+      (github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "number=${{ github.event.inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check main branch CI health
+        if: (github.event_name == 'issues' && github.event.action == 'labeled') || github.event_name == 'workflow_dispatch'
+        id: main_health
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          LAST_MAIN_CI=$(gh run list --workflow=ci-cd.yml --branch=main --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
+          if [ "$LAST_MAIN_CI" = "failure" ]; then
+            echo "WARNING: Main branch CI is currently broken. Proceeding with caution."
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate story dependencies (DAG)
+        if: >-
+          ((github.event_name == 'issues' &&
+          github.event.action == 'labeled' &&
+          github.event.label.name == 'qwen-code') ||
+          github.event_name == 'workflow_dispatch') &&
+          steps.issue.outputs.number != ''
+        id: validate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          DAG_FILE=".github/story-dag.json"
+
+          if [ ! -f "$DAG_FILE" ]; then
+            echo "No DAG file found. Proceeding (might be a non-DAG issue)."
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STORY_EPIC=$(jq -r --argjson num "$ISSUE_NUM" '.stories[($num | tostring)].epic // empty' "$DAG_FILE")
+
+          if [ -z "$STORY_EPIC" ]; then
+            echo "Issue #$ISSUE_NUM is not in the story DAG. Proceeding as ad-hoc."
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STORY_ID=$(jq -r --argjson num "$ISSUE_NUM" '.stories[($num | tostring)].id' "$DAG_FILE")
+          EPIC_NAME=$(jq -r --arg ep "$STORY_EPIC" '.epics[$ep].name' "$DAG_FILE")
+
+          EPIC_STORIES=$(jq -r --arg ep "$STORY_EPIC" '.epics[$ep].stories | @json' "$DAG_FILE")
+          STORY_INDEX=$(echo "$EPIC_STORIES" | jq --argjson num "$ISSUE_NUM" 'to_entries[] | select(.value == $num) | .key')
+
+          if [ "$STORY_INDEX" -gt 0 ]; then
+            PREV_INDEX=$((STORY_INDEX - 1))
+            PREV_ISSUE=$(echo "$EPIC_STORIES" | jq ".[$PREV_INDEX]")
+            PREV_STATE=$(gh issue view "$PREV_ISSUE" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+
+            if [ "$PREV_STATE" = "OPEN" ]; then
+              echo "BLOCKED: Previous story in epic (#$PREV_ISSUE) is still open."
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              gh issue edit "$ISSUE_NUM" --remove-label "qwen-code"
+              gh issue comment "$ISSUE_NUM" --body "Blocked: Previous story in Epic $STORY_EPIC (#$PREV_ISSUE) is still open. This story will be triggered automatically when it completes."
+              exit 0
+            fi
+          fi
+
+          for DEP_EPIC in $(jq -r --arg ep "$STORY_EPIC" '.epics[$ep].depends_on[]' "$DAG_FILE"); do
+            for DEP_ISSUE in $(jq -r --arg ep "$DEP_EPIC" '.epics[$ep].stories[]' "$DAG_FILE"); do
+              DEP_STATE=$(gh issue view "$DEP_ISSUE" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+              if [ "$DEP_STATE" = "OPEN" ]; then
+                DEP_NAME=$(jq -r --arg ep "$DEP_EPIC" '.epics[$ep].name' "$DAG_FILE")
+                echo "BLOCKED: Dependency Epic $DEP_EPIC ($DEP_NAME) has open story #$DEP_ISSUE."
+                echo "valid=false" >> "$GITHUB_OUTPUT"
+                gh issue edit "$ISSUE_NUM" --remove-label "qwen-code"
+                gh issue comment "$ISSUE_NUM" --body "Blocked: Dependency Epic $DEP_EPIC ($DEP_NAME) is not yet complete (story #$DEP_ISSUE still open). This story will be triggered when all dependencies are met."
+                exit 0
+              fi
+            done
+          done
+
+          echo "DAG validation passed. Story $STORY_ID (Epic $STORY_EPIC: $EPIC_NAME) is ready."
+          echo "valid=true" >> "$GITHUB_OUTPUT"
+
+      - name: Abort if validation failed
+        if: steps.validate.outputs.valid == 'false'
+        run: |
+          echo "Story chain validation failed. Aborting."
+          exit 0
+
+      - name: Verify Qwen LLM endpoint
+        if: steps.validate.outputs.valid != 'false'
+        id: llm_check
+        run: |
+          set +e
+          HEALTH=$(curl -sf --max-time 10 "${{ secrets.QWEN_API_BASE }}/models" \
+            -H "Authorization: Bearer ${{ secrets.QWEN_API_KEY }}" 2>/dev/null)
+
+          if [ $? -eq 0 ]; then
+            MODEL=$(echo "$HEALTH" | jq -r '.data[0].id // "unknown"')
+            echo "LLM endpoint healthy. Model: $MODEL"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "WARNING: Qwen LLM endpoint not reachable at ${{ secrets.QWEN_API_BASE }}"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Abort if LLM unavailable
+        if: steps.llm_check.outputs.available == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          if [ -n "$ISSUE_NUM" ]; then
+            gh issue comment "$ISSUE_NUM" --body "Qwen LLM endpoint is not reachable. The DGX Spark server may be offline. Removing label — please retry when the server is back up." || true
+            gh issue edit "$ISSUE_NUM" --remove-label "qwen-code" || true
+          fi
+          echo "LLM endpoint unavailable. Aborting."
+          exit 1
+
+      - name: Set up Python
+        if: steps.validate.outputs.valid != 'false' && steps.llm_check.outputs.available == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install OpenHands resolver
+        if: steps.validate.outputs.valid != 'false' && steps.llm_check.outputs.available == 'true'
+        run: pip install openhands-resolver
+
+      - name: Post acknowledgment
+        if: >-
+          steps.validate.outputs.valid != 'false' &&
+          steps.llm_check.outputs.available == 'true' &&
+          steps.issue.outputs.number != '' &&
+          ((github.event_name == 'issues' && github.event.action == 'labeled') || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          gh issue comment "$ISSUE_NUM" --body "I'm picking up this issue now (Qwen Code via OpenHands). I'll create a feature branch, implement, run tests, and open a PR when ready.
+
+          **Agent:** Qwen3-Coder-Next (self-hosted on DGX Spark)
+          **Status:** In Progress
+          **Branch:** \`qwen/issue-${ISSUE_NUM}\`"
+
+          # Update Kanban if script exists
+          if [ -f ".github/scripts/update-kanban.sh" ]; then
+            chmod +x .github/scripts/update-kanban.sh
+            GH_TOKEN="${{ secrets.PROJECT_TOKEN }}" .github/scripts/update-kanban.sh --issue "$ISSUE_NUM" --status "In progress" || true
+          fi
+
+      - name: Resolve issue with OpenHands
+        if: steps.validate.outputs.valid != 'false' && steps.llm_check.outputs.available == 'true'
+        env:
+          LLM_MODEL: ollama/qwen3-coder-next:q4_K_M
+          LLM_BASE_URL: ${{ secrets.QWEN_API_BASE }}
+          LLM_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "No issue number found. Cannot resolve."
+            exit 1
+          fi
+
+          python -m openhands.resolver.resolve_issue \
+            --repo "${{ github.repository }}" \
+            --issue-number "$ISSUE_NUM" \
+            --branch-prefix "qwen/issue-" \
+            --max-iterations 30
+
+      - name: Update Kanban to In Review
+        if: success() && steps.issue.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          if [ -f ".github/scripts/update-kanban.sh" ]; then
+            chmod +x .github/scripts/update-kanban.sh
+            GH_TOKEN="${{ secrets.PROJECT_TOKEN }}" .github/scripts/update-kanban.sh --issue "$ISSUE_NUM" --status "In review" || true
+          fi
