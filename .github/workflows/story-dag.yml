@@ -68,6 +68,7 @@ jobs:
           # CRITICAL: Must use PAT (not GITHUB_TOKEN) to add labels.
           # GITHUB_TOKEN cannot trigger new workflow runs (GitHub anti-recursion).
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+          QWEN_API_BASE: ${{ secrets.QWEN_API_BASE }}
         run: |
           ISSUE_NUM="${{ steps.extract.outputs.issue_number }}"
           DAG_FILE=".github/story-dag.json"
@@ -98,21 +99,33 @@ jobs:
           TRIGGERED_ISSUES=""
           TRIGGERED_COUNT=0
 
-          # ── Helper: Resolve agent for an epic ──
-          resolve_agent() {
-            local epic_id="$1"
-            local agent=$(jq -r --arg ep "$epic_id" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
-            echo "$agent"
+          # ── Helper: Intelligent agent routing ──
+          # Uses .github/scripts/route-story.sh for complexity-based routing
+          # Falls back to static epic_agents mapping if script unavailable
+          route_story() {
+            local issue_num="$1"
+            local route_output
+            if [ -x ".github/scripts/route-story.sh" ]; then
+              route_output=$(QWEN_API_BASE="${QWEN_API_BASE:-}" .github/scripts/route-story.sh "$issue_num" "$DAG_FILE" 2>/dev/null | tail -1)
+            fi
+            if [ -z "$route_output" ]; then
+              local epic_id
+              epic_id=$(jq -r --argjson num "$issue_num" '.stories[($num | tostring)].epic // empty' "$DAG_FILE" 2>/dev/null || echo "")
+              local agent
+              agent=$(jq -r --arg ep "$epic_id" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+              local wf label
+              wf=$(jq -r --arg a "$agent" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+              label=$(jq -r --arg a "$agent" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+              route_output="AGENT=$agent WORKFLOW=$wf LABEL=$label REASON=\"fallback\""
+            fi
+            echo "$route_output"
           }
 
-          get_agent_workflow() {
-            local agent="$1"
-            jq -r --arg a "$agent" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE"
-          }
-
-          get_agent_label() {
-            local agent="$1"
-            jq -r --arg a "$agent" '.config.agents[$a].label // "claude-code"' "$DAG_FILE"
+          # ── Guard: Remove conflicting labels before assigning ──
+          clean_agent_labels() {
+            local issue_num="$1"
+            gh issue edit "$issue_num" --remove-label "claude-code" 2>/dev/null || true
+            gh issue edit "$issue_num" --remove-label "qwen-code" 2>/dev/null || true
           }
 
           # ── Step 1: Trigger next story in same epic (if any) ──
@@ -121,16 +134,17 @@ jobs:
             NEXT_STORY_ID=$(jq -r --argjson num "$NEXT_ISSUE" '.stories[($num | tostring)].id' "$DAG_FILE")
             NEXT_TITLE=$(jq -r --argjson num "$NEXT_ISSUE" '.stories[($num | tostring)].title' "$DAG_FILE")
 
-            # Resolve which agent handles this epic
-            AGENT=$(resolve_agent "$STORY_EPIC")
-            AGENT_WORKFLOW=$(get_agent_workflow "$AGENT")
-            AGENT_LABEL=$(get_agent_label "$AGENT")
+            # Intelligent agent routing
+            ROUTE=$(route_story "$NEXT_ISSUE")
+            eval "$ROUTE"
+            AGENT_WORKFLOW="$WORKFLOW"
+            AGENT_LABEL="$LABEL"
 
-            echo "Next in epic: Story $NEXT_STORY_ID (#$NEXT_ISSUE) - $NEXT_TITLE [Agent: $AGENT]"
+            echo "Next in epic: Story $NEXT_STORY_ID (#$NEXT_ISSUE) - $NEXT_TITLE [Agent: $AGENT, $REASON]"
 
-            # Add label for tracking (may not trigger workflow in exported repos)
+            # Clean any stale labels, then assign the correct one
+            clean_agent_labels "$NEXT_ISSUE"
             gh issue edit "$NEXT_ISSUE" --add-label "$AGENT_LABEL" 2>/dev/null || true
-            # Trigger agent workflow directly via workflow_dispatch (reliable)
             gh workflow run "$AGENT_WORKFLOW" --ref main -f issue_number="$NEXT_ISSUE" 2>/dev/null || true
 
             COMMENT_BODY="## DAG Chain: Next Story in Epic
@@ -139,7 +153,8 @@ jobs:
 
           Triggering next story in **Epic $STORY_EPIC ($EPIC_NAME)**: **$NEXT_STORY_ID - $NEXT_TITLE**
 
-          Assigning to **${AGENT^}** for autonomous development."
+          Assigning to **${AGENT^}** for autonomous development.
+          _Routing: $REASON_"
             gh issue comment "$NEXT_ISSUE" --body "$COMMENT_BODY"
 
             TRIGGERED_ISSUES="$NEXT_ISSUE"
@@ -179,8 +194,8 @@ jobs:
           # Find epics that are ready (all deps complete) and not yet started
           MAX_PARALLEL=$(jq -r '.config.max_parallel' "$DAG_FILE")
 
-          # Count currently active stories (open issues with claude-code label)
-          ACTIVE_COUNT=$(echo "$ALL_ISSUES" | jq '[.[] | select(.state == "OPEN" and (.labels | map(.name) | any(. == "claude-code")))] | length')
+          # Count currently active stories (open issues with any agent label)
+          ACTIVE_COUNT=$(echo "$ALL_ISSUES" | jq '[.[] | select(.state == "OPEN" and (.labels | map(.name) | any(. == "claude-code" or . == "qwen-code")))] | length')
           # Include what we just triggered
           ACTIVE_COUNT=$((ACTIVE_COUNT + TRIGGERED_COUNT))
           echo "Currently active stories (including just triggered): $ACTIVE_COUNT"
@@ -197,12 +212,12 @@ jobs:
               continue
             fi
 
-            # Check if epic has already started (any story closed or has claude-code label)
+            # Check if epic has already started (any story closed or has agent label)
             EPIC_STARTED=false
             FIRST_STORY=""
             for S_ISSUE in $(jq -r --arg ep "$EPIC_ID" '.epics[$ep].stories[]' "$DAG_FILE"); do
               STATE=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].state // "OPEN"')
-              HAS_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code")')
+              HAS_LABEL=$(echo "$ALL_ISSUES" | jq -r --argjson num "$S_ISSUE" '[.[] | select(.number == $num)][0].labels // [] | map(.name) | any(. == "claude-code" or . == "qwen-code")')
 
               if [ "$STATE" = "CLOSED" ] || [ "$HAS_LABEL" = "true" ]; then
                 EPIC_STARTED=true
@@ -232,16 +247,17 @@ jobs:
               FIRST_TITLE=$(jq -r --argjson num "$FIRST_STORY" '.stories[($num | tostring)].title' "$DAG_FILE")
               EPIC_NAME_NEW=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
 
-              # Resolve which agent handles this epic
-              EPIC_AGENT=$(resolve_agent "$EPIC_ID")
-              EPIC_WORKFLOW=$(get_agent_workflow "$EPIC_AGENT")
-              EPIC_LABEL=$(get_agent_label "$EPIC_AGENT")
+              # Intelligent agent routing
+              EPIC_ROUTE=$(route_story "$FIRST_STORY")
+              eval "$EPIC_ROUTE"
+              EPIC_WORKFLOW="$WORKFLOW"
+              EPIC_LABEL="$LABEL"
+              EPIC_AGENT="$AGENT"
 
-              echo "Epic $EPIC_ID ($EPIC_NAME_NEW) is now READY. Triggering first story: $FIRST_STORY_ID (#$FIRST_STORY) [Agent: $EPIC_AGENT]"
+              echo "Epic $EPIC_ID ($EPIC_NAME_NEW) is now READY. Triggering first story: $FIRST_STORY_ID (#$FIRST_STORY) [Agent: $EPIC_AGENT, $REASON]"
 
-              # Add label for tracking (may not trigger workflow in exported repos)
+              clean_agent_labels "$FIRST_STORY"
               gh issue edit "$FIRST_STORY" --add-label "$EPIC_LABEL" 2>/dev/null || true
-              # Trigger agent workflow directly via workflow_dispatch (reliable)
               gh workflow run "$EPIC_WORKFLOW" --ref main -f issue_number="$FIRST_STORY" 2>/dev/null || true
 
               COMMENT_BODY="## DAG Chain: New Epic Unlocked
@@ -250,7 +266,8 @@ jobs:
 
           Starting first story: **$FIRST_STORY_ID - $FIRST_TITLE**
 
-          Assigning to **${EPIC_AGENT^}** for autonomous development."
+          Assigning to **${EPIC_AGENT^}** for autonomous development.
+          _Routing: $REASON_"
               gh issue comment "$FIRST_STORY" --body "$COMMENT_BODY"
 
               TRIGGERED_ISSUES="$TRIGGERED_ISSUES $FIRST_STORY"

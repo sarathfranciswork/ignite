@@ -140,6 +140,7 @@ jobs:
           # CRITICAL: Must use PAT to trigger Claude workflow via labels.
           # GITHUB_TOKEN cannot trigger new workflow runs (GitHub anti-recursion).
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+          QWEN_API_BASE: ${{ secrets.QWEN_API_BASE }}
         run: |
           set +e
           DAG_FILE=".github/story-dag.json"
@@ -208,13 +209,21 @@ jobs:
                 S_ID=$(jq -r --argjson num "$NEXT_STORY" '.stories[($num | tostring)].id' "$DAG_FILE")
                 EPIC_NAME=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
 
-                # Resolve agent for this epic
-                HEAL_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
-                HEAL_WORKFLOW=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
-                HEAL_LABEL=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+                # Intelligent agent routing
+                if [ -x ".github/scripts/route-story.sh" ]; then
+                  HEAL_ROUTE=$(QWEN_API_BASE="${QWEN_API_BASE:-}" .github/scripts/route-story.sh "$NEXT_STORY" "$DAG_FILE" 2>/dev/null | tail -1)
+                  eval "$HEAL_ROUTE"
+                  HEAL_AGENT="$AGENT"; HEAL_WORKFLOW="$WORKFLOW"; HEAL_LABEL="$LABEL"; HEAL_REASON="$REASON"
+                else
+                  HEAL_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+                  HEAL_WORKFLOW=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+                  HEAL_LABEL=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+                  HEAL_REASON="fallback"
+                fi
 
-                echo "Unsticking Epic $EPIC_ID: triggering Story $S_ID (#$NEXT_STORY) [Agent: $HEAL_AGENT]"
+                echo "Unsticking Epic $EPIC_ID: triggering Story $S_ID (#$NEXT_STORY) [Agent: $HEAL_AGENT, $HEAL_REASON]"
 
+                gh issue edit "$NEXT_STORY" --remove-label "claude-code" --remove-label "qwen-code" 2>/dev/null || true
                 gh issue edit "$NEXT_STORY" --add-label "$HEAL_LABEL" 2>/dev/null || true
                 gh workflow run "$HEAL_WORKFLOW" --ref main -f issue_number="$NEXT_STORY" 2>/dev/null || true
                 gh issue comment "$NEXT_STORY" --body "## Orchestration: DAG Lane Recovery
@@ -222,6 +231,7 @@ jobs:
           Epic $EPIC_ID ($EPIC_NAME) lane was stuck. Triggering Story $S_ID automatically.
 
           **Agent:** ${HEAL_AGENT^}
+          **Routing:** $HEAL_REASON
           **Trigger:** Orchestration Watchdog (self-healing)" || true
 
                 TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
@@ -243,13 +253,21 @@ jobs:
               S_ID=$(jq -r --argjson num "$FIRST_OPEN_STORY" '.stories[($num | tostring)].id' "$DAG_FILE")
               EPIC_NAME=$(jq -r --arg ep "$EPIC_ID" '.epics[$ep].name' "$DAG_FILE")
 
-              # Resolve agent for this epic
-              READY_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
-              READY_WORKFLOW=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
-              READY_LABEL=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+              # Intelligent agent routing
+              if [ -x ".github/scripts/route-story.sh" ]; then
+                READY_ROUTE=$(QWEN_API_BASE="${QWEN_API_BASE:-}" .github/scripts/route-story.sh "$FIRST_OPEN_STORY" "$DAG_FILE" 2>/dev/null | tail -1)
+                eval "$READY_ROUTE"
+                READY_AGENT="$AGENT"; READY_WORKFLOW="$WORKFLOW"; READY_LABEL="$LABEL"; READY_REASON="$REASON"
+              else
+                READY_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+                READY_WORKFLOW=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+                READY_LABEL=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+                READY_REASON="fallback"
+              fi
 
-              echo "Starting ready Epic $EPIC_ID ($EPIC_NAME): Story $S_ID (#$FIRST_OPEN_STORY) [Agent: $READY_AGENT]"
+              echo "Starting ready Epic $EPIC_ID ($EPIC_NAME): Story $S_ID (#$FIRST_OPEN_STORY) [Agent: $READY_AGENT, $READY_REASON]"
 
+              gh issue edit "$FIRST_OPEN_STORY" --remove-label "claude-code" --remove-label "qwen-code" 2>/dev/null || true
               gh issue edit "$FIRST_OPEN_STORY" --add-label "$READY_LABEL" 2>/dev/null || true
               gh workflow run "$READY_WORKFLOW" --ref main -f issue_number="$FIRST_OPEN_STORY" 2>/dev/null || true
               gh issue comment "$FIRST_OPEN_STORY" --body "## Orchestration: New Epic Unlocked
@@ -257,6 +275,7 @@ jobs:
           All dependencies for **Epic $EPIC_ID ($EPIC_NAME)** are met. Starting first story.
 
           **Agent:** ${READY_AGENT^}
+          **Routing:** $READY_REASON
           **Trigger:** Orchestration Watchdog (self-healing)" || true
 
               TRIGGERED_COUNT=$((TRIGGERED_COUNT + 1))
@@ -331,6 +350,7 @@ jobs:
         env:
           # Must use PAT for label operations that trigger Claude workflow
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+          QWEN_API_BASE: ${{ secrets.QWEN_API_BASE }}
         run: |
           set +e
           ACTIVE_STORIES="${{ steps.dag_health.outputs.active_stories }}"
@@ -358,18 +378,32 @@ jobs:
 
             ATTEMPT=$((RETRY_COUNT + 1))
 
-            # Determine which agent to use for retry based on epic assignment
-            STORY_EPIC=$(jq -r --argjson num "$ISSUE_NUM" '.stories[($num | tostring)].epic // empty' ".github/story-dag.json" 2>/dev/null || echo "")
-            if [ -n "$STORY_EPIC" ]; then
-              RETRY_AGENT=$(jq -r --arg ep "$STORY_EPIC" '.config.epic_agents[$ep] // .config.default_agent // "claude"' ".github/story-dag.json")
+            # On retry, check which label the issue currently has
+            CURRENT_LABELS=$(gh issue view "$ISSUE_NUM" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            if echo "$CURRENT_LABELS" | grep -qw "qwen-code"; then
+              PREV_AGENT="qwen"
             else
+              PREV_AGENT="claude"
+            fi
+
+            # If previous agent failed 2+ times, escalate to the other agent
+            if [ "$RETRY_COUNT" -ge 2 ] && [ "$PREV_AGENT" = "qwen" ]; then
               RETRY_AGENT="claude"
+              RETRY_REASON="escalated from Qwen after $RETRY_COUNT failures"
+            elif [ -x ".github/scripts/route-story.sh" ]; then
+              RETRY_ROUTE=$(QWEN_API_BASE="${QWEN_API_BASE:-}" .github/scripts/route-story.sh "$ISSUE_NUM" ".github/story-dag.json" 2>/dev/null | tail -1)
+              eval "$RETRY_ROUTE"
+              RETRY_AGENT="$AGENT"; RETRY_REASON="$REASON"
+            else
+              RETRY_AGENT="$PREV_AGENT"
+              RETRY_REASON="same agent retry"
             fi
             RETRY_WORKFLOW=$(jq -r --arg a "$RETRY_AGENT" '.config.agents[$a].workflow // "claude.yml"' ".github/story-dag.json")
             RETRY_LABEL=$(jq -r --arg a "$RETRY_AGENT" '.config.agents[$a].label // "claude-code"' ".github/story-dag.json")
 
-            echo "Retrying story #$ISSUE_NUM (attempt $ATTEMPT/${{ env.MAX_RETRIES }}) [Agent: $RETRY_AGENT]"
+            echo "Retrying story #$ISSUE_NUM (attempt $ATTEMPT/${{ env.MAX_RETRIES }}) [Agent: $RETRY_AGENT, $RETRY_REASON]"
 
+            gh issue edit "$ISSUE_NUM" --remove-label "claude-code" --remove-label "qwen-code" 2>/dev/null || true
             gh issue edit "$ISSUE_NUM" --add-label "$RETRY_LABEL" 2>/dev/null || true
             gh workflow run "$RETRY_WORKFLOW" --ref main -f issue_number="$ISSUE_NUM" 2>/dev/null || true
             gh issue comment "$ISSUE_NUM" --body "## Orchestration: Retry (Attempt $ATTEMPT/${{ env.MAX_RETRIES }})
@@ -377,6 +411,7 @@ jobs:
           Previous run failed. Retrying automatically.
 
           **Agent:** ${RETRY_AGENT^}
+          **Routing:** $RETRY_REASON
           **Failed Run:** ${{ steps.claude_runs.outputs.failed_run }}" || true
           done
 
