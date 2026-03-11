@@ -18,6 +18,9 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IdeaDiscussion } from "@/components/ideas/IdeaDiscussion";
+import { LikeButton } from "@/components/ideas/LikeButton";
+import { FollowButton } from "@/components/ideas/FollowButton";
+import { VotingWidget } from "@/components/ideas/VotingWidget";
 import {
   Dialog,
   DialogContent,
@@ -133,7 +136,13 @@ export function IdeaDetail({ ideaId }: IdeaDetailProps) {
             </div>
             {idea.teaser && <p className="mt-2 text-gray-600">{idea.teaser}</p>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {!isDraft && (
+              <>
+                <LikeButton ideaId={idea.id} initialLikesCount={idea.likesCount} />
+                <FollowButton ideaId={idea.id} />
+              </>
+            )}
             {isDraft && (
               <>
                 <Button
@@ -255,6 +264,8 @@ export function IdeaDetail({ ideaId }: IdeaDetailProps) {
         <MetricCard label="Confidential" value={idea.isConfidential ? "Yes" : "No"} />
         <MetricCard label="Invention Disclosure" value={idea.inventionDisclosure ? "Yes" : "No"} />
       </div>
+
+      {!isDraft && <VotingWidget ideaId={idea.id} />}
 
       <IdeaDiscussion ideaId={idea.id} />
 

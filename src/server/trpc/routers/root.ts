@@ -4,6 +4,7 @@ import { authRouter } from "./auth";
 import { campaignRouter } from "./campaign";
 import { channelRouter } from "./channel";
 import { commentRouter } from "./comment";
+import { engagementRouter } from "./engagement";
 import { ideaRouter } from "./idea";
 import { organizationRouter } from "./organization";
 import { spaceRouter } from "./space";
@@ -16,6 +17,7 @@ export const appRouter = createTRPCRouter({
   campaign: campaignRouter,
   channel: channelRouter,
   comment: commentRouter,
+  engagement: engagementRouter,
   idea: ideaRouter,
   organization: organizationRouter,
   space: spaceRouter,
