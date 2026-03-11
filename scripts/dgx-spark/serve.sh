@@ -42,39 +42,59 @@ case "$ACTION" in
       exit 1
     fi
 
-    echo "Starting Cloudflare Tunnel to expose Ollama on port $OLLAMA_PORT..."
+    # Use named tunnel (permanent URL) if configured, otherwise quick tunnel
+    if [ -f "$HOME/.cloudflared/config.yml" ]; then
+      TUNNEL_NAME=$(grep '^tunnel:' "$HOME/.cloudflared/config.yml" | awk '{print $2}')
+      TUNNEL_HOSTNAME=$(grep 'hostname:' "$HOME/.cloudflared/config.yml" | awk '{print $3}' | head -1)
+      echo "Starting named Cloudflare Tunnel: https://${TUNNEL_HOSTNAME}"
 
-    "$CLOUDFLARED" tunnel --url "http://localhost:${OLLAMA_PORT}" --no-autoupdate \
-      > /tmp/cloudflared.log 2>&1 &
-    TUNNEL_PID=$!
-    echo "$TUNNEL_PID" > "$DATA_DIR/config/tunnel-pid"
+      "$CLOUDFLARED" tunnel run --config "$HOME/.cloudflared/config.yml" \
+        > /tmp/cloudflared.log 2>&1 &
+      TUNNEL_PID=$!
+      echo "$TUNNEL_PID" > "$DATA_DIR/config/tunnel-pid"
+      echo "https://${TUNNEL_HOSTNAME}" > "$DATA_DIR/config/tunnel-url"
+      sleep 3
 
-    # Wait for URL to appear
-    for i in $(seq 1 30); do
-      TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log 2>/dev/null | head -1 || true)
-      if [ -n "$TUNNEL_URL" ]; then
-        echo "$TUNNEL_URL" > "$DATA_DIR/config/tunnel-url"
-        echo ""
-        echo "============================================"
-        echo "  Tunnel live!"
-        echo "  URL:      $TUNNEL_URL"
-        echo "  API Base: ${TUNNEL_URL}/v1"
-        echo "  PID:      $TUNNEL_PID"
-        echo "============================================"
-        echo ""
-        echo "To update GitHub secret:"
-        echo "  echo '${TUNNEL_URL}/v1' | gh secret set QWEN_API_BASE -R sarathfranciswork/ignite"
-        echo ""
-        echo "Tunnel running in background. Stop with: $0 stop"
-        exit 0
-      fi
-      sleep 1
-    done
+      echo ""
+      echo "============================================"
+      echo "  Tunnel live!"
+      echo "  URL:      https://${TUNNEL_HOSTNAME}"
+      echo "  API Base: https://${TUNNEL_HOSTNAME}/v1"
+      echo "  PID:      $TUNNEL_PID"
+      echo "============================================"
+      echo ""
+      echo "Tunnel running in background. Stop with: $0 stop"
+    else
+      echo "Starting quick Cloudflare Tunnel (temporary URL)..."
 
-    echo "ERROR: Tunnel failed to start in 30 seconds."
-    echo "Check /tmp/cloudflared.log"
-    kill "$TUNNEL_PID" 2>/dev/null || true
-    exit 1
+      "$CLOUDFLARED" tunnel --url "http://localhost:${OLLAMA_PORT}" --no-autoupdate \
+        > /tmp/cloudflared.log 2>&1 &
+      TUNNEL_PID=$!
+      echo "$TUNNEL_PID" > "$DATA_DIR/config/tunnel-pid"
+
+      for i in $(seq 1 30); do
+        TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log 2>/dev/null | head -1 || true)
+        if [ -n "$TUNNEL_URL" ]; then
+          echo "$TUNNEL_URL" > "$DATA_DIR/config/tunnel-url"
+          echo ""
+          echo "============================================"
+          echo "  Tunnel live!"
+          echo "  URL:      $TUNNEL_URL"
+          echo "  API Base: ${TUNNEL_URL}/v1"
+          echo "  PID:      $TUNNEL_PID"
+          echo "============================================"
+          echo ""
+          echo "To update GitHub secret:"
+          echo "  echo '${TUNNEL_URL}/v1' | gh secret set QWEN_API_BASE -R sarathfranciswork/ignite"
+          exit 0
+        fi
+        sleep 1
+      done
+
+      echo "ERROR: Tunnel failed to start in 30 seconds."
+      kill "$TUNNEL_PID" 2>/dev/null || true
+      exit 1
+    fi
     ;;
 
   stop)
