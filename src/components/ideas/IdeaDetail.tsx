@@ -21,6 +21,8 @@ import { IdeaDiscussion } from "@/components/ideas/IdeaDiscussion";
 import { LikeButton } from "@/components/ideas/LikeButton";
 import { FollowButton } from "@/components/ideas/FollowButton";
 import { VotingWidget } from "@/components/ideas/VotingWidget";
+import { GraduationProgress } from "@/components/ideas/GraduationProgress";
+import { ActivityFeed } from "@/components/ideas/ActivityFeed";
 import {
   Dialog,
   DialogContent,
@@ -267,7 +269,11 @@ export function IdeaDetail({ ideaId }: IdeaDetailProps) {
 
       {!isDraft && <VotingWidget ideaId={idea.id} />}
 
+      {idea.status === "COMMUNITY_DISCUSSION" && <GraduationProgress ideaId={idea.id} />}
+
       <IdeaDiscussion ideaId={idea.id} />
+
+      {!isDraft && <ActivityFeed ideaId={idea.id} />}
 
       {(submitMutation.error ?? deleteMutation.error) && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">

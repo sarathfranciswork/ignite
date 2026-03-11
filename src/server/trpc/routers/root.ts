@@ -1,4 +1,5 @@
 import { createTRPCRouter } from "../trpc";
+import { activityRouter } from "./activity";
 import { adminRouter } from "./admin";
 import { authRouter } from "./auth";
 import { campaignRouter } from "./campaign";
@@ -16,6 +17,7 @@ import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
 
 export const appRouter = createTRPCRouter({
+  activity: activityRouter,
   admin: adminRouter,
   auth: authRouter,
   campaign: campaignRouter,
