@@ -4,10 +4,14 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { trpc } from "@/lib/trpc";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const organizationFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
@@ -35,6 +39,7 @@ type OrganizationFormValues = z.infer<typeof organizationFormSchema>;
 
 interface OrganizationFormProps {
   defaultValues?: Partial<OrganizationFormValues>;
+  excludeId?: string;
   onSubmit: (data: {
     name: string;
     description?: string;
@@ -59,8 +64,18 @@ interface OrganizationFormProps {
   submitLabel: string;
 }
 
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function OrganizationForm({
   defaultValues,
+  excludeId,
   onSubmit,
   isSubmitting,
   submitLabel,
@@ -68,6 +83,7 @@ export function OrganizationForm({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<OrganizationFormValues>({
     resolver: zodResolver(organizationFormSchema),
@@ -85,6 +101,15 @@ export function OrganizationForm({
       isConfidential: defaultValues?.isConfidential ?? false,
     },
   });
+
+  const websiteUrlValue = watch("websiteUrl");
+  const debouncedUrl = useDebounce(websiteUrlValue ?? "", 500);
+  const shouldCheckUrl = debouncedUrl.length > 0 && isValidUrl(debouncedUrl);
+
+  const urlDuplicateQuery = trpc.organization.checkDuplicateByUrl.useQuery(
+    { websiteUrl: debouncedUrl, excludeId },
+    { enabled: shouldCheckUrl },
+  );
 
   function handleFormSubmit(values: OrganizationFormValues) {
     onSubmit({
@@ -119,7 +144,7 @@ export function OrganizationForm({
           )}
         </div>
 
-        <div>
+        <div className="sm:col-span-2">
           <Label htmlFor="websiteUrl">Website</Label>
           <Input
             id="websiteUrl"
@@ -130,6 +155,23 @@ export function OrganizationForm({
           />
           {errors.websiteUrl && (
             <p className="mt-1 text-sm text-red-600">{errors.websiteUrl.message}</p>
+          )}
+          {urlDuplicateQuery.data?.isDuplicate && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="text-sm text-amber-800">
+                <p>
+                  An organization with this website already exists:{" "}
+                  <strong>{urlDuplicateQuery.data.existingName}</strong>.
+                </p>
+                <Link
+                  href={`/partners/${urlDuplicateQuery.data.existingId}`}
+                  className="mt-1 inline-block font-medium text-amber-700 underline hover:text-amber-900"
+                >
+                  View existing organization
+                </Link>
+              </div>
+            </div>
           )}
         </div>
 

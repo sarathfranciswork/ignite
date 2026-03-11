@@ -86,6 +86,7 @@ export default function EditOrganizationPage() {
               ndaStatus: org.ndaStatus,
               isConfidential: org.isConfidential,
             }}
+            excludeId={params.id}
             onSubmit={(data) => updateOrganization.mutate({ id: params.id, ...data })}
             isSubmitting={updateOrganization.isPending}
             submitLabel="Save Changes"

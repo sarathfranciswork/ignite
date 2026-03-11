@@ -6,12 +6,18 @@ import {
   updateOrganization,
   deleteOrganization,
   checkDuplicateOrganization,
+  checkDuplicateByUrl,
+  checkDuplicateByCrunchbaseId,
+  getDistinctIndustries,
+  getDistinctLocations,
+  normalizeWebsiteUrl,
   OrganizationServiceError,
 } from "./organization.service";
 import {
   organizationListInput,
   organizationCreateInput,
   organizationUpdateInput,
+  checkDuplicateByUrlInput,
 } from "./organization.schemas";
 
 vi.mock("@/server/lib/prisma", () => ({
@@ -414,6 +420,301 @@ describe("organization.service", () => {
 
       expect(result.isDuplicate).toBe(true);
       expect(result.existingId).toBe("org-1");
+    });
+  });
+
+  // ── normalizeWebsiteUrl ──────────────────────────────
+
+  describe("normalizeWebsiteUrl", () => {
+    it("strips https protocol", () => {
+      expect(normalizeWebsiteUrl("https://acme.com")).toBe("acme.com");
+    });
+
+    it("strips http protocol", () => {
+      expect(normalizeWebsiteUrl("http://acme.com")).toBe("acme.com");
+    });
+
+    it("strips www prefix", () => {
+      expect(normalizeWebsiteUrl("https://www.acme.com")).toBe("acme.com");
+    });
+
+    it("strips trailing slashes", () => {
+      expect(normalizeWebsiteUrl("https://acme.com/")).toBe("acme.com");
+      expect(normalizeWebsiteUrl("https://acme.com///")).toBe("acme.com");
+    });
+
+    it("removes path segments", () => {
+      expect(normalizeWebsiteUrl("https://acme.com/about")).toBe("acme.com");
+      expect(normalizeWebsiteUrl("https://www.acme.com/contact/us")).toBe("acme.com");
+    });
+
+    it("lowercases the domain", () => {
+      expect(normalizeWebsiteUrl("https://ACME.COM")).toBe("acme.com");
+      expect(normalizeWebsiteUrl("https://Www.AcMe.Com/About/")).toBe("acme.com");
+    });
+
+    it("handles complex URLs consistently", () => {
+      const result1 = normalizeWebsiteUrl("https://www.Acme.com/about/");
+      const result2 = normalizeWebsiteUrl("http://acme.com");
+      expect(result1).toBe(result2);
+    });
+  });
+
+  // ── checkDuplicateByUrl ──────────────────────────────
+
+  describe("checkDuplicateByUrl", () => {
+    it("returns isDuplicate false when no URL match", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      const result = await checkDuplicateByUrl({
+        websiteUrl: "https://newcompany.com",
+      });
+
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it("detects duplicate by normalized domain", async () => {
+      orgFindMany.mockResolvedValue([
+        { id: "org-1", name: "Acme Corp", websiteUrl: "https://www.acme.com" },
+      ]);
+
+      const result = await checkDuplicateByUrl({
+        websiteUrl: "https://acme.com/about",
+      });
+
+      expect(result.isDuplicate).toBe(true);
+      expect(result.existingId).toBe("org-1");
+      expect(result.existingName).toBe("Acme Corp");
+    });
+
+    it("excludes specified organization from check", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      await checkDuplicateByUrl({
+        websiteUrl: "https://acme.com",
+        excludeId: "org-1",
+      });
+
+      expect(orgFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { not: "org-1" },
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── checkDuplicateByCrunchbaseId ─────────────────────
+
+  describe("checkDuplicateByCrunchbaseId", () => {
+    it("returns isDuplicate false when no match", async () => {
+      orgFindFirst.mockResolvedValue(null);
+
+      const result = await checkDuplicateByCrunchbaseId({
+        crunchbaseId: "new-cb-id",
+      });
+
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it("returns isDuplicate true when match found", async () => {
+      orgFindFirst.mockResolvedValue({ id: "org-1", name: "Acme Corp" });
+
+      const result = await checkDuplicateByCrunchbaseId({
+        crunchbaseId: "existing-cb-id",
+      });
+
+      expect(result.isDuplicate).toBe(true);
+      expect(result.existingId).toBe("org-1");
+    });
+  });
+
+  // ── getDistinctIndustries ────────────────────────────
+
+  describe("getDistinctIndustries", () => {
+    it("returns unique industry list", async () => {
+      orgFindMany.mockResolvedValue([
+        { industry: "Technology" },
+        { industry: "Healthcare" },
+        { industry: "Finance" },
+      ]);
+
+      const result = await getDistinctIndustries();
+
+      expect(result).toEqual(["Technology", "Healthcare", "Finance"]);
+    });
+
+    it("returns empty array when no industries", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      const result = await getDistinctIndustries();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ── getDistinctLocations ─────────────────────────────
+
+  describe("getDistinctLocations", () => {
+    it("returns unique location list", async () => {
+      orgFindMany.mockResolvedValue([
+        { location: "San Francisco, CA" },
+        { location: "Berlin, Germany" },
+      ]);
+
+      const result = await getDistinctLocations();
+
+      expect(result).toEqual(["San Francisco, CA", "Berlin, Germany"]);
+    });
+  });
+
+  // ── listOrganizations (new filters) ──────────────────
+
+  describe("listOrganizations advanced filters", () => {
+    it("filters by location", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      await listOrganizations({ limit: 20, location: "Berlin" });
+
+      expect(orgFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            location: { contains: "Berlin", mode: "insensitive" },
+          }),
+        }),
+      );
+    });
+
+    it("filters by NDA status", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      await listOrganizations({ limit: 20, ndaStatus: "SIGNED" });
+
+      expect(orgFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            ndaStatus: "SIGNED",
+          }),
+        }),
+      );
+    });
+
+    it("filters by multiple industries", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      await listOrganizations({ limit: 20, industries: ["Technology", "Healthcare"] });
+
+      expect(orgFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { industry: { contains: "Technology", mode: "insensitive" } },
+              { industry: { contains: "Healthcare", mode: "insensitive" } },
+            ],
+          }),
+        }),
+      );
+    });
+
+    it("sorts by specified field and direction", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      await listOrganizations({ limit: 20, sortBy: "createdAt", sortDirection: "desc" });
+
+      expect(orgFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: "desc" },
+        }),
+      );
+    });
+
+    it("includes websiteUrl in search", async () => {
+      orgFindMany.mockResolvedValue([]);
+
+      await listOrganizations({ limit: 20, search: "acme.com" });
+
+      expect(orgFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { websiteUrl: { contains: "acme.com", mode: "insensitive" } },
+            ]),
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── Schema validation (new schemas) ──────────────────
+
+  describe("checkDuplicateByUrlInput schema", () => {
+    it("accepts valid URL", () => {
+      expect(
+        checkDuplicateByUrlInput.safeParse({
+          websiteUrl: "https://example.com",
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects invalid URL", () => {
+      expect(
+        checkDuplicateByUrlInput.safeParse({
+          websiteUrl: "not-a-url",
+        }).success,
+      ).toBe(false);
+    });
+
+    it("accepts excludeId", () => {
+      expect(
+        checkDuplicateByUrlInput.safeParse({
+          websiteUrl: "https://example.com",
+          excludeId: "clxxxxxxxxxxxxxxxxxxxxxxxxx",
+        }).success,
+      ).toBe(true);
+    });
+  });
+
+  describe("organizationListInput (new fields)", () => {
+    it("accepts sort options", () => {
+      expect(
+        organizationListInput.safeParse({
+          sortBy: "createdAt",
+          sortDirection: "desc",
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts industries array", () => {
+      expect(
+        organizationListInput.safeParse({
+          industries: ["Technology", "Healthcare"],
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts location filter", () => {
+      expect(
+        organizationListInput.safeParse({
+          location: "Berlin",
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts ndaStatus filter", () => {
+      expect(
+        organizationListInput.safeParse({
+          ndaStatus: "SIGNED",
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects invalid sort field", () => {
+      expect(
+        organizationListInput.safeParse({
+          sortBy: "invalid",
+        }).success,
+      ).toBe(false);
     });
   });
 });

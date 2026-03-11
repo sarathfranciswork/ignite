@@ -7,6 +7,8 @@ import {
   organizationUpdateInput,
   organizationGetByIdInput,
   organizationDeleteInput,
+  checkDuplicateByUrlInput,
+  checkDuplicateByCrunchbaseIdInput,
 } from "@/server/services/organization.schemas";
 import {
   listOrganizations,
@@ -15,6 +17,10 @@ import {
   updateOrganization,
   deleteOrganization,
   checkDuplicateOrganization,
+  checkDuplicateByUrl,
+  checkDuplicateByCrunchbaseId,
+  getDistinctIndustries,
+  getDistinctLocations,
   OrganizationServiceError,
 } from "@/server/services/organization.service";
 import {
@@ -41,6 +47,7 @@ function handleOrganizationError(error: unknown): never {
     const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT"> = {
       ORGANIZATION_NOT_FOUND: "NOT_FOUND",
       DUPLICATE_CRUNCHBASE_ID: "CONFLICT",
+      DUPLICATE_WEBSITE_URL: "CONFLICT",
     };
 
     throw new TRPCError({
@@ -127,6 +134,32 @@ export const organizationRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       return checkDuplicateOrganization(input.name, input.excludeId);
+    }),
+
+  checkDuplicateByUrl: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_READ))
+    .input(checkDuplicateByUrlInput)
+    .query(async ({ input }) => {
+      return checkDuplicateByUrl(input);
+    }),
+
+  checkDuplicateByCrunchbaseId: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_READ))
+    .input(checkDuplicateByCrunchbaseIdInput)
+    .query(async ({ input }) => {
+      return checkDuplicateByCrunchbaseId(input);
+    }),
+
+  distinctIndustries: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_READ))
+    .query(async () => {
+      return getDistinctIndustries();
+    }),
+
+  distinctLocations: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_READ))
+    .query(async () => {
+      return getDistinctLocations();
     }),
 
   // Contact sub-procedures

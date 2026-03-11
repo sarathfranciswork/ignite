@@ -2,41 +2,44 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Building2, Plus, Search } from "lucide-react";
+import { Building2, Plus, Search, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OrganizationCard } from "@/components/organizations/OrganizationCard";
+import { OrganizationListRow } from "@/components/organizations/OrganizationListRow";
+import {
+  OrganizationFilters,
+  type OrganizationFilterValues,
+} from "@/components/organizations/OrganizationFilters";
 import { trpc } from "@/lib/trpc";
 
-type RelationshipFilter =
-  | "IDENTIFIED"
-  | "VERIFIED"
-  | "QUALIFIED"
-  | "EVALUATION"
-  | "PILOT"
-  | "PARTNERSHIP"
-  | "ARCHIVED"
-  | undefined;
+type ViewMode = "tile" | "list";
 
-const STATUS_FILTERS: { label: string; value: RelationshipFilter }[] = [
-  { label: "All", value: undefined },
-  { label: "Identified", value: "IDENTIFIED" },
-  { label: "Verified", value: "VERIFIED" },
-  { label: "Qualified", value: "QUALIFIED" },
-  { label: "Evaluation", value: "EVALUATION" },
-  { label: "Pilot", value: "PILOT" },
-  { label: "Partnership", value: "PARTNERSHIP" },
-  { label: "Archived", value: "ARCHIVED" },
-];
+const DEFAULT_FILTERS: OrganizationFilterValues = {
+  relationshipStatus: undefined,
+  industries: [],
+  location: "",
+  ndaStatus: undefined,
+  isConfidential: undefined,
+  sortBy: "name",
+  sortDirection: "asc",
+};
 
 export default function PartnersPage() {
   const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<RelationshipFilter>(undefined);
+  const [viewMode, setViewMode] = React.useState<ViewMode>("tile");
+  const [filters, setFilters] = React.useState<OrganizationFilterValues>(DEFAULT_FILTERS);
 
   const organizationsQuery = trpc.organization.list.useQuery({
     limit: 20,
     search: search || undefined,
-    relationshipStatus: statusFilter,
+    relationshipStatus: filters.relationshipStatus,
+    industries: filters.industries.length > 0 ? filters.industries : undefined,
+    location: filters.location || undefined,
+    ndaStatus: filters.ndaStatus,
+    isConfidential: filters.isConfidential,
+    sortBy: filters.sortBy,
+    sortDirection: filters.sortDirection,
   });
 
   return (
@@ -45,7 +48,7 @@ export default function PartnersPage() {
         <div>
           <h1 className="font-display text-2xl font-bold text-gray-900">Organizations</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage partner organizations, contacts, and relationships.
+            Search, explore, and manage partner organizations.
           </p>
         </div>
         <Link href="/partners/new">
@@ -60,35 +63,50 @@ export default function PartnersPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
-            placeholder="Search organizations..."
+            placeholder="Search by name, website, industry, or location..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.label}
-              onClick={() => setStatusFilter(filter.value)}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                statusFilter === filter.value
-                  ? "bg-primary-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1 rounded-lg border border-gray-200 p-0.5">
+          <button
+            onClick={() => setViewMode("tile")}
+            className={`rounded-md p-1.5 transition-colors ${
+              viewMode === "tile"
+                ? "bg-primary-600 text-white"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            aria-label="Tile view"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`rounded-md p-1.5 transition-colors ${
+              viewMode === "list"
+                ? "bg-primary-600 text-white"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            aria-label="List view"
+          >
+            <List className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
+      <OrganizationFilters filters={filters} onFiltersChange={setFilters} />
+
       {organizationsQuery.isLoading && (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          className={viewMode === "tile" ? "grid gap-6 sm:grid-cols-2 lg:grid-cols-3" : "space-y-2"}
+        >
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="h-52 animate-pulse rounded-xl border border-gray-200 bg-gray-50"
+              className={`animate-pulse rounded-xl border border-gray-200 bg-gray-50 ${
+                viewMode === "tile" ? "h-52" : "h-16"
+              }`}
             />
           ))}
         </div>
@@ -105,11 +123,11 @@ export default function PartnersPage() {
           <Building2 className="mx-auto h-12 w-12 text-gray-300" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">No organizations found</h3>
           <p className="mt-2 text-sm text-gray-500">
-            {search || statusFilter
-              ? "Try adjusting your filters."
+            {search || filters.relationshipStatus || filters.industries.length > 0
+              ? "Try adjusting your search or filters."
               : "Get started by adding your first partner organization."}
           </p>
-          {!search && !statusFilter && (
+          {!search && !filters.relationshipStatus && filters.industries.length === 0 && (
             <Link href="/partners/new" className="mt-4 inline-block">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -120,13 +138,25 @@ export default function PartnersPage() {
         </div>
       )}
 
-      {organizationsQuery.data && organizationsQuery.data.items.length > 0 && (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {organizationsQuery.data.items.map((org) => (
-            <OrganizationCard key={org.id} organization={org} />
-          ))}
-        </div>
-      )}
+      {organizationsQuery.data &&
+        organizationsQuery.data.items.length > 0 &&
+        viewMode === "tile" && (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {organizationsQuery.data.items.map((org) => (
+              <OrganizationCard key={org.id} organization={org} />
+            ))}
+          </div>
+        )}
+
+      {organizationsQuery.data &&
+        organizationsQuery.data.items.length > 0 &&
+        viewMode === "list" && (
+          <div className="space-y-2">
+            {organizationsQuery.data.items.map((org) => (
+              <OrganizationListRow key={org.id} organization={org} />
+            ))}
+          </div>
+        )}
     </div>
   );
 }
