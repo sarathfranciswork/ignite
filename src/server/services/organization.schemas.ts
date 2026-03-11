@@ -6,16 +6,35 @@ const httpsUrl = z
   .max(2048)
   .refine((url: string) => /^https?:\/\//i.test(url), "URL must use http or https protocol");
 
+const relationshipStatusEnum = z.enum([
+  "IDENTIFIED",
+  "VERIFIED",
+  "QUALIFIED",
+  "EVALUATION",
+  "PILOT",
+  "PARTNERSHIP",
+  "ARCHIVED",
+]);
+
+const ndaStatusEnum = z.enum(["NONE", "REQUESTED", "SIGNED", "EXPIRED"]);
+
+const sortFieldEnum = z.enum(["name", "relationshipStatus", "createdAt", "updatedAt"]);
+
+const sortDirectionEnum = z.enum(["asc", "desc"]);
+
 export const organizationListInput = z.object({
   cursor: z.string().cuid().optional(),
   limit: z.number().int().min(1).max(100).default(20),
   search: z.string().max(200).optional(),
-  relationshipStatus: z
-    .enum(["IDENTIFIED", "VERIFIED", "QUALIFIED", "EVALUATION", "PILOT", "PARTNERSHIP", "ARCHIVED"])
-    .optional(),
+  relationshipStatus: relationshipStatusEnum.optional(),
+  industries: z.array(z.string().max(100)).max(20).optional(),
   industry: z.string().max(100).optional(),
+  location: z.string().max(200).optional(),
+  ndaStatus: ndaStatusEnum.optional(),
   isConfidential: z.boolean().optional(),
   isArchived: z.boolean().optional(),
+  sortBy: sortFieldEnum.default("name"),
+  sortDirection: sortDirectionEnum.default("asc"),
 });
 
 export const organizationCreateInput = z.object({
@@ -29,10 +48,8 @@ export const organizationCreateInput = z.object({
   employeeCount: z.string().max(50).optional(),
   fundingStage: z.string().max(100).optional(),
   fundingTotal: z.string().max(100).optional(),
-  relationshipStatus: z
-    .enum(["IDENTIFIED", "VERIFIED", "QUALIFIED", "EVALUATION", "PILOT", "PARTNERSHIP", "ARCHIVED"])
-    .default("IDENTIFIED"),
-  ndaStatus: z.enum(["NONE", "REQUESTED", "SIGNED", "EXPIRED"]).default("NONE"),
+  relationshipStatus: relationshipStatusEnum.default("IDENTIFIED"),
+  ndaStatus: ndaStatusEnum.default("NONE"),
   isConfidential: z.boolean().default(false),
   crunchbaseId: z.string().max(200).optional(),
   innospotId: z.string().max(200).optional(),
@@ -52,10 +69,8 @@ export const organizationUpdateInput = z.object({
   employeeCount: z.string().max(50).optional().nullable(),
   fundingStage: z.string().max(100).optional().nullable(),
   fundingTotal: z.string().max(100).optional().nullable(),
-  relationshipStatus: z
-    .enum(["IDENTIFIED", "VERIFIED", "QUALIFIED", "EVALUATION", "PILOT", "PARTNERSHIP", "ARCHIVED"])
-    .optional(),
-  ndaStatus: z.enum(["NONE", "REQUESTED", "SIGNED", "EXPIRED"]).optional(),
+  relationshipStatus: relationshipStatusEnum.optional(),
+  ndaStatus: ndaStatusEnum.optional(),
   isConfidential: z.boolean().optional(),
   crunchbaseId: z.string().max(200).optional().nullable(),
   innospotId: z.string().max(200).optional().nullable(),
@@ -71,6 +86,18 @@ export const organizationDeleteInput = z.object({
   id: z.string().cuid(),
 });
 
-export type OrganizationListInput = z.infer<typeof organizationListInput>;
+export const checkDuplicateByUrlInput = z.object({
+  websiteUrl: z.string().url().max(2048),
+  excludeId: z.string().cuid().optional(),
+});
+
+export const checkDuplicateByCrunchbaseIdInput = z.object({
+  crunchbaseId: z.string().min(1).max(200),
+  excludeId: z.string().cuid().optional(),
+});
+
+export type OrganizationListInput = z.input<typeof organizationListInput>;
 export type OrganizationCreateInput = z.infer<typeof organizationCreateInput>;
 export type OrganizationUpdateInput = z.infer<typeof organizationUpdateInput>;
+export type CheckDuplicateByUrlInput = z.infer<typeof checkDuplicateByUrlInput>;
+export type CheckDuplicateByCrunchbaseIdInput = z.infer<typeof checkDuplicateByCrunchbaseIdInput>;

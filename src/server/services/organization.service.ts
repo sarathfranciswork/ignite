@@ -6,6 +6,8 @@ import type {
   OrganizationListInput,
   OrganizationCreateInput,
   OrganizationUpdateInput,
+  CheckDuplicateByUrlInput,
+  CheckDuplicateByCrunchbaseIdInput,
 } from "./organization.schemas";
 
 type JsonSafe = Record<string, string> | null;
@@ -56,6 +58,24 @@ function mapOrganizationToResponse(org: OrgWithManagers) {
   };
 }
 
+/**
+ * Normalize a website URL to a comparable domain string.
+ * Strips protocol, www prefix, trailing slashes, and lowercases.
+ * e.g. "https://www.Acme.com/about/" -> "acme.com"
+ */
+export function normalizeWebsiteUrl(url: string): string {
+  let domain = url.toLowerCase().trim();
+  domain = domain.replace(/^https?:\/\//, "");
+  domain = domain.replace(/^www\./, "");
+  domain = domain.replace(/\/+$/, "");
+  // Remove path, query, and hash - keep only domain
+  const slashIndex = domain.indexOf("/");
+  if (slashIndex !== -1) {
+    domain = domain.substring(0, slashIndex);
+  }
+  return domain;
+}
+
 const childLogger = logger.child({ service: "organization" });
 
 export async function listOrganizations(input: OrganizationListInput) {
@@ -65,8 +85,20 @@ export async function listOrganizations(input: OrganizationListInput) {
     where.relationshipStatus = input.relationshipStatus;
   }
 
-  if (input.industry) {
+  if (input.industries && input.industries.length > 0) {
+    where.OR = input.industries.map((ind) => ({
+      industry: { contains: ind, mode: "insensitive" as const },
+    }));
+  } else if (input.industry) {
     where.industry = { contains: input.industry, mode: "insensitive" };
+  }
+
+  if (input.location) {
+    where.location = { contains: input.location, mode: "insensitive" };
+  }
+
+  if (input.ndaStatus) {
+    where.ndaStatus = input.ndaStatus;
   }
 
   if (input.isConfidential !== undefined) {
@@ -78,13 +110,26 @@ export async function listOrganizations(input: OrganizationListInput) {
   }
 
   if (input.search) {
-    where.OR = [
+    const searchConditions: Prisma.OrganizationWhereInput[] = [
       { name: { contains: input.search, mode: "insensitive" } },
       { description: { contains: input.search, mode: "insensitive" } },
       { industry: { contains: input.search, mode: "insensitive" } },
       { location: { contains: input.search, mode: "insensitive" } },
+      { websiteUrl: { contains: input.search, mode: "insensitive" } },
     ];
+
+    if (where.OR) {
+      where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+      delete where.OR;
+    } else {
+      where.OR = searchConditions;
+    }
   }
+
+  const sortBy = input.sortBy ?? "name";
+  const sortDirection = input.sortDirection ?? "asc";
+  const orderBy: Prisma.OrganizationOrderByWithRelationInput = { [sortBy]: sortDirection };
+  const limit = input.limit ?? 20;
 
   const items = await prisma.organization.findMany({
     where,
@@ -92,13 +137,13 @@ export async function listOrganizations(input: OrganizationListInput) {
       ...orgWithManagersInclude,
       managers: { ...managerInclude, take: 3 },
     },
-    take: input.limit + 1,
+    take: limit + 1,
     ...(input.cursor ? { skip: 1, cursor: { id: input.cursor } } : {}),
-    orderBy: { name: "asc" },
+    orderBy,
   });
 
   let nextCursor: string | undefined;
-  if (items.length > input.limit) {
+  if (items.length > limit) {
     const next = items.pop();
     nextCursor = next?.id;
   }
@@ -299,6 +344,63 @@ export async function checkDuplicateOrganization(name: string, excludeId?: strin
   return existing
     ? { isDuplicate: true, existingId: existing.id, existingName: existing.name }
     : { isDuplicate: false };
+}
+
+export async function checkDuplicateByUrl(input: CheckDuplicateByUrlInput) {
+  const normalizedDomain = normalizeWebsiteUrl(input.websiteUrl);
+
+  // Find all orgs with a website URL, then compare normalized domains
+  const orgsWithUrl = await prisma.organization.findMany({
+    where: {
+      websiteUrl: { not: null },
+      ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
+    },
+    select: { id: true, name: true, websiteUrl: true },
+  });
+
+  const match = orgsWithUrl.find(
+    (org) => org.websiteUrl && normalizeWebsiteUrl(org.websiteUrl) === normalizedDomain,
+  );
+
+  if (match) {
+    return { isDuplicate: true as const, existingId: match.id, existingName: match.name };
+  }
+  return { isDuplicate: false as const, existingId: undefined, existingName: undefined };
+}
+
+export async function checkDuplicateByCrunchbaseId(input: CheckDuplicateByCrunchbaseIdInput) {
+  const existing = await prisma.organization.findFirst({
+    where: {
+      crunchbaseId: input.crunchbaseId,
+      ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
+    },
+    select: { id: true, name: true },
+  });
+
+  if (existing) {
+    return { isDuplicate: true as const, existingId: existing.id, existingName: existing.name };
+  }
+  return { isDuplicate: false as const, existingId: undefined, existingName: undefined };
+}
+
+export async function getDistinctIndustries(): Promise<string[]> {
+  const result = await prisma.organization.findMany({
+    where: { industry: { not: null } },
+    select: { industry: true },
+    distinct: ["industry"],
+    orderBy: { industry: "asc" },
+  });
+  return result.map((r) => r.industry).filter((i): i is string => i !== null);
+}
+
+export async function getDistinctLocations(): Promise<string[]> {
+  const result = await prisma.organization.findMany({
+    where: { location: { not: null } },
+    select: { location: true },
+    distinct: ["location"],
+    orderBy: { location: "asc" },
+  });
+  return result.map((r) => r.location).filter((l): l is string => l !== null);
 }
 
 export class OrganizationServiceError extends Error {
