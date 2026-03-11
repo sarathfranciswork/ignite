@@ -8,6 +8,7 @@ import { engagementRouter } from "./engagement";
 import { ideaRouter } from "./idea";
 import { notificationRouter } from "./notification";
 import { organizationRouter } from "./organization";
+import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
 import { ssoRouter } from "./sso";
 import { useCaseRouter } from "./use-case";
@@ -23,6 +24,7 @@ export const appRouter = createTRPCRouter({
   idea: ideaRouter,
   notification: notificationRouter,
   organization: organizationRouter,
+  search: searchRouter,
   space: spaceRouter,
   sso: ssoRouter,
   useCase: useCaseRouter,

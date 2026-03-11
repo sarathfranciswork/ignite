@@ -184,12 +184,8 @@ describe("markAsRead", () => {
       userId: "other-user",
     });
 
-    await expect(markAsRead(userId, { id: "notif-1" })).rejects.toThrow(
-      NotificationServiceError,
-    );
-    await expect(markAsRead(userId, { id: "notif-1" })).rejects.toThrow(
-      "Not authorized",
-    );
+    await expect(markAsRead(userId, { id: "notif-1" })).rejects.toThrow(NotificationServiceError);
+    await expect(markAsRead(userId, { id: "notif-1" })).rejects.toThrow("Not authorized");
   });
 });
 

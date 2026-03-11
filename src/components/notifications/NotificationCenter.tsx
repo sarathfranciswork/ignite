@@ -19,10 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 
-const NOTIFICATION_TYPE_CONFIG: Record<
-  string,
-  { icon: React.ElementType; label: string }
-> = {
+const NOTIFICATION_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string }> = {
   IDEA_SUBMITTED: { icon: Lightbulb, label: "Idea Submitted" },
   EVALUATION_REQUESTED: { icon: ClipboardCheck, label: "Evaluation" },
   STATUS_CHANGE: { icon: ArrowRightLeft, label: "Status Change" },
@@ -101,7 +98,7 @@ function NotificationRow({
         </div>
         <p className="mt-0.5 text-sm text-gray-600">{notification.body}</p>
         <div className="mt-1 flex items-center gap-2">
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+          <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
             {config.label}
           </Badge>
           <span className="text-xs text-gray-400">

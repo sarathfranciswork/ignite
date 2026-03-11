@@ -82,6 +82,11 @@ export const Action = {
   ORGANIZATION_DELETE: "organization.delete",
   ORGANIZATION_MANAGE_CONTACTS: "organization.manageContacts",
 
+  // Search
+  SEARCH_GLOBAL: "search.global",
+  SEARCH_SAVE: "search.save",
+  SEARCH_DELETE_OWN: "search.delete.own",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -146,6 +151,9 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.USE_CASE_TRANSITION,
     Action.USE_CASE_MANAGE_TEAM,
     Action.USE_CASE_MANAGE_TASKS,
+    Action.SEARCH_GLOBAL,
+    Action.SEARCH_SAVE,
+    Action.SEARCH_DELETE_OWN,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -167,6 +175,9 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.NOTIFICATION_READ_OWN,
     Action.ORGANIZATION_READ,
     Action.USE_CASE_READ,
+    Action.SEARCH_GLOBAL,
+    Action.SEARCH_SAVE,
+    Action.SEARCH_DELETE_OWN,
   ],
 } as const;
 

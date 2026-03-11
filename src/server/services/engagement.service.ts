@@ -254,10 +254,7 @@ export async function deleteVote(input: VoteDeleteInput, userId: string) {
     },
   });
 
-  childLogger.info(
-    { ideaId: input.ideaId, criterionId: input.criterionId },
-    "Vote deleted",
-  );
+  childLogger.info({ ideaId: input.ideaId, criterionId: input.criterionId }, "Vote deleted");
 
   return { ideaId: input.ideaId, criterionId: input.criterionId };
 }
@@ -297,33 +294,36 @@ export async function getIdeaVotes(input: VoteGetInput, userId: string) {
     aggregateMap.set(v.criterionId, agg);
   }
 
-  const criteriaStats = (criteria.length > 0 ? criteria : [{ id: "overall", label: "Overall" }]).map(
-    (c) => {
-      const agg = aggregateMap.get(c.id);
-      const userVote = userVotes.find((v) => v.criterionId === c.id);
-      return {
-        criterionId: c.id,
-        label: c.label,
-        averageScore: agg ? agg.total / agg.count : 0,
-        totalVoters: agg?.count ?? 0,
-        userScore: userVote?.score ?? null,
-      };
-    },
-  );
+  const criteriaStats = (
+    criteria.length > 0 ? criteria : [{ id: "overall", label: "Overall" }]
+  ).map((c) => {
+    const agg = aggregateMap.get(c.id);
+    const userVote = userVotes.find((v) => v.criterionId === c.id);
+    return {
+      criterionId: c.id,
+      label: c.label,
+      averageScore: agg ? agg.total / agg.count : 0,
+      totalVoters: agg?.count ?? 0,
+      userScore: userVote?.score ?? null,
+    };
+  });
 
   return {
     ideaId: input.ideaId,
     hasVoting: idea.campaign.hasVoting,
     criteria: criteriaStats,
-    totalVoters: new Set(allVotes.map(() => "counted")).size > 0
-      ? new Set(
-          (await prisma.ideaVote.findMany({
-            where: { ideaId: input.ideaId },
-            select: { userId: true },
-            distinct: ["userId"],
-          })).map((v) => v.userId),
-        ).size
-      : 0,
+    totalVoters:
+      new Set(allVotes.map(() => "counted")).size > 0
+        ? new Set(
+            (
+              await prisma.ideaVote.findMany({
+                where: { ideaId: input.ideaId },
+                select: { userId: true },
+                distinct: ["userId"],
+              })
+            ).map((v) => v.userId),
+          ).size
+        : 0,
   };
 }
 

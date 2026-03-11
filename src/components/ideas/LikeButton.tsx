@@ -45,10 +45,7 @@ export function LikeButton({ ideaId, initialLikesCount }: LikeButtonProps) {
     <Button
       variant="ghost"
       size="sm"
-      className={cn(
-        "gap-1.5 text-gray-500 hover:text-red-500",
-        displayLiked && "text-red-500",
-      )}
+      className={cn("gap-1.5 text-gray-500 hover:text-red-500", displayLiked && "text-red-500")}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();

@@ -93,6 +93,8 @@ export interface EventMap {
   "useCaseTask.updated": EventPayload;
   "useCaseTask.statusChanged": EventPayload;
   "useCaseTask.deleted": EventPayload;
+  "search.saved": EventPayload;
+  "search.deleted": EventPayload;
 }
 
 export type EventName = keyof EventMap;
