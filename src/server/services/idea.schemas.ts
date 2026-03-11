@@ -107,3 +107,42 @@ export type IdeaArchiveInput = z.infer<typeof ideaArchiveInput>;
 export type IdeaUnarchiveInput = z.infer<typeof ideaUnarchiveInput>;
 export type IdeaCoachQualifyInput = z.infer<typeof ideaCoachQualifyInput>;
 export type CoachQualificationDecision = z.infer<typeof coachQualificationDecision>;
+
+// ── Idea Board Schemas ─────────────────────────────────────
+
+export const ideaBoardSortField = z.enum([
+  "title",
+  "status",
+  "category",
+  "likesCount",
+  "commentsCount",
+  "viewsCount",
+  "createdAt",
+  "updatedAt",
+]);
+
+export const ideaBoardListInput = z.object({
+  campaignId: z.string(),
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(100).default(25),
+  search: z.string().max(200).optional(),
+  status: z
+    .enum([
+      "DRAFT",
+      "QUALIFICATION",
+      "COMMUNITY_DISCUSSION",
+      "HOT",
+      "EVALUATION",
+      "SELECTED_IMPLEMENTATION",
+      "IMPLEMENTED",
+      "ARCHIVED",
+    ])
+    .optional(),
+  tag: z.string().max(50).optional(),
+  category: z.string().max(200).optional(),
+  sortField: ideaBoardSortField.default("createdAt"),
+  sortDirection: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export type IdeaBoardListInput = z.infer<typeof ideaBoardListInput>;
+export type IdeaBoardSortField = z.infer<typeof ideaBoardSortField>;

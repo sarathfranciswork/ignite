@@ -3,18 +3,28 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Lightbulb, BarChart3, Settings, LayoutDashboard, MessageSquare, Eye } from "lucide-react";
+import {
+  Lightbulb,
+  BarChart3,
+  Settings,
+  LayoutDashboard,
+  MessageSquare,
+  Eye,
+  TableProperties,
+} from "lucide-react";
 import { CampaignHeader } from "@/components/campaigns/CampaignHeader";
 import { CampaignLifecycleBar } from "@/components/campaigns/CampaignLifecycleBar";
 import { CampaignPhaseControls } from "@/components/campaigns/CampaignPhaseControls";
 import { CampaignCockpit } from "@/components/campaigns/CampaignCockpit";
 import { CopyCampaignButton } from "@/components/campaigns/CopyCampaignButton";
 import { CampaignIdeasTab } from "@/components/ideas/CampaignIdeasTab";
+import { IdeaBoard } from "@/components/ideas/IdeaBoard";
 import { trpc } from "@/lib/trpc";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
+  { id: "board", label: "Board", icon: TableProperties },
   { id: "evaluation", label: "Evaluation", icon: BarChart3 },
   { id: "cockpit", label: "Cockpit", icon: MessageSquare },
   { id: "settings", label: "Settings", icon: Settings },
@@ -145,6 +155,8 @@ export default function CampaignDetailPage() {
         {activeTab === "ideas" && (
           <CampaignIdeasTab campaignId={campaign.id} campaignStatus={campaign.status} />
         )}
+
+        {activeTab === "board" && <IdeaBoard campaignId={campaign.id} />}
 
         {activeTab === "evaluation" && (
           <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">
