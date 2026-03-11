@@ -40,6 +40,7 @@ async function createNotifications(targets: NotificationTarget[]) {
 
     childLogger.info({ count: targets.length }, "Notifications created via listener");
 
+    // Dispatch email notifications (fire-and-forget — respects user frequency preference)
     for (const notification of created) {
       enqueueEmail({
         notificationId: notification.id,

@@ -5,11 +5,15 @@ import { registerNotificationListeners } from "@/server/events/listeners/notific
 import { registerGraduationListeners } from "@/server/events/listeners/graduation.listener";
 import { registerActivityListeners } from "@/server/events/listeners/activity.listener";
 import { registerEmbeddingListeners } from "@/server/events/listeners/embedding.listener";
+import { initializeJobWorkers } from "@/server/jobs/init";
 
 registerNotificationListeners();
 registerGraduationListeners();
 registerActivityListeners();
 registerEmbeddingListeners();
+initializeJobWorkers().catch(() => {
+  // Initialization errors are logged internally — non-blocking
+});
 
 function handler(req: Request) {
   return fetchRequestHandler({

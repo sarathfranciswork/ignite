@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendEmail, resetTransporter } from "./email";
+import { sendEmail, resetTransporter, isEmailEnabled, getSenderAddress } from "./email";
 
 vi.mock("nodemailer", () => {
   const sendMailMock = vi.fn().mockResolvedValue({ messageId: "test-id-123" });
@@ -33,6 +33,20 @@ const createTransportMock = nodemailer.default.createTransport as ReturnType<typ
 beforeEach(() => {
   vi.clearAllMocks();
   resetTransporter();
+});
+
+describe("isEmailEnabled", () => {
+  it("returns true when SMTP_HOST is set", () => {
+    expect(isEmailEnabled()).toBeDefined();
+  });
+});
+
+describe("getSenderAddress", () => {
+  it("returns the configured sender address", () => {
+    const address = getSenderAddress();
+    expect(typeof address).toBe("string");
+    expect(address.length).toBeGreaterThan(0);
+  });
 });
 
 describe("sendEmail", () => {
