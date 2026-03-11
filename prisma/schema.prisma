@@ -63,6 +63,7 @@ model User {
   createdUseCases       UseCase[]             @relation("UseCaseCreatedBy")
   useCaseTeamMemberships UseCaseTeamMember[]
   assignedUseCaseTasks  UseCaseTask[]         @relation("UseCaseTaskAssignee")
+  notifications         Notification[]
 
   @@map("users")
 }
@@ -939,4 +940,37 @@ model SsoGroupMapping {
   @@unique([ssoProviderId, externalGroup, targetType])
   @@index([ssoProviderId])
   @@map("sso_group_mappings")
+}
+
+// ── Notification Models ──────────────────────────────────────
+
+enum NotificationType {
+  IDEA_SUBMITTED
+  EVALUATION_REQUESTED
+  STATUS_CHANGE
+  HOT_GRADUATION
+  CAMPAIGN_PHASE_CHANGE
+  COMMENT_ON_FOLLOWED
+  MENTION
+
+  @@map("notification_type")
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String           @map("user_id")
+  type       NotificationType
+  title      String
+  body       String           @db.Text
+  entityType String           @map("entity_type")
+  entityId   String           @map("entity_id")
+  isRead     Boolean          @default(false) @map("is_read")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("notifications")
 }
