@@ -1,8 +1,6 @@
 {
   "config": {
-    "max_parallel": 0,
-    "paused": true,
-    "pause_reason": "GCP migration to innovation-labs-489916 — resume after deploy + visual audit",
+    "max_parallel": 3,
     "description": "DAG-based parallel story execution. Stories within an epic run sequentially. Epics run in parallel (up to max_parallel) once all their dependencies are complete."
   },
   "epics": {
