@@ -420,6 +420,46 @@ jobs:
 
           python3 .github/scripts/qwen-agent.py /tmp/system_prompt.txt /tmp/user_prompt.txt
 
+      - name: Validate agent output
+        if: steps.qwen.outcome == 'success' && steps.issue.outputs.trigger != 'pr_comment'
+        id: validate_output
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+
+          # Check if a PR was created for this issue
+          OPEN_PR=$(gh pr list --state open --search "issue-${ISSUE_NUM}" --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          # Check if a branch exists
+          BRANCH_EXISTS=$(git branch -r --list "origin/qwen/issue-${ISSUE_NUM}-*" 2>/dev/null | head -1 || echo "")
+
+          if [ -n "$OPEN_PR" ]; then
+            echo "Agent created PR #$OPEN_PR. Output validated."
+            echo "has_output=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BRANCH_EXISTS" ]; then
+            echo "Agent created branch but no PR. Partial output."
+            echo "has_output=partial" >> "$GITHUB_OUTPUT"
+          else
+            echo "WARNING: Agent completed successfully but created no branch or PR."
+            echo "has_output=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Remove label on silent failure
+        if: steps.validate_output.outputs.has_output == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          gh issue edit "$ISSUE_NUM" --remove-label "qwen-code" 2>/dev/null || true
+          gh issue comment "$ISSUE_NUM" --body "Qwen Code completed but produced no branch or PR. Removing label so the watchdog can retry.
+
+          **Agent:** Qwen3-Coder-Next
+          **Status:** Silent failure (no output)
+          **Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" || true
+
       - name: Handle failure
         if: failure() && steps.issue.outputs.number != ''
         env:
@@ -427,6 +467,8 @@ jobs:
         run: |
           set +e
           ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          # Remove label so watchdog can retry
+          gh issue edit "$ISSUE_NUM" --remove-label "qwen-code" 2>/dev/null || true
           gh issue comment "$ISSUE_NUM" --body "Qwen Code failed to implement this issue. Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
 
           **Agent:** Qwen3-Coder-Next

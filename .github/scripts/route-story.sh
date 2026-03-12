@@ -37,9 +37,14 @@ route_to() {
   echo "AGENT=$agent WORKFLOW=$workflow LABEL=$label REASON=\"$reason\""
 }
 
-# ── Guard: Force override ──
+# ── Guard: Force override (env var or DAG config) ──
 if [ -n "${FORCE_AGENT:-}" ]; then
   route_to "$FORCE_AGENT" "forced via FORCE_AGENT env"
+  exit 0
+fi
+DAG_FORCE_AGENT=$(jq -r '.config.force_agent // empty' "$DAG_FILE" 2>/dev/null || echo "")
+if [ -n "$DAG_FORCE_AGENT" ]; then
+  route_to "$DAG_FORCE_AGENT" "forced via DAG config force_agent"
   exit 0
 fi
 

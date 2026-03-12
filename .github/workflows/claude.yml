@@ -339,6 +339,46 @@ jobs:
             - One logical change per commit
             - The PR body MUST contain `Closes #<issue-number>` for the chain to work
 
+      # ── Output validation for issue implementation ──
+      - name: Validate Claude output
+        if: steps.claude-issue.outcome == 'success' && steps.issue.outputs.trigger != 'pr_comment'
+        id: validate_output
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+
+          # Check if a PR was created for this issue
+          OPEN_PR=$(gh pr list --state open --search "issue-${ISSUE_NUM}" --json number --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          # Check if a branch exists
+          BRANCH_EXISTS=$(git branch -r --list "origin/claude/issue-${ISSUE_NUM}-*" 2>/dev/null | head -1 || echo "")
+
+          if [ -n "$OPEN_PR" ]; then
+            echo "Claude created PR #$OPEN_PR. Output validated."
+            echo "has_output=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BRANCH_EXISTS" ]; then
+            echo "Claude created branch but no PR. Partial output."
+            echo "has_output=partial" >> "$GITHUB_OUTPUT"
+          else
+            echo "WARNING: Claude completed successfully but created no branch or PR."
+            echo "has_output=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Remove label on silent failure
+        if: steps.validate_output.outputs.has_output == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          ISSUE_NUM="${{ steps.issue.outputs.number }}"
+          gh issue edit "$ISSUE_NUM" --remove-label "claude-code" 2>/dev/null || true
+          gh issue comment "$ISSUE_NUM" --body "Claude Code completed but produced no branch or PR. Removing label so the watchdog can retry.
+
+          **Status:** Silent failure (no output)
+          **Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" || true
+
       # ── Claude for PR COMMENTS (targeted fix/rebase only) ──
       - name: Run Claude Code (PR feedback)
         if: steps.issue.outputs.trigger == 'pr_comment'

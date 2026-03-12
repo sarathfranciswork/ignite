@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 LLM_BASE_URL = os.environ["LLM_BASE_URL"]
@@ -330,12 +331,26 @@ def chat_completion(messages: list, tools: list | None = None) -> dict:
 
     url = f"{LLM_BASE_URL}/chat/completions"
 
-    if requests is not None:
-        resp = requests.post(url, headers=headers, json=payload, timeout=300)
-        resp.raise_for_status()
-        return resp.json()
-    else:
-        return _FallbackRequests.post(url, headers=headers, json_data=payload, timeout=300)
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            if requests is not None:
+                resp = requests.post(url, headers=headers, json=payload, timeout=600)
+                resp.raise_for_status()
+                return resp.json()
+            else:
+                return _FallbackRequests.post(url, headers=headers, json_data=payload, timeout=600)
+        except Exception as e:
+            err_str = str(e)
+            # Retry on 524 (Cloudflare timeout) or 502/503/504 gateway errors
+            is_retryable = any(code in err_str for code in ("524", "502", "503", "504", "Connection", "timeout", "Timeout"))
+            if is_retryable and attempt < max_retries:
+                wait = 10 * attempt  # 10s, 20s backoff
+                print(f"  LLM API retryable error (attempt {attempt}/{max_retries}): {e}")
+                print(f"  Retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            raise  # Re-raise on non-retryable or final attempt
 
 
 # ── Agent loop ──
@@ -361,9 +376,10 @@ def run_agent(system_prompt: str, user_prompt: str) -> str:
         except Exception as e:
             print(f"LLM API error: {e}")
             if iteration < 3:
-                print("Retrying...")
+                print("Retrying next iteration...")
                 continue
-            return f"Agent failed: LLM API error after {iteration} iterations: {e}"
+            print(f"FATAL: LLM API error after {iteration} iterations: {e}")
+            sys.exit(1)
 
         choice = result["choices"][0]
         message = choice["message"]
@@ -447,3 +463,26 @@ if __name__ == "__main__":
     print(f"\n{'='*60}")
     print("  AGENT COMPLETE")
     print(f"{'='*60}")
+
+    # Validate that the agent actually produced output (commits, branch, or PR)
+    try:
+        # Check if we're on a feature branch (not main/master)
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, cwd=REPO_ROOT,
+        ).stdout.strip()
+
+        # Check for commits ahead of origin/main
+        commits_ahead = subprocess.run(
+            ["git", "rev-list", "--count", "origin/main..HEAD"],
+            capture_output=True, text=True, cwd=REPO_ROOT,
+        ).stdout.strip()
+
+        if branch in ("main", "master") or commits_ahead == "0":
+            print(f"\nWARNING: Agent completed but no commits on branch '{branch}' (ahead: {commits_ahead})")
+            print("Agent did not produce any implementation. Exiting with failure.")
+            sys.exit(1)
+        else:
+            print(f"\nValidation: Branch '{branch}', {commits_ahead} commit(s) ahead of main.")
+    except Exception as e:
+        print(f"Output validation error (non-fatal): {e}")

@@ -215,7 +215,7 @@ jobs:
                   eval "$HEAL_ROUTE"
                   HEAL_AGENT="$AGENT"; HEAL_WORKFLOW="$WORKFLOW"; HEAL_LABEL="$LABEL"; HEAL_REASON="$REASON"
                 else
-                  HEAL_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+                  HEAL_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.force_agent // .config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
                   HEAL_WORKFLOW=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
                   HEAL_LABEL=$(jq -r --arg a "$HEAL_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
                   HEAL_REASON="fallback"
@@ -259,7 +259,7 @@ jobs:
                 eval "$READY_ROUTE"
                 READY_AGENT="$AGENT"; READY_WORKFLOW="$WORKFLOW"; READY_LABEL="$LABEL"; READY_REASON="$REASON"
               else
-                READY_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+                READY_AGENT=$(jq -r --arg ep "$EPIC_ID" '.config.force_agent // .config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
                 READY_WORKFLOW=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
                 READY_LABEL=$(jq -r --arg a "$READY_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
                 READY_REASON="fallback"
@@ -285,6 +285,93 @@ jobs:
 
           echo "triggered_count=$TRIGGERED_COUNT" >> "$GITHUB_OUTPUT"
           echo "triggered_list=$TRIGGERED_LIST" >> "$GITHUB_OUTPUT"
+
+      # ══════════════════════════════════════════════════════════
+      # 2b. Stall Detection: Labeled but No Running Workflow
+      # ══════════════════════════════════════════════════════════
+      - name: "Detect stalled stories (labeled but idle)"
+        id: stall_detect
+        if: steps.dag_health.outputs.dag_status == 'active'
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+          QWEN_API_BASE: ${{ secrets.QWEN_API_BASE }}
+        run: |
+          set +e
+          ACTIVE_STORIES="${{ steps.dag_health.outputs.active_stories }}"
+          DAG_FILE=".github/story-dag.json"
+          STALL_RETRIGGER=0
+
+          # Get all in-progress workflow runs for both agents
+          CLAUDE_RUNNING=$(gh run list --workflow=claude.yml --status=in_progress --json databaseId --jq '.[].databaseId' 2>/dev/null || echo "")
+          QWEN_RUNNING=$(gh run list --workflow=qwen-code.yml --status=in_progress --json databaseId --jq '.[].databaseId' 2>/dev/null || echo "")
+          CLAUDE_QUEUED=$(gh run list --workflow=claude.yml --status=queued --json databaseId --jq '.[].databaseId' 2>/dev/null || echo "")
+          QWEN_QUEUED=$(gh run list --workflow=qwen-code.yml --status=queued --json databaseId --jq '.[].databaseId' 2>/dev/null || echo "")
+
+          TOTAL_RUNNING=$(echo "$CLAUDE_RUNNING $QWEN_RUNNING $CLAUDE_QUEUED $QWEN_QUEUED" | tr ' ' '\n' | grep -c '[0-9]' || echo "0")
+
+          if [ "$TOTAL_RUNNING" -gt 0 ]; then
+            echo "Workflows are running ($TOTAL_RUNNING active/queued). No stall."
+            echo "stalled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "No agent workflows running but ${{ steps.dag_health.outputs.active_count }} stories have labels. Checking for stalls..."
+
+          for ISSUE_NUM in $ACTIVE_STORIES; do
+            # Check if there's an open PR for this issue (work in progress)
+            OPEN_PR=$(gh pr list --state open --search "issue-${ISSUE_NUM}" --json number --jq 'length' 2>/dev/null || echo "0")
+            if [ "$OPEN_PR" -gt 0 ]; then
+              echo "Story #$ISSUE_NUM has an open PR. Not stalled (waiting for CI/merge)."
+              continue
+            fi
+
+            # Check last workflow run for this story
+            LAST_CLAUDE_RUN=$(gh run list --workflow=claude.yml --limit 5 --json databaseId,conclusion,createdAt,displayTitle 2>/dev/null || echo "[]")
+            LAST_QWEN_RUN=$(gh run list --workflow=qwen-code.yml --limit 5 --json databaseId,conclusion,createdAt,displayTitle 2>/dev/null || echo "[]")
+
+            # Story is stalled: has label, no running workflow, no open PR
+            echo "STALLED: Story #$ISSUE_NUM has agent label but no running workflow and no open PR."
+
+            # Determine which agent to use
+            CURRENT_LABELS=$(gh issue view "$ISSUE_NUM" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+            if echo "$CURRENT_LABELS" | grep -qw "qwen-code"; then
+              STALL_AGENT="qwen"
+            else
+              STALL_AGENT="claude"
+            fi
+
+            # Route via intelligent router if available
+            if [ -x ".github/scripts/route-story.sh" ]; then
+              STALL_ROUTE=$(QWEN_API_BASE="${QWEN_API_BASE:-}" .github/scripts/route-story.sh "$ISSUE_NUM" "$DAG_FILE" 2>/dev/null | tail -1)
+              if [ -n "$STALL_ROUTE" ]; then
+                eval "$STALL_ROUTE"
+                STALL_AGENT="$AGENT"; STALL_LABEL="$LABEL"; STALL_WORKFLOW="$WORKFLOW"
+              else
+                STALL_LABEL=$(jq -r --arg a "$STALL_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+                STALL_WORKFLOW=$(jq -r --arg a "$STALL_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+              fi
+            else
+              STALL_LABEL=$(jq -r --arg a "$STALL_AGENT" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")
+              STALL_WORKFLOW=$(jq -r --arg a "$STALL_AGENT" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
+            fi
+
+            echo "Re-triggering Story #$ISSUE_NUM via $STALL_WORKFLOW [Agent: $STALL_AGENT]"
+            gh issue edit "$ISSUE_NUM" --remove-label "claude-code" --remove-label "qwen-code" 2>/dev/null || true
+            gh issue edit "$ISSUE_NUM" --add-label "$STALL_LABEL" 2>/dev/null || true
+            gh workflow run "$STALL_WORKFLOW" --ref main -f issue_number="$ISSUE_NUM" 2>/dev/null || true
+            gh issue comment "$ISSUE_NUM" --body "## Orchestration: Stall Recovery
+
+          Story had an agent label but no running workflow and no open PR.
+          Re-triggering automatically.
+
+          **Agent:** ${STALL_AGENT^}
+          **Trigger:** Watchdog stall detection" || true
+
+            STALL_RETRIGGER=$((STALL_RETRIGGER + 1))
+          done
+
+          echo "stalled=$( [ "$STALL_RETRIGGER" -gt 0 ] && echo 'true' || echo 'false' )" >> "$GITHUB_OUTPUT"
+          echo "retrigger_count=$STALL_RETRIGGER" >> "$GITHUB_OUTPUT"
 
       # ══════════════════════════════════════════════════════════
       # 3. Check Active Claude Runs for Timeouts/Failures
@@ -359,21 +446,39 @@ jobs:
             RETRY_COUNT=$(gh issue view "$ISSUE_NUM" --json comments --jq '[.comments[] | select(.body | contains("Orchestration: Retry"))] | length' 2>/dev/null || echo "0")
 
             if [ "$RETRY_COUNT" -ge "${{ env.MAX_RETRIES }}" ]; then
-              echo "Max retries reached for #$ISSUE_NUM. Creating alert."
-              EXISTING=$(gh issue list --label "orchestration-alert" --state open --search "#$ISSUE_NUM stuck" --json number --jq 'length' 2>/dev/null || echo "0")
-              if [ "$EXISTING" -eq 0 ]; then
-                STORY_ID=$(jq -r --argjson num "$ISSUE_NUM" '.stories[($num | tostring)].id' ".github/story-dag.json")
-                gh issue create \
-                  --title "Orchestration Alert: Story $STORY_ID (#$ISSUE_NUM) stuck after ${{ env.MAX_RETRIES }} retries" \
-                  --label "orchestration-alert,bug" \
-                  --body "## Max Retries Exceeded
+              # Cooldown: if last retry was >2 hours ago, allow retrying again
+              LAST_RETRY_TIME=$(gh issue view "$ISSUE_NUM" --json comments --jq '[.comments[] | select(.body | contains("Orchestration: Retry")) | .createdAt] | sort | last // empty' 2>/dev/null || echo "")
+              COOLDOWN_EXPIRED=false
+              if [ -n "$LAST_RETRY_TIME" ]; then
+                LAST_RETRY_EPOCH=$(date -d "$LAST_RETRY_TIME" +%s 2>/dev/null || echo "0")
+                NOW_EPOCH=$(date +%s)
+                HOURS_SINCE=$(( (NOW_EPOCH - LAST_RETRY_EPOCH) / 3600 ))
+                if [ "$HOURS_SINCE" -ge 2 ]; then
+                  COOLDOWN_EXPIRED=true
+                  echo "Cooldown expired for #$ISSUE_NUM (last retry ${HOURS_SINCE}h ago). Allowing new retry cycle."
+                fi
+              fi
+
+              if [ "$COOLDOWN_EXPIRED" != "true" ]; then
+                echo "Max retries reached for #$ISSUE_NUM (cooldown not expired). Creating alert."
+                EXISTING=$(gh issue list --label "orchestration-alert" --state open --search "#$ISSUE_NUM stuck" --json number --jq 'length' 2>/dev/null || echo "0")
+                if [ "$EXISTING" -eq 0 ]; then
+                  STORY_ID=$(jq -r --argjson num "$ISSUE_NUM" '.stories[($num | tostring)].id' ".github/story-dag.json")
+                  gh issue create \
+                    --title "Orchestration Alert: Story $STORY_ID (#$ISSUE_NUM) stuck after ${{ env.MAX_RETRIES }} retries" \
+                    --label "orchestration-alert,bug" \
+                    --body "## Max Retries Exceeded
 
           **Story:** $STORY_ID (#$ISSUE_NUM)
           **Retries exhausted:** ${{ env.MAX_RETRIES }}
+          **Cooldown:** Will auto-retry after 2 hours
 
-          Manual intervention required. Check workflow runs for error details." || true
+          Manual intervention may speed things up. Check workflow runs for error details." || true
+                fi
+                continue
               fi
-              continue
+              # Reset for cooldown retry — treat as attempt 1 of a new cycle
+              RETRY_COUNT=0
             fi
 
             ATTEMPT=$((RETRY_COUNT + 1))
@@ -665,7 +770,10 @@ jobs:
           # Self-healing summary
           HEALED=""
           if [ "${{ steps.trigger_ready.outputs.triggered_count }}" -gt "0" ] 2>/dev/null; then
-            HEALED="Triggered stories: ${{ steps.trigger_ready.outputs.triggered_list }}"
+            HEALED="Triggered ready stories: ${{ steps.trigger_ready.outputs.triggered_list }}"
+          fi
+          if [ "${{ steps.stall_detect.outputs.stalled }}" = "true" ] 2>/dev/null; then
+            HEALED="${HEALED:+$HEALED | }Stall recovery: ${{ steps.stall_detect.outputs.retrigger_count }} stories re-triggered"
           fi
 
           REPORT=$(cat <<ENDOFBODY

@@ -112,7 +112,7 @@ jobs:
               local epic_id
               epic_id=$(jq -r --argjson num "$issue_num" '.stories[($num | tostring)].epic // empty' "$DAG_FILE" 2>/dev/null || echo "")
               local agent
-              agent=$(jq -r --arg ep "$epic_id" '.config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
+              agent=$(jq -r --arg ep "$epic_id" '.config.force_agent // .config.epic_agents[$ep] // .config.default_agent // "claude"' "$DAG_FILE")
               local wf label
               wf=$(jq -r --arg a "$agent" '.config.agents[$a].workflow // "claude.yml"' "$DAG_FILE")
               label=$(jq -r --arg a "$agent" '.config.agents[$a].label // "claude-code"' "$DAG_FILE")

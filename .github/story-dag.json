@@ -3,6 +3,7 @@
     "max_parallel": 3,
     "description": "DAG-based parallel story execution. Stories within an epic run sequentially. Epics run in parallel (up to max_parallel) once all their dependencies are complete.",
     "default_agent": "claude",
+    "force_agent": "claude",
     "agents": {
       "claude": {
         "workflow": "claude.yml",
