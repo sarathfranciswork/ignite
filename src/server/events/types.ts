@@ -103,6 +103,9 @@ export interface EventMap {
   "sso.providerDisabled": EventPayload;
   "sso.userProvisioned": EventPayload;
   "sso.groupSynced": EventPayload;
+  "scim.userProvisioned": EventPayload;
+  "scim.userDeprovisioned": EventPayload;
+  "scim.groupSynced": EventPayload;
   "useCase.created": EventPayload;
   "useCase.updated": EventPayload;
   "useCase.statusChanged": EventPayload;

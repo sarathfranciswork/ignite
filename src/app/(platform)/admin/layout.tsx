@@ -16,6 +16,7 @@ import {
   BookText,
   Globe,
   LogIn,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const systemAdminNav: AdminNavItem[] = [
   { label: "Spaces", href: "/admin/spaces", icon: Globe },
   { label: "System Health", href: "/admin/health", icon: Activity },
   { label: "Settings", href: "/admin/settings", icon: Settings },
+  { label: "SCIM", href: "/admin/scim", icon: KeyRound },
 ];
 
 const innovationConfigNav: AdminNavItem[] = [
