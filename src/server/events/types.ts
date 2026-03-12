@@ -165,6 +165,12 @@ export interface EventMap {
   "insight.deleted": EventPayload;
   "insight.trendLinked": EventPayload;
   "insight.trendUnlinked": EventPayload;
+  "portfolio.created": EventPayload;
+  "portfolio.updated": EventPayload;
+  "portfolio.deleted": EventPayload;
+  "portfolio.itemAdded": EventPayload;
+  "portfolio.itemRemoved": EventPayload;
+  "portfolio.itemsReordered": EventPayload;
   "sia.created": EventPayload;
   "sia.updated": EventPayload;
   "sia.archived": EventPayload;

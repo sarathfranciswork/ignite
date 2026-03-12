@@ -77,6 +77,7 @@ model User {
   createdTrends              Trend[]                     @relation("TrendCreatedBy")
   createdTechnologies        Technology[]                @relation("TechnologyCreatedBy")
   createdInsights            Insight[]                   @relation("InsightCreatedBy")
+  createdPortfolios          InnovationPortfolio[]       @relation("PortfolioCreatedBy")
 
   @@map("users")
 }
@@ -1750,4 +1751,47 @@ model TechSiaLink {
 
   @@unique([techId, siaId])
   @@map("tech_sia_links")
+}
+
+// ─── Innovation Portfolios ─────────────────────────────────
+
+enum PortfolioItemType {
+  TREND
+  TECHNOLOGY
+  IDEA
+  SIA
+
+  @@map("portfolio_item_type")
+}
+
+model InnovationPortfolio {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User            @relation("PortfolioCreatedBy", fields: [createdById], references: [id])
+  items     PortfolioItem[]
+
+  @@index([createdById])
+  @@map("innovation_portfolios")
+}
+
+model PortfolioItem {
+  id          String            @id @default(cuid())
+  portfolioId String            @map("portfolio_id")
+  entityType  PortfolioItemType @map("entity_type")
+  entityId    String            @map("entity_id")
+  bucketLabel String?           @map("bucket_label")
+  position    Int               @default(0)
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  portfolio InnovationPortfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, entityType, entityId])
+  @@index([portfolioId])
+  @@index([entityType, entityId])
+  @@map("portfolio_items")
 }

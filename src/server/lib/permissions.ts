@@ -154,6 +154,12 @@ export const Action = {
   INSIGHT_UPDATE: "insight.update",
   INSIGHT_DELETE: "insight.delete",
 
+  // Innovation Portfolios
+  PORTFOLIO_CREATE: "portfolio.create",
+  PORTFOLIO_READ: "portfolio.read",
+  PORTFOLIO_UPDATE: "portfolio.update",
+  PORTFOLIO_DELETE: "portfolio.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -267,6 +273,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.INSIGHT_READ,
     Action.INSIGHT_UPDATE,
     Action.INSIGHT_DELETE,
+    Action.PORTFOLIO_CREATE,
+    Action.PORTFOLIO_READ,
+    Action.PORTFOLIO_UPDATE,
+    Action.PORTFOLIO_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -309,6 +319,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.TECHNOLOGY_READ,
     Action.INSIGHT_CREATE,
     Action.INSIGHT_READ,
+    Action.PORTFOLIO_READ,
   ],
 } as const;
 
