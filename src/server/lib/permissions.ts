@@ -193,6 +193,7 @@ export const Action = {
   PROJECT_REQUEST_GATE_REVIEW: "project.requestGateReview",
   PROJECT_SUBMIT_GATE_DECISION: "project.submitGateDecision",
   PROJECT_UPDATE_PHASE_DATES: "project.updatePhaseDates",
+  PROJECT_MANAGE_TASKS: "project.manageTasks",
 
   // Webhook management
   WEBHOOK_CREATE: "webhook.create",
@@ -343,6 +344,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PROJECT_REQUEST_GATE_REVIEW,
     Action.PROJECT_SUBMIT_GATE_DECISION,
     Action.PROJECT_UPDATE_PHASE_DATES,
+    Action.PROJECT_MANAGE_TASKS,
     Action.EXTERNAL_INVITATION_CREATE,
     Action.EXTERNAL_INVITATION_LIST,
     Action.EXTERNAL_INVITATION_REVOKE,
@@ -402,6 +404,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PORTFOLIO_READ,
     Action.PROCESS_DEFINITION_READ,
     Action.PROJECT_READ,
+    Action.PROJECT_MANAGE_TASKS,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,

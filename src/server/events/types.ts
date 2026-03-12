@@ -192,6 +192,9 @@ export interface EventMap {
   "project.phasePostponed": EventPayload;
   "project.terminated": EventPayload;
   "project.completed": EventPayload;
+  "project.taskAssigned": EventPayload;
+  "project.taskUpdated": EventPayload;
+  "project.taskCompleted": EventPayload;
   "externalUser.invited": EventPayload;
   "externalUser.accepted": EventPayload;
   "sia.created": EventPayload;
