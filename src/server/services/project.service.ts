@@ -8,6 +8,10 @@ import type {
   ProjectUpdateInput,
   ProjectAddTeamMemberInput,
   ProjectRemoveTeamMemberInput,
+  RequestGateReviewInput,
+  SubmitGateDecisionInput,
+  GetPhaseInstancesInput,
+  UpdatePhaseDatesInput,
 } from "./project.schemas";
 
 const childLogger = logger.child({ service: "project" });
@@ -192,7 +196,6 @@ export async function createProject(input: ProjectCreateInput, userId: string) {
     include: {
       phases: {
         orderBy: { position: "asc" },
-        take: 1,
       },
     },
   });
@@ -227,6 +230,14 @@ export async function createProject(input: ProjectCreateInput, userId: string) {
         create: (input.teamMembers ?? []).map((tm) => ({
           userId: tm.userId,
           role: tm.role,
+        })),
+      },
+      phaseInstances: {
+        create: processDefinition.phases.map((phase, index) => ({
+          phaseId: phase.id,
+          position: phase.position,
+          status: index === 0 ? "ELABORATION" : "SKIPPED",
+          actualStartAt: index === 0 ? new Date() : null,
         })),
       },
     },
@@ -377,4 +388,366 @@ export async function removeTeamMember(input: ProjectRemoveTeamMemberInput, user
   );
 
   return getProjectById(input.projectId);
+}
+
+export async function getPhaseInstances(input: GetPhaseInstancesInput) {
+  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  const instances = await prisma.projectPhaseInstance.findMany({
+    where: { projectId: input.projectId },
+    include: {
+      phase: {
+        select: { id: true, name: true, description: true, plannedDurationDays: true },
+      },
+      gateDecisions: {
+        include: {
+          gatekeeper: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+        },
+        orderBy: { createdAt: "desc" as const },
+      },
+    },
+    orderBy: { position: "asc" },
+  });
+
+  return instances.map((inst) => ({
+    id: inst.id,
+    projectId: inst.projectId,
+    phase: inst.phase,
+    position: inst.position,
+    status: inst.status,
+    plannedStartAt: inst.plannedStartAt?.toISOString() ?? null,
+    plannedEndAt: inst.plannedEndAt?.toISOString() ?? null,
+    actualStartAt: inst.actualStartAt?.toISOString() ?? null,
+    actualEndAt: inst.actualEndAt?.toISOString() ?? null,
+    reworkFeedback: inst.reworkFeedback,
+    postponeUntil: inst.postponeUntil?.toISOString() ?? null,
+    gateDecisions: inst.gateDecisions.map((gd) => ({
+      id: gd.id,
+      gatekeeper: gd.gatekeeper,
+      decision: gd.decision,
+      feedback: gd.feedback,
+      createdAt: gd.createdAt.toISOString(),
+    })),
+    createdAt: inst.createdAt.toISOString(),
+    updatedAt: inst.updatedAt.toISOString(),
+  }));
+}
+
+export async function requestGateReview(input: RequestGateReviewInput, userId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    include: { currentPhase: true },
+  });
+
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  if (project.status !== "ACTIVE") {
+    throw new ProjectServiceError(
+      "INVALID_PROJECT_STATUS",
+      "Gate review can only be requested for active projects",
+    );
+  }
+
+  if (!project.currentPhaseId) {
+    throw new ProjectServiceError("NO_CURRENT_PHASE", "Project has no active phase");
+  }
+
+  const phaseInstance = await prisma.projectPhaseInstance.findUnique({
+    where: {
+      projectId_phaseId: {
+        projectId: input.projectId,
+        phaseId: project.currentPhaseId,
+      },
+    },
+  });
+
+  if (!phaseInstance) {
+    throw new ProjectServiceError("PHASE_INSTANCE_NOT_FOUND", "Current phase instance not found");
+  }
+
+  if (phaseInstance.status !== "ELABORATION") {
+    throw new ProjectServiceError(
+      "INVALID_PHASE_STATUS",
+      `Phase is in ${phaseInstance.status} status, must be ELABORATION to request gate review`,
+    );
+  }
+
+  await prisma.projectPhaseInstance.update({
+    where: { id: phaseInstance.id },
+    data: { status: "GATE_REVIEW" },
+  });
+
+  eventBus.emit("project.gateReviewRequested", {
+    entity: "Project",
+    entityId: input.projectId,
+    actor: userId,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      phaseInstanceId: phaseInstance.id,
+      phaseId: project.currentPhaseId,
+    },
+  });
+
+  childLogger.info(
+    { projectId: input.projectId, phaseInstanceId: phaseInstance.id },
+    "Gate review requested",
+  );
+
+  return getPhaseInstances({ projectId: input.projectId });
+}
+
+export async function submitGateDecision(input: SubmitGateDecisionInput, userId: string) {
+  const project = await prisma.project.findUnique({
+    where: { id: input.projectId },
+    include: {
+      processDefinition: {
+        include: {
+          phases: {
+            orderBy: { position: "asc" },
+          },
+        },
+      },
+    },
+  });
+
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  if (project.status !== "ACTIVE") {
+    throw new ProjectServiceError(
+      "INVALID_PROJECT_STATUS",
+      "Gate decisions can only be submitted for active projects",
+    );
+  }
+
+  const phaseInstance = await prisma.projectPhaseInstance.findUnique({
+    where: { id: input.phaseInstanceId },
+  });
+
+  if (!phaseInstance) {
+    throw new ProjectServiceError(
+      "PHASE_INSTANCE_NOT_FOUND",
+      `Phase instance ${input.phaseInstanceId} not found`,
+    );
+  }
+
+  if (phaseInstance.projectId !== input.projectId) {
+    throw new ProjectServiceError(
+      "PHASE_INSTANCE_MISMATCH",
+      "Phase instance does not belong to this project",
+    );
+  }
+
+  if (phaseInstance.status !== "GATE_REVIEW") {
+    throw new ProjectServiceError(
+      "INVALID_PHASE_STATUS",
+      `Phase is in ${phaseInstance.status} status, must be GATE_REVIEW to submit a decision`,
+    );
+  }
+
+  const isGatekeeper = await prisma.projectTeamMember.findFirst({
+    where: {
+      projectId: input.projectId,
+      userId,
+      role: "GATEKEEPER",
+    },
+  });
+
+  if (!isGatekeeper) {
+    throw new ProjectServiceError("NOT_A_GATEKEEPER", "Only gatekeepers can submit gate decisions");
+  }
+
+  const gateDecision = await prisma.gateDecision.create({
+    data: {
+      phaseInstanceId: input.phaseInstanceId,
+      gatekeeperId: userId,
+      decision: input.decision,
+      feedback: input.feedback,
+    },
+  });
+
+  eventBus.emit("project.gateDecision", {
+    entity: "Project",
+    entityId: input.projectId,
+    actor: userId,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      phaseInstanceId: input.phaseInstanceId,
+      decision: input.decision,
+      gateDecisionId: gateDecision.id,
+    },
+  });
+
+  switch (input.decision) {
+    case "FORWARD":
+      await handleForwardDecision(project, phaseInstance, userId);
+      break;
+    case "REWORK":
+      await handleReworkDecision(phaseInstance, input.feedback ?? null);
+      break;
+    case "POSTPONE":
+      await handlePostponeDecision(phaseInstance, input.postponeUntil ?? null);
+      break;
+    case "TERMINATE":
+      await handleTerminateDecision(project, input.feedback ?? null, userId);
+      break;
+  }
+
+  childLogger.info(
+    {
+      projectId: input.projectId,
+      phaseInstanceId: input.phaseInstanceId,
+      decision: input.decision,
+    },
+    "Gate decision submitted",
+  );
+
+  return getPhaseInstances({ projectId: input.projectId });
+}
+
+async function handleForwardDecision(
+  project: {
+    id: string;
+    currentPhaseId: string | null;
+    processDefinition: {
+      phases: Array<{ id: string; position: number }>;
+    };
+  },
+  phaseInstance: { id: string; phaseId: string; position: number },
+  userId: string,
+) {
+  const phases = project.processDefinition.phases;
+  const currentIndex = phases.findIndex((p) => p.id === phaseInstance.phaseId);
+  const nextPhase = phases[currentIndex + 1];
+
+  await prisma.projectPhaseInstance.update({
+    where: { id: phaseInstance.id },
+    data: {
+      status: "COMPLETED",
+      actualEndAt: new Date(),
+    },
+  });
+
+  if (nextPhase) {
+    await prisma.projectPhaseInstance.update({
+      where: {
+        projectId_phaseId: {
+          projectId: project.id,
+          phaseId: nextPhase.id,
+        },
+      },
+      data: {
+        status: "ELABORATION",
+        actualStartAt: new Date(),
+      },
+    });
+
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { currentPhaseId: nextPhase.id },
+    });
+
+    eventBus.emit("project.phaseAdvanced", {
+      entity: "Project",
+      entityId: project.id,
+      actor: userId,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        fromPhaseId: phaseInstance.phaseId,
+        toPhaseId: nextPhase.id,
+      },
+    });
+  } else {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        status: "COMPLETED",
+        currentPhaseId: null,
+      },
+    });
+
+    eventBus.emit("project.completed", {
+      entity: "Project",
+      entityId: project.id,
+      actor: userId,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+
+async function handleReworkDecision(phaseInstance: { id: string }, feedback: string | null) {
+  await prisma.projectPhaseInstance.update({
+    where: { id: phaseInstance.id },
+    data: {
+      status: "ELABORATION",
+      reworkFeedback: feedback,
+    },
+  });
+}
+
+async function handlePostponeDecision(phaseInstance: { id: string }, postponeUntil: string | null) {
+  await prisma.projectPhaseInstance.update({
+    where: { id: phaseInstance.id },
+    data: {
+      status: "ELABORATION",
+      postponeUntil: postponeUntil ? new Date(postponeUntil) : null,
+    },
+  });
+}
+
+async function handleTerminateDecision(
+  project: { id: string },
+  feedback: string | null,
+  userId: string,
+) {
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { status: "TERMINATED" },
+  });
+
+  eventBus.emit("project.terminated", {
+    entity: "Project",
+    entityId: project.id,
+    actor: userId,
+    timestamp: new Date().toISOString(),
+    metadata: { reason: feedback },
+  });
+}
+
+export async function updatePhaseDates(input: UpdatePhaseDatesInput, _userId: string) {
+  const phaseInstance = await prisma.projectPhaseInstance.findUnique({
+    where: { id: input.phaseInstanceId },
+  });
+
+  if (!phaseInstance) {
+    throw new ProjectServiceError(
+      "PHASE_INSTANCE_NOT_FOUND",
+      `Phase instance ${input.phaseInstanceId} not found`,
+    );
+  }
+
+  const updateData: Prisma.ProjectPhaseInstanceUpdateInput = {};
+  if (input.plannedStartAt !== undefined) {
+    updateData.plannedStartAt = input.plannedStartAt ? new Date(input.plannedStartAt) : null;
+  }
+  if (input.plannedEndAt !== undefined) {
+    updateData.plannedEndAt = input.plannedEndAt ? new Date(input.plannedEndAt) : null;
+  }
+
+  await prisma.projectPhaseInstance.update({
+    where: { id: input.phaseInstanceId },
+    data: updateData,
+  });
+
+  childLogger.info({ phaseInstanceId: input.phaseInstanceId }, "Phase dates updated");
+
+  return getPhaseInstances({ projectId: phaseInstance.projectId });
 }

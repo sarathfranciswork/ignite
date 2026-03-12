@@ -190,6 +190,9 @@ export const Action = {
   PROJECT_UPDATE: "project.update",
   PROJECT_DELETE: "project.delete",
   PROJECT_MANAGE_TEAM: "project.manageTeam",
+  PROJECT_REQUEST_GATE_REVIEW: "project.requestGateReview",
+  PROJECT_SUBMIT_GATE_DECISION: "project.submitGateDecision",
+  PROJECT_UPDATE_PHASE_DATES: "project.updatePhaseDates",
 
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
@@ -325,6 +328,9 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PROJECT_UPDATE,
     Action.PROJECT_DELETE,
     Action.PROJECT_MANAGE_TEAM,
+    Action.PROJECT_REQUEST_GATE_REVIEW,
+    Action.PROJECT_SUBMIT_GATE_DECISION,
+    Action.PROJECT_UPDATE_PHASE_DATES,
     Action.EXTERNAL_INVITATION_CREATE,
     Action.EXTERNAL_INVITATION_LIST,
     Action.EXTERNAL_INVITATION_REVOKE,

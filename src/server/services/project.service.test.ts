@@ -27,6 +27,14 @@ vi.mock("@/server/lib/prisma", () => ({
       create: vi.fn(),
       delete: vi.fn(),
     },
+    projectPhaseInstance: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
+    gateDecision: {
+      create: vi.fn(),
+    },
     idea: {
       findUnique: vi.fn(),
     },
