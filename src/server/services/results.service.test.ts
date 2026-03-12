@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { getEnhancedResults } from "./results.service";
 import {
-  getEnhancedResults,
   getShortlist,
   addToShortlist,
   removeFromShortlist,
   lockShortlist,
   forwardShortlistItem,
   forwardAllShortlistItems,
-} from "./results.service";
+} from "./shortlist.service";
 import { EvaluationServiceError } from "./evaluation.schemas";
 
 vi.mock("@/server/lib/prisma", () => ({
@@ -43,6 +43,10 @@ vi.mock("@/server/lib/logger", () => ({
 
 vi.mock("@/server/events/event-bus", () => ({
   eventBus: { emit: vi.fn() },
+}));
+
+vi.mock("./idea.service", () => ({
+  transitionIdea: vi.fn(),
 }));
 
 const { prisma } = await import("@/server/lib/prisma");
@@ -324,13 +328,17 @@ describe("lockShortlist", () => {
 
 describe("forwardShortlistItem", () => {
   it("should forward a shortlisted idea to implementation", async () => {
+    const { transitionIdea } = await import("./idea.service");
+    const mockTransitionIdea = transitionIdea as ReturnType<typeof vi.fn>;
+
     mockPrisma.evaluationSession.findUnique.mockResolvedValue({
       id: "session-1",
       shortlistLocked: true,
       campaignId: "campaign-1",
     });
     mockPrisma.evaluationShortlistItem.findUnique.mockResolvedValue({ id: "item-1" });
-    mockPrisma.$transaction.mockResolvedValue([]);
+    mockTransitionIdea.mockResolvedValue({});
+    mockPrisma.evaluationShortlistItem.update.mockResolvedValue({});
 
     const result = await forwardShortlistItem(
       { sessionId: "session-1", ideaId: "idea-1", target: "SELECTED_IMPLEMENTATION" },
@@ -339,6 +347,10 @@ describe("forwardShortlistItem", () => {
 
     expect(result.forwarded).toBe(true);
     expect(result.target).toBe("SELECTED_IMPLEMENTATION");
+    expect(mockTransitionIdea).toHaveBeenCalledWith(
+      { id: "idea-1", targetStatus: "SELECTED_IMPLEMENTATION" },
+      "user-1",
+    );
   });
 
   it("should reject if shortlist is not locked", async () => {
@@ -359,6 +371,9 @@ describe("forwardShortlistItem", () => {
 
 describe("forwardAllShortlistItems", () => {
   it("should forward all unforwarded items", async () => {
+    const { transitionIdea } = await import("./idea.service");
+    const mockTransitionIdea = transitionIdea as ReturnType<typeof vi.fn>;
+
     mockPrisma.evaluationSession.findUnique.mockResolvedValue({
       id: "session-1",
       shortlistLocked: true,
@@ -368,7 +383,8 @@ describe("forwardAllShortlistItems", () => {
       { id: "item-1", ideaId: "idea-1" },
       { id: "item-2", ideaId: "idea-2" },
     ]);
-    mockPrisma.$transaction.mockResolvedValue([]);
+    mockTransitionIdea.mockResolvedValue({});
+    mockPrisma.evaluationShortlistItem.updateMany.mockResolvedValue({ count: 2 });
 
     const result = await forwardAllShortlistItems(
       { sessionId: "session-1", target: "ARCHIVED" },
@@ -376,6 +392,7 @@ describe("forwardAllShortlistItems", () => {
     );
 
     expect(result.forwarded).toBe(2);
+    expect(mockTransitionIdea).toHaveBeenCalledTimes(2);
   });
 
   it("should return 0 when no items to forward", async () => {
