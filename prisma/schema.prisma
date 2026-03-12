@@ -1090,6 +1090,10 @@ model WhiteLabelConfig {
   // Custom domain
   customDomain String? @unique @map("custom_domain")
 
+  // Login page customization
+  loginWelcomeTitle   String? @map("login_welcome_title")
+  loginWelcomeMessage String? @map("login_welcome_message") @db.Text
+
   // Email theming
   emailLogoUrl      String? @map("email_logo_url")
   emailPrimaryColor String  @default("#6366F1") @map("email_primary_color")
@@ -1101,6 +1105,29 @@ model WhiteLabelConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("white_label_configs")
+}
+
+// ── Notification Templates ──────────────────────────────────
+
+model NotificationTemplate {
+  id   String           @id @default(cuid())
+  type NotificationType @unique
+
+  // Email template
+  emailSubject String  @map("email_subject")
+  emailBody    String  @map("email_body") @db.Text
+
+  // In-app template
+  inAppTitle String @map("in_app_title")
+  inAppBody  String @map("in_app_body") @db.Text
+
+  // Metadata
+  isActive  Boolean  @default(true) @map("is_active")
+  updatedBy String?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_templates")
 }
 
 // ── Push Subscription Models ──────────────────────────────────
