@@ -136,6 +136,12 @@ export const Action = {
   SIA_UPDATE: "sia.update",
   SIA_DELETE: "sia.delete",
 
+  // Trends
+  TREND_CREATE: "trend.create",
+  TREND_READ: "trend.read",
+  TREND_UPDATE: "trend.update",
+  TREND_DELETE: "trend.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -237,6 +243,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SIA_READ,
     Action.SIA_UPDATE,
     Action.SIA_DELETE,
+    Action.TREND_CREATE,
+    Action.TREND_READ,
+    Action.TREND_UPDATE,
+    Action.TREND_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -275,6 +285,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.AI_ENRICH_IDEA,
     Action.AI_SUMMARIZE,
     Action.SIA_READ,
+    Action.TREND_READ,
   ],
 } as const;
 

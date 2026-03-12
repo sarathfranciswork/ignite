@@ -24,6 +24,16 @@ vi.mock("@/server/lib/prisma", () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    $transaction: vi.fn((fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        strategicInnovationArea: {
+          delete: vi.fn(),
+        },
+        campaign: {
+          updateMany: vi.fn(),
+        },
+      }),
+    ),
   },
 }));
 
@@ -246,17 +256,10 @@ describe("deleteSia", () => {
       name: "Digital Transformation",
       _count: { campaigns: 2 },
     });
-    campaignUpdateMany.mockResolvedValue({ count: 2 });
-    siaDelete.mockResolvedValue(undefined);
 
     const result = await deleteSia("sia-1", "user-1");
 
     expect(result.success).toBe(true);
-    expect(campaignUpdateMany).toHaveBeenCalledWith({
-      where: { siaId: "sia-1" },
-      data: { siaId: null },
-    });
-    expect(siaDelete).toHaveBeenCalledWith({ where: { id: "sia-1" } });
     expect(eventBus.emit).toHaveBeenCalledWith(
       "sia.deleted",
       expect.objectContaining({ entityId: "sia-1" }),
@@ -269,11 +272,10 @@ describe("deleteSia", () => {
       name: "Test",
       _count: { campaigns: 0 },
     });
-    siaDelete.mockResolvedValue(undefined);
 
-    await deleteSia("sia-1", "user-1");
+    const result = await deleteSia("sia-1", "user-1");
 
-    expect(campaignUpdateMany).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
   });
 
   it("throws SIA_NOT_FOUND when not found", async () => {

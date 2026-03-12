@@ -144,6 +144,13 @@ export interface EventMap {
   "push.subscribed": EventPayload;
   "push.unsubscribed": EventPayload;
   "push.sent": EventPayload;
+  "trend.created": EventPayload;
+  "trend.updated": EventPayload;
+  "trend.archived": EventPayload;
+  "trend.unarchived": EventPayload;
+  "trend.deleted": EventPayload;
+  "trend.siaLinked": EventPayload;
+  "trend.siaUnlinked": EventPayload;
   "sia.created": EventPayload;
   "sia.updated": EventPayload;
   "sia.archived": EventPayload;
