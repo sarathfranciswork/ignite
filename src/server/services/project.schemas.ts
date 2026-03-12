@@ -57,5 +57,33 @@ export type ProjectCreateInput = z.input<typeof projectCreateInput>;
 export type ProjectUpdateInput = z.infer<typeof projectUpdateInput>;
 export type ProjectGetByIdInput = z.infer<typeof projectGetByIdInput>;
 export type ProjectDeleteInput = z.infer<typeof projectDeleteInput>;
+export const gateDecisionEnum = z.enum(["FORWARD", "REWORK", "POSTPONE", "TERMINATE"]);
+
+export const requestGateReviewInput = z.object({
+  projectId: z.string().cuid(),
+});
+
+export const submitGateDecisionInput = z.object({
+  projectId: z.string().cuid(),
+  phaseInstanceId: z.string().cuid(),
+  decision: gateDecisionEnum,
+  feedback: z.string().max(10000).optional(),
+  postponeUntil: z.string().datetime().optional(),
+});
+
+export const getPhaseInstancesInput = z.object({
+  projectId: z.string().cuid(),
+});
+
+export const updatePhaseDatesInput = z.object({
+  phaseInstanceId: z.string().cuid(),
+  plannedStartAt: z.string().datetime().optional().nullable(),
+  plannedEndAt: z.string().datetime().optional().nullable(),
+});
+
 export type ProjectAddTeamMemberInput = z.infer<typeof projectAddTeamMemberInput>;
 export type ProjectRemoveTeamMemberInput = z.infer<typeof projectRemoveTeamMemberInput>;
+export type RequestGateReviewInput = z.infer<typeof requestGateReviewInput>;
+export type SubmitGateDecisionInput = z.infer<typeof submitGateDecisionInput>;
+export type GetPhaseInstancesInput = z.infer<typeof getPhaseInstancesInput>;
+export type UpdatePhaseDatesInput = z.infer<typeof updatePhaseDatesInput>;

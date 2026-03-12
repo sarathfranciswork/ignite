@@ -84,6 +84,7 @@ model User {
   createdProcessDefinitions  ProcessDefinition[]         @relation("ProcessDefinitionCreatedBy")
   createdProjects            Project[]                   @relation("ProjectCreatedBy")
   projectTeamMemberships     ProjectTeamMember[]         @relation("ProjectTeamMember")
+  gateDecisions              GateDecision[]              @relation("GateDecisionGatekeeper")
   scimExternalId             String?                     @unique @map("scim_external_id")
   createdScimTokens          ScimToken[]                 @relation("ScimTokenCreatedBy")
   sentCampaignMessages       CampaignMessage[]           @relation("CampaignMessageSentBy")
@@ -1888,7 +1889,7 @@ model ProcessDefinition {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdBy User             @relation("ProcessDefinitionCreatedBy", fields: [createdById], references: [id])
+  createdBy User           @relation("ProcessDefinitionCreatedBy", fields: [createdById], references: [id])
   phases    ProcessPhase[]
   projects  Project[]
 
@@ -1897,18 +1898,19 @@ model ProcessDefinition {
 }
 
 model ProcessPhase {
-  id                    String   @id @default(cuid())
-  processDefinitionId   String   @map("process_definition_id")
-  name                  String
-  description           String?  @db.Text
-  plannedDurationDays   Int?     @map("planned_duration_days")
-  position              Int
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(cuid())
+  processDefinitionId String   @map("process_definition_id")
+  name                String
+  description         String?  @db.Text
+  plannedDurationDays Int?     @map("planned_duration_days")
+  position            Int
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   processDefinition ProcessDefinition      @relation(fields: [processDefinitionId], references: [id], onDelete: Cascade)
   activities        ProcessPhaseActivity[]
   currentProjects   Project[]              @relation("ProjectCurrentPhase")
+  phaseInstances    ProjectPhaseInstance[]
 
   @@index([processDefinitionId])
   @@map("process_phases")
@@ -1924,7 +1926,7 @@ model ProcessPhaseActivity {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  phase ProcessPhase              @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  phase ProcessPhase               @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   tasks ProcessPhaseActivityTask[]
 
   @@index([phaseId])
@@ -1948,23 +1950,24 @@ model ProcessPhaseActivityTask {
 }
 
 model Project {
-  id                    String        @id @default(cuid())
-  title                 String
-  description           String?       @db.Text
-  processDefinitionId   String        @map("process_definition_id")
-  status                ProjectStatus @default(ACTIVE)
-  currentPhaseId        String?       @map("current_phase_id")
-  isConfidential        Boolean       @default(false) @map("is_confidential")
-  createdById           String        @map("created_by_id")
-  sourceIdeaId          String?       @map("source_idea_id")
-  createdAt             DateTime      @default(now()) @map("created_at")
-  updatedAt             DateTime      @updatedAt @map("updated_at")
+  id                  String        @id @default(cuid())
+  title               String
+  description         String?       @db.Text
+  processDefinitionId String        @map("process_definition_id")
+  status              ProjectStatus @default(ACTIVE)
+  currentPhaseId      String?       @map("current_phase_id")
+  isConfidential      Boolean       @default(false) @map("is_confidential")
+  createdById         String        @map("created_by_id")
+  sourceIdeaId        String?       @map("source_idea_id")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
-  processDefinition ProcessDefinition  @relation(fields: [processDefinitionId], references: [id])
-  currentPhase      ProcessPhase?      @relation("ProjectCurrentPhase", fields: [currentPhaseId], references: [id], onDelete: SetNull)
-  createdBy         User               @relation("ProjectCreatedBy", fields: [createdById], references: [id])
-  sourceIdea        Idea?              @relation("ProjectSourceIdea", fields: [sourceIdeaId], references: [id], onDelete: SetNull)
+  processDefinition ProcessDefinition      @relation(fields: [processDefinitionId], references: [id])
+  currentPhase      ProcessPhase?          @relation("ProjectCurrentPhase", fields: [currentPhaseId], references: [id], onDelete: SetNull)
+  createdBy         User                   @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+  sourceIdea        Idea?                  @relation("ProjectSourceIdea", fields: [sourceIdeaId], references: [id], onDelete: SetNull)
   teamMembers       ProjectTeamMember[]
+  phaseInstances    ProjectPhaseInstance[]
 
   @@index([processDefinitionId])
   @@index([createdById])
@@ -1987,6 +1990,68 @@ model ProjectTeamMember {
   @@index([projectId])
   @@index([userId])
   @@map("project_team_members")
+}
+
+// ── Phase Lifecycle & Gate Decisions ────────────────────────
+
+enum PhaseInstanceStatus {
+  ELABORATION
+  GATE_REVIEW
+  COMPLETED
+  SKIPPED
+
+  @@map("phase_instance_status")
+}
+
+enum GateDecisionType {
+  FORWARD
+  REWORK
+  POSTPONE
+  TERMINATE
+
+  @@map("gate_decision_type")
+}
+
+model ProjectPhaseInstance {
+  id             String              @id @default(cuid())
+  projectId      String              @map("project_id")
+  phaseId        String              @map("phase_id")
+  position       Int
+  status         PhaseInstanceStatus @default(ELABORATION)
+  plannedStartAt DateTime?           @map("planned_start_at")
+  plannedEndAt   DateTime?           @map("planned_end_at")
+  actualStartAt  DateTime?           @map("actual_start_at")
+  actualEndAt    DateTime?           @map("actual_end_at")
+  reworkFeedback String?             @map("rework_feedback") @db.Text
+  postponeUntil  DateTime?           @map("postpone_until")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase         ProcessPhase   @relation(fields: [phaseId], references: [id])
+  gateDecisions GateDecision[]
+
+  @@unique([projectId, phaseId])
+  @@index([projectId])
+  @@index([phaseId])
+  @@index([status])
+  @@map("project_phase_instances")
+}
+
+model GateDecision {
+  id              String           @id @default(cuid())
+  phaseInstanceId String           @map("phase_instance_id")
+  gatekeeperId    String           @map("gatekeeper_id")
+  decision        GateDecisionType
+  feedback        String?          @db.Text
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  phaseInstance ProjectPhaseInstance @relation(fields: [phaseInstanceId], references: [id], onDelete: Cascade)
+  gatekeeper    User                 @relation("GateDecisionGatekeeper", fields: [gatekeeperId], references: [id])
+
+  @@index([phaseInstanceId])
+  @@index([gatekeeperId])
+  @@map("gate_decisions")
 }
 
 // ── SCIM Provisioning Models ─────────────────────────────────

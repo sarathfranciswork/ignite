@@ -185,6 +185,13 @@ export interface EventMap {
   "project.deleted": EventPayload;
   "project.teamMemberAdded": EventPayload;
   "project.teamMemberRemoved": EventPayload;
+  "project.gateReviewRequested": EventPayload;
+  "project.gateDecision": EventPayload;
+  "project.phaseAdvanced": EventPayload;
+  "project.phaseReworked": EventPayload;
+  "project.phasePostponed": EventPayload;
+  "project.terminated": EventPayload;
+  "project.completed": EventPayload;
   "externalUser.invited": EventPayload;
   "externalUser.accepted": EventPayload;
   "sia.created": EventPayload;

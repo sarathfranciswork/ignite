@@ -9,6 +9,10 @@ import {
   projectDeleteInput,
   projectAddTeamMemberInput,
   projectRemoveTeamMemberInput,
+  requestGateReviewInput,
+  submitGateDecisionInput,
+  getPhaseInstancesInput,
+  updatePhaseDatesInput,
 } from "@/server/services/project.schemas";
 import {
   listProjects,
@@ -18,6 +22,10 @@ import {
   deleteProject,
   addTeamMember,
   removeTeamMember,
+  getPhaseInstances,
+  requestGateReview,
+  submitGateDecision,
+  updatePhaseDates,
   ProjectServiceError,
 } from "@/server/services/project.service";
 
@@ -25,13 +33,19 @@ function handleProjectError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
 
   if (error instanceof ProjectServiceError) {
-    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT"> = {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "FORBIDDEN"> = {
       PROJECT_NOT_FOUND: "NOT_FOUND",
       PROCESS_DEFINITION_NOT_FOUND: "NOT_FOUND",
       IDEA_NOT_FOUND: "NOT_FOUND",
       USER_NOT_FOUND: "NOT_FOUND",
       MEMBER_NOT_FOUND: "NOT_FOUND",
       MEMBER_ALREADY_EXISTS: "CONFLICT",
+      PHASE_INSTANCE_NOT_FOUND: "NOT_FOUND",
+      INVALID_PROJECT_STATUS: "BAD_REQUEST",
+      NO_CURRENT_PHASE: "BAD_REQUEST",
+      INVALID_PHASE_STATUS: "BAD_REQUEST",
+      PHASE_INSTANCE_MISMATCH: "BAD_REQUEST",
+      NOT_A_GATEKEEPER: "FORBIDDEN",
     };
 
     throw new TRPCError({
@@ -112,6 +126,50 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await removeTeamMember(input, ctx.session.user.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  getPhaseInstances: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(getPhaseInstancesInput)
+    .query(async ({ input }) => {
+      try {
+        return await getPhaseInstances(input);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  requestGateReview: protectedProcedure
+    .use(requirePermission(Action.PROJECT_REQUEST_GATE_REVIEW))
+    .input(requestGateReviewInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await requestGateReview(input, ctx.session.user.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  submitGateDecision: protectedProcedure
+    .use(requirePermission(Action.PROJECT_SUBMIT_GATE_DECISION))
+    .input(submitGateDecisionInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await submitGateDecision(input, ctx.session.user.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  updatePhaseDates: protectedProcedure
+    .use(requirePermission(Action.PROJECT_UPDATE_PHASE_DATES))
+    .input(updatePhaseDatesInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await updatePhaseDates(input, ctx.session.user.id);
       } catch (error) {
         handleProjectError(error);
       }
