@@ -4,12 +4,10 @@ import {
   getIdeaByIdWithConfidentialCheck,
   listIdeasWithConfidentialFilter,
   canAccessConfidentialIdea,
-  IdeaServiceError,
 } from "./idea.service";
 import {
   setOrganizationConfidential,
   getOrganizationByIdWithConfidentialCheck,
-  OrganizationServiceError,
 } from "./organization.service";
 
 vi.mock("@/server/lib/prisma", () => ({
