@@ -68,15 +68,15 @@ import {
   getPairwiseProgress,
   getPairwiseResults,
 } from "@/server/services/pairwise-ranking.service";
+import { getEnhancedResults } from "@/server/services/results.service";
 import {
-  getEnhancedResults,
   getShortlist,
   addToShortlist,
   removeFromShortlist,
   lockShortlist,
   forwardShortlistItem,
   forwardAllShortlistItems,
-} from "@/server/services/results.service";
+} from "@/server/services/shortlist.service";
 
 function handleEvaluationError(error: unknown): never {
   if (error instanceof TRPCError) throw error;

@@ -69,6 +69,8 @@ model User {
   scoutingBoardShares    ScoutingBoardShare[]
   activityEvents         ActivityEvent[]
   pushSubscriptions      PushSubscription[]
+  lockedShortlists       EvaluationSession[]         @relation("EvalSessionShortlistLocker")
+  addedShortlistItems    EvaluationShortlistItem[]    @relation("ShortlistItemAddedBy")
 
   @@map("users")
 }
@@ -1323,6 +1325,7 @@ model EvaluationSession {
   shortlistLocked     Boolean   @default(false) @map("shortlist_locked")
   shortlistLockedAt   DateTime? @map("shortlist_locked_at")
   shortlistLockedById String?   @map("shortlist_locked_by_id")
+  shortlistLockedBy   User?     @relation("EvalSessionShortlistLocker", fields: [shortlistLockedById], references: [id], onDelete: SetNull)
 
   // References
   createdById String   @map("created_by_id")
@@ -1453,6 +1456,7 @@ model EvaluationShortlistItem {
   sessionId   String                  @map("session_id")
   ideaId      String                  @map("idea_id")
   addedById   String                  @map("added_by_id")
+  addedBy     User                    @relation("ShortlistItemAddedBy", fields: [addedById], references: [id], onDelete: Cascade)
   addedAt     DateTime                @default(now()) @map("added_at")
   forwardedTo ShortlistForwardTarget? @map("forwarded_to")
   forwardedAt DateTime?               @map("forwarded_at")
