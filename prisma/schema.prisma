@@ -83,6 +83,7 @@ model User {
   sentExternalInvitations    ExternalInvitation[]        @relation("ExternalInvitationInviter")
   scimExternalId             String?                     @unique @map("scim_external_id")
   createdScimTokens          ScimToken[]                 @relation("ScimTokenCreatedBy")
+  sentCampaignMessages       CampaignMessage[]           @relation("CampaignMessageSentBy")
 
   @@map("users")
 }
@@ -409,6 +410,7 @@ model Campaign {
   buckets            Bucket[]
   evaluationSessions EvaluationSession[]
   siaLinks           CampaignSiaLink[]
+  messages           CampaignMessage[]
 
   @@index([status])
   @@index([submissionType])
@@ -1861,4 +1863,100 @@ model ScimToken {
   @@index([tokenHash])
   @@index([createdById])
   @@map("scim_tokens")
+}
+
+// ─── Communication Hub ──────────────────────────────────────
+
+enum CampaignMessageStatus {
+  DRAFT
+  SENT
+  FAILED
+
+  @@map("campaign_message_status")
+}
+
+enum AudienceSegment {
+  ALL_MEMBERS
+  CONTRIBUTORS
+  NON_CONTRIBUTORS
+  VIEWERS_NO_CONTRIBUTION
+  SELECTED_IDEA_AUTHORS
+  MANAGERS
+  COACHES
+  EVALUATORS
+  SEEDERS
+  SPONSORS
+  CUSTOM_ROLE
+
+  @@map("audience_segment")
+}
+
+model CampaignMessage {
+  id         String                @id @default(cuid())
+  campaignId String                @map("campaign_id")
+  subject    String
+  body       String                @db.Text
+  segment    AudienceSegment       @default(ALL_MEMBERS)
+  status     CampaignMessageStatus @default(DRAFT)
+  sentAt     DateTime?             @map("sent_at")
+  sentById   String                @map("sent_by_id")
+
+  // Delivery stats
+  recipientCount Int @default(0) @map("recipient_count")
+  deliveredCount Int @default(0) @map("delivered_count")
+  failedCount    Int @default(0) @map("failed_count")
+
+  // Whether to also post to campaign activity feed
+  postToFeed Boolean @default(true) @map("post_to_feed")
+
+  // Whether to send email
+  sendEmail Boolean @default(true) @map("send_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaign         Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sentBy           User               @relation("CampaignMessageSentBy", fields: [sentById], references: [id])
+  communicationLog CommunicationLog[]
+
+  @@index([campaignId])
+  @@index([campaignId, status])
+  @@index([sentById])
+  @@index([sentAt])
+  @@map("campaign_messages")
+}
+
+enum CommunicationChannel {
+  EMAIL
+  IN_APP
+  FEED
+
+  @@map("communication_channel")
+}
+
+enum CommunicationStatus {
+  PENDING
+  DELIVERED
+  FAILED
+
+  @@map("communication_status")
+}
+
+model CommunicationLog {
+  id        String               @id @default(cuid())
+  messageId String               @map("message_id")
+  userId    String               @map("user_id")
+  channel   CommunicationChannel
+  status    CommunicationStatus  @default(PENDING)
+  error     String?              @db.Text
+  sentAt    DateTime             @default(now()) @map("sent_at")
+
+  // Relations
+  message CampaignMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([userId])
+  @@index([messageId, status])
+  @@map("communication_logs")
 }

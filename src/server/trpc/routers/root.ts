@@ -8,6 +8,7 @@ import { campaignRouter } from "./campaign";
 import { channelRouter } from "./channel";
 import { dashboardRouter } from "./dashboard";
 import { commentRouter } from "./comment";
+import { communicationRouter } from "./communication";
 import { engagementRouter } from "./engagement";
 import { externalInvitationRouter } from "./external-invitation";
 import { evaluationRouter } from "./evaluation";
@@ -38,6 +39,7 @@ export const appRouter = createTRPCRouter({
   campaign: campaignRouter,
   channel: channelRouter,
   comment: commentRouter,
+  communication: communicationRouter,
   dashboard: dashboardRouter,
   engagement: engagementRouter,
   evaluation: evaluationRouter,
