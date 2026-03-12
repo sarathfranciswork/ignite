@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Archive, FolderInput, Download, X, Loader2 } from "lucide-react";
+import { Archive, FolderInput, Download, GitMerge, Scissors, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ interface BulkActionsToolbarProps {
   campaignId: string;
   onClearSelection: () => void;
   onActionComplete: () => void;
+  onSplitClick?: () => void;
+  onMergeClick?: () => void;
 }
 
 export function BulkActionsToolbar({
@@ -19,6 +21,8 @@ export function BulkActionsToolbar({
   campaignId,
   onClearSelection,
   onActionComplete,
+  onSplitClick,
+  onMergeClick,
 }: BulkActionsToolbarProps) {
   const [showArchiveDialog, setShowArchiveDialog] = React.useState(false);
   const [showBucketDialog, setShowBucketDialog] = React.useState(false);
@@ -118,6 +122,23 @@ export function BulkActionsToolbar({
           {count} idea{count === 1 ? "" : "s"} selected
         </span>
         <div className="flex items-center gap-1.5">
+          {count === 1 && onSplitClick && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSplitClick}
+              title="Split idea into multiple"
+            >
+              <Scissors className="mr-1.5 h-3.5 w-3.5" />
+              Split
+            </Button>
+          )}
+          {count >= 2 && onMergeClick && (
+            <Button variant="outline" size="sm" onClick={onMergeClick} title="Merge selected ideas">
+              <GitMerge className="mr-1.5 h-3.5 w-3.5" />
+              Merge
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setShowBucketDialog(true)}>
             <FolderInput className="mr-1.5 h-3.5 w-3.5" />
             Assign Bucket

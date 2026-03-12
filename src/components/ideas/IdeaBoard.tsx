@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { BulkActionsToolbar } from "./BulkActionsToolbar";
+import { SplitIdeaDialog } from "@/components/ideas/SplitIdeaDialog";
+import { MergeIdeasDialog } from "@/components/ideas/MergeIdeasDialog";
 import { trpc } from "@/lib/trpc";
 import {
   useIdeaBoardStore,
@@ -21,6 +23,7 @@ interface BoardIdeaItem {
   id: string;
   title: string;
   teaser: string | null;
+  description?: string | null;
   status: IdeaStatus;
   category: string | null;
   tags: string[];
@@ -95,6 +98,10 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
   const [showColumnPicker, setShowColumnPicker] = React.useState(false);
   const columnPickerRef = React.useRef<HTMLDivElement>(null);
 
+  // Dialog state for split/merge
+  const [splitDialogOpen, setSplitDialogOpen] = React.useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = React.useState(false);
+
   // Close column picker on outside click
   React.useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -107,6 +114,8 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
       return () => document.removeEventListener("mousedown", handleClick);
     }
   }, [showColumnPicker]);
+
+  const utils = trpc.useUtils();
 
   const ideasQuery = trpc.idea.listForBoard.useQuery({
     campaignId,
@@ -139,6 +148,19 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
       selectAllRows(ids);
     }
   }
+
+  function handleActionSuccess() {
+    clearSelection();
+    void utils.idea.listForBoard.invalidate();
+    void utils.idea.list.invalidate();
+    void utils.bucket.list.invalidate();
+  }
+
+  // Get selected items data for dialogs
+  const selectedItems = items.filter((item) => selectedRows.has(item.id));
+
+  // For split: use the single selected idea
+  const splitTarget = selectedItems.length === 1 ? selectedItems[0] : null;
 
   return (
     <div className="space-y-4">
@@ -234,6 +256,8 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
         campaignId={campaignId}
         onClearSelection={clearSelection}
         onActionComplete={() => void ideasQuery.refetch()}
+        onSplitClick={() => setSplitDialogOpen(true)}
+        onMergeClick={() => setMergeDialogOpen(true)}
       />
 
       {/* Error state */}
@@ -276,6 +300,33 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
           </Button>
         </div>
       )}
+
+      {/* Split Dialog */}
+      {splitTarget && (
+        <SplitIdeaDialog
+          ideaId={splitTarget.id}
+          ideaTitle={splitTarget.title}
+          ideaDescription={splitTarget.description ?? splitTarget.teaser}
+          open={splitDialogOpen}
+          onOpenChange={setSplitDialogOpen}
+          onSuccess={handleActionSuccess}
+        />
+      )}
+
+      {/* Merge Dialog */}
+      <MergeIdeasDialog
+        sourceIdeas={selectedItems.map((i) => ({
+          id: i.id,
+          title: i.title,
+          description: i.description ?? i.teaser,
+          contributor: i.contributor
+            ? { name: i.contributor.name, email: i.contributor.email }
+            : null,
+        }))}
+        open={mergeDialogOpen}
+        onOpenChange={setMergeDialogOpen}
+        onSuccess={handleActionSuccess}
+      />
     </div>
   );
 }
