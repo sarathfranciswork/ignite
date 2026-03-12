@@ -144,6 +144,13 @@ export interface EventMap {
   "push.subscribed": EventPayload;
   "push.unsubscribed": EventPayload;
   "push.sent": EventPayload;
+  "sia.created": EventPayload;
+  "sia.updated": EventPayload;
+  "sia.archived": EventPayload;
+  "sia.activated": EventPayload;
+  "sia.deleted": EventPayload;
+  "sia.campaignLinked": EventPayload;
+  "sia.campaignUnlinked": EventPayload;
 }
 
 export type EventName = keyof EventMap;

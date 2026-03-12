@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Compass,
+  Target,
   Building2,
   Shield,
   User,
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "core" },
   { label: "Campaigns", href: "/campaigns", icon: Megaphone, section: "ideation" },
   { label: "Explore", href: "/explore", icon: Compass, section: "ideation" },
+  { label: "Strategy", href: "/strategy/sias", icon: Target, section: "strategy" },
   { label: "Partners", href: "/partners", icon: Building2, section: "partners" },
   { label: "Admin", href: "/admin", icon: Shield, section: "admin" },
 ];
