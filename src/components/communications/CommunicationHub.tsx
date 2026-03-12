@@ -379,7 +379,7 @@ function MessageCard({
       {isSelected && (
         <div className="border-t border-gray-100 p-4">
           <div className="prose prose-sm max-w-none text-gray-700">
-            <div dangerouslySetInnerHTML={{ __html: message.body }} />
+            <p className="whitespace-pre-wrap">{message.body}</p>
           </div>
           {message.status === "SENT" && (
             <div className="mt-4 flex gap-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
