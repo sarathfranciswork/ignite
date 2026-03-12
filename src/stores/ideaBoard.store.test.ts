@@ -3,9 +3,11 @@ import { useIdeaBoardStore } from "./ideaBoard.store";
 
 describe("useIdeaBoardStore", () => {
   beforeEach(() => {
-    const { resetFilters, clearSelection, setColumns, setSort } = useIdeaBoardStore.getState();
+    const { resetFilters, clearSelection, setColumns, setSort, resetComparison } =
+      useIdeaBoardStore.getState();
     resetFilters();
     clearSelection();
+    resetComparison();
     setColumns([
       "title",
       "status",
@@ -127,6 +129,95 @@ describe("useIdeaBoardStore", () => {
       selectAllRows(["idea-1", "idea-2"]);
       clearSelection();
       expect(useIdeaBoardStore.getState().selectedRows.size).toBe(0);
+    });
+  });
+
+  describe("comparison mode", () => {
+    it("starts with comparison mode disabled", () => {
+      const { comparison } = useIdeaBoardStore.getState();
+      expect(comparison.isComparisonMode).toBe(false);
+      expect(comparison.leftIdeaId).toBeNull();
+      expect(comparison.rightIdeaId).toBeNull();
+    });
+
+    it("toggleComparisonMode enables comparison mode", () => {
+      const { toggleComparisonMode } = useIdeaBoardStore.getState();
+      toggleComparisonMode();
+      expect(useIdeaBoardStore.getState().comparison.isComparisonMode).toBe(true);
+    });
+
+    it("toggleComparisonMode disables and resets comparison", () => {
+      const { toggleComparisonMode, setComparisonSlot } = useIdeaBoardStore.getState();
+      toggleComparisonMode();
+      setComparisonSlot("left", "idea-1");
+      setComparisonSlot("right", "idea-2");
+      toggleComparisonMode();
+
+      const { comparison } = useIdeaBoardStore.getState();
+      expect(comparison.isComparisonMode).toBe(false);
+      expect(comparison.leftIdeaId).toBeNull();
+      expect(comparison.rightIdeaId).toBeNull();
+    });
+
+    it("setComparisonSlot sets left idea", () => {
+      const { setComparisonSlot } = useIdeaBoardStore.getState();
+      setComparisonSlot("left", "idea-1");
+      expect(useIdeaBoardStore.getState().comparison.leftIdeaId).toBe("idea-1");
+    });
+
+    it("setComparisonSlot sets right idea", () => {
+      const { setComparisonSlot } = useIdeaBoardStore.getState();
+      setComparisonSlot("right", "idea-2");
+      expect(useIdeaBoardStore.getState().comparison.rightIdeaId).toBe("idea-2");
+    });
+
+    it("clearComparisonSlot clears the left slot", () => {
+      const { setComparisonSlot, clearComparisonSlot } = useIdeaBoardStore.getState();
+      setComparisonSlot("left", "idea-1");
+      clearComparisonSlot("left");
+      expect(useIdeaBoardStore.getState().comparison.leftIdeaId).toBeNull();
+    });
+
+    it("clearComparisonSlot clears the right slot", () => {
+      const { setComparisonSlot, clearComparisonSlot } = useIdeaBoardStore.getState();
+      setComparisonSlot("right", "idea-2");
+      clearComparisonSlot("right");
+      expect(useIdeaBoardStore.getState().comparison.rightIdeaId).toBeNull();
+    });
+
+    it("swapComparisonSlots swaps left and right", () => {
+      const { setComparisonSlot, swapComparisonSlots } = useIdeaBoardStore.getState();
+      setComparisonSlot("left", "idea-1");
+      setComparisonSlot("right", "idea-2");
+      swapComparisonSlots();
+
+      const { comparison } = useIdeaBoardStore.getState();
+      expect(comparison.leftIdeaId).toBe("idea-2");
+      expect(comparison.rightIdeaId).toBe("idea-1");
+    });
+
+    it("swapComparisonSlots works with only one slot filled", () => {
+      const { setComparisonSlot, swapComparisonSlots } = useIdeaBoardStore.getState();
+      setComparisonSlot("left", "idea-1");
+      swapComparisonSlots();
+
+      const { comparison } = useIdeaBoardStore.getState();
+      expect(comparison.leftIdeaId).toBeNull();
+      expect(comparison.rightIdeaId).toBe("idea-1");
+    });
+
+    it("resetComparison resets all comparison state", () => {
+      const { toggleComparisonMode, setComparisonSlot, resetComparison } =
+        useIdeaBoardStore.getState();
+      toggleComparisonMode();
+      setComparisonSlot("left", "idea-1");
+      setComparisonSlot("right", "idea-2");
+      resetComparison();
+
+      const { comparison } = useIdeaBoardStore.getState();
+      expect(comparison.isComparisonMode).toBe(false);
+      expect(comparison.leftIdeaId).toBeNull();
+      expect(comparison.rightIdeaId).toBeNull();
     });
   });
 });
