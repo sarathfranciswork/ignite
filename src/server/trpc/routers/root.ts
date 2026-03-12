@@ -14,6 +14,7 @@ import { ideaRouter } from "./idea";
 import { insightRouter } from "./insight";
 import { notificationRouter } from "./notification";
 import { organizationRouter } from "./organization";
+import { portfolioRouter } from "./portfolio";
 import { pushRouter } from "./push";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
@@ -43,6 +44,7 @@ export const appRouter = createTRPCRouter({
   insight: insightRouter,
   notification: notificationRouter,
   organization: organizationRouter,
+  portfolio: portfolioRouter,
   push: pushRouter,
   search: searchRouter,
   scoutingBoard: scoutingBoardRouter,
