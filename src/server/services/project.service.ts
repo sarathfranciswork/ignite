@@ -12,6 +12,11 @@ import type {
   SubmitGateDecisionInput,
   GetPhaseInstancesInput,
   UpdatePhaseDatesInput,
+  ListTaskAssignmentsInput,
+  GetTaskAssignmentInput,
+  UpsertTaskAssignmentInput,
+  UpdateTaskStatusInput,
+  ListPhaseActivitiesInput,
 } from "./project.schemas";
 
 const childLogger = logger.child({ service: "project" });
@@ -750,4 +755,405 @@ export async function updatePhaseDates(input: UpdatePhaseDatesInput, _userId: st
   childLogger.info({ phaseInstanceId: input.phaseInstanceId }, "Phase dates updated");
 
   return getPhaseInstances({ projectId: phaseInstance.projectId });
+}
+
+// ── Activity & Task Management ─────────────────────────────
+
+const taskAssignmentInclude = {
+  task: {
+    include: {
+      activity: {
+        select: { id: true, name: true, isMandatory: true },
+      },
+    },
+  },
+  assignee: {
+    select: { id: true, name: true, email: true, image: true },
+  },
+} as const;
+
+function formatTaskAssignment(ta: {
+  id: string;
+  projectId: string;
+  taskId: string;
+  phaseId: string;
+  assigneeId: string | null;
+  status: string;
+  dueDate: Date | null;
+  textValue: string | null;
+  numberValue: number | null;
+  dateValue: Date | null;
+  keywordValue: string[];
+  fileUrl: string | null;
+  userValue: string | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  task: {
+    id: string;
+    name: string;
+    fieldType: string;
+    isMandatory: boolean;
+    position: number;
+    activity: { id: string; name: string; isMandatory: boolean };
+  };
+  assignee: { id: string; name: string | null; email: string; image: string | null } | null;
+}) {
+  return {
+    id: ta.id,
+    projectId: ta.projectId,
+    taskId: ta.taskId,
+    phaseId: ta.phaseId,
+    status: ta.status,
+    dueDate: ta.dueDate?.toISOString() ?? null,
+    textValue: ta.textValue,
+    numberValue: ta.numberValue,
+    dateValue: ta.dateValue?.toISOString() ?? null,
+    keywordValue: ta.keywordValue,
+    fileUrl: ta.fileUrl,
+    userValue: ta.userValue,
+    completedAt: ta.completedAt?.toISOString() ?? null,
+    assignee: ta.assignee,
+    task: {
+      id: ta.task.id,
+      name: ta.task.name,
+      fieldType: ta.task.fieldType,
+      isMandatory: ta.task.isMandatory,
+      position: ta.task.position,
+      activity: ta.task.activity,
+    },
+    createdAt: ta.createdAt.toISOString(),
+    updatedAt: ta.updatedAt.toISOString(),
+  };
+}
+
+export async function listPhaseActivities(input: ListPhaseActivitiesInput) {
+  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  const phase = await prisma.processPhase.findUnique({
+    where: { id: input.phaseId },
+    include: {
+      activities: {
+        orderBy: { position: "asc" },
+        include: {
+          tasks: {
+            orderBy: { position: "asc" },
+          },
+        },
+      },
+    },
+  });
+
+  if (!phase) {
+    throw new ProjectServiceError("PHASE_NOT_FOUND", `Phase ${input.phaseId} not found`);
+  }
+
+  const taskAssignments = await prisma.projectTaskAssignment.findMany({
+    where: {
+      projectId: input.projectId,
+      phaseId: input.phaseId,
+    },
+  });
+
+  const assignmentMap = new Map(taskAssignments.map((ta) => [ta.taskId, ta]));
+
+  return phase.activities.map((activity) => {
+    const totalTasks = activity.tasks.length;
+    const completedTasks = activity.tasks.filter((t) => {
+      const assignment = assignmentMap.get(t.id);
+      return assignment?.status === "COMPLETED";
+    }).length;
+
+    return {
+      id: activity.id,
+      name: activity.name,
+      description: activity.description,
+      isMandatory: activity.isMandatory,
+      position: activity.position,
+      totalTasks,
+      completedTasks,
+      tasks: activity.tasks.map((task) => {
+        const assignment = assignmentMap.get(task.id);
+        return {
+          id: task.id,
+          name: task.name,
+          fieldType: task.fieldType,
+          isMandatory: task.isMandatory,
+          position: task.position,
+          assignment: assignment
+            ? {
+                id: assignment.id,
+                status: assignment.status,
+                assigneeId: assignment.assigneeId,
+                dueDate: assignment.dueDate?.toISOString() ?? null,
+                textValue: assignment.textValue,
+                numberValue: assignment.numberValue,
+                dateValue: assignment.dateValue?.toISOString() ?? null,
+                keywordValue: assignment.keywordValue,
+                fileUrl: assignment.fileUrl,
+                userValue: assignment.userValue,
+                completedAt: assignment.completedAt?.toISOString() ?? null,
+              }
+            : null,
+        };
+      }),
+    };
+  });
+}
+
+export async function listTaskAssignments(input: ListTaskAssignmentsInput) {
+  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  const where: Prisma.ProjectTaskAssignmentWhereInput = {
+    projectId: input.projectId,
+  };
+
+  if (input.phaseId) where.phaseId = input.phaseId;
+  if (input.assigneeId) where.assigneeId = input.assigneeId;
+  if (input.status) where.status = input.status;
+  if (input.activityId) {
+    where.task = { activityId: input.activityId };
+  }
+  if (input.mandatoryOnly) {
+    where.task = {
+      ...((where.task as Prisma.ProcessPhaseActivityTaskWhereInput) ?? {}),
+      isMandatory: true,
+    };
+  }
+  if (input.overdue) {
+    where.dueDate = { lt: new Date() };
+    where.status = { not: "COMPLETED" };
+  }
+
+  const items = await prisma.projectTaskAssignment.findMany({
+    where,
+    include: taskAssignmentInclude,
+    orderBy: [{ task: { activity: { position: "asc" } } }, { task: { position: "asc" } }],
+  });
+
+  return items.map(formatTaskAssignment);
+}
+
+export async function getTaskAssignment(input: GetTaskAssignmentInput) {
+  const assignment = await prisma.projectTaskAssignment.findUnique({
+    where: {
+      projectId_taskId: {
+        projectId: input.projectId,
+        taskId: input.taskId,
+      },
+    },
+    include: taskAssignmentInclude,
+  });
+
+  if (!assignment) {
+    throw new ProjectServiceError(
+      "TASK_ASSIGNMENT_NOT_FOUND",
+      `Task assignment for task ${input.taskId} in project ${input.projectId} not found`,
+    );
+  }
+
+  return formatTaskAssignment(assignment);
+}
+
+export async function upsertTaskAssignment(input: UpsertTaskAssignmentInput, userId: string) {
+  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  const task = await prisma.processPhaseActivityTask.findUnique({
+    where: { id: input.taskId },
+  });
+  if (!task) {
+    throw new ProjectServiceError("TASK_NOT_FOUND", `Task ${input.taskId} not found`);
+  }
+
+  if (input.assigneeId) {
+    const assignee = await prisma.projectTeamMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: input.projectId,
+          userId: input.assigneeId,
+        },
+      },
+    });
+    if (!assignee) {
+      throw new ProjectServiceError(
+        "ASSIGNEE_NOT_TEAM_MEMBER",
+        "Assignee must be a team member of this project",
+      );
+    }
+  }
+
+  const data: Prisma.ProjectTaskAssignmentUncheckedCreateInput = {
+    projectId: input.projectId,
+    taskId: input.taskId,
+    phaseId: input.phaseId,
+    assigneeId: input.assigneeId ?? null,
+    dueDate: input.dueDate ? new Date(input.dueDate) : null,
+    textValue: input.textValue ?? null,
+    numberValue: input.numberValue ?? null,
+    dateValue: input.dateValue ? new Date(input.dateValue) : null,
+    keywordValue: input.keywordValue ?? [],
+    fileUrl: input.fileUrl ?? null,
+    userValue: input.userValue ?? null,
+  };
+
+  const assignment = await prisma.projectTaskAssignment.upsert({
+    where: {
+      projectId_taskId: {
+        projectId: input.projectId,
+        taskId: input.taskId,
+      },
+    },
+    create: data,
+    update: {
+      assigneeId: data.assigneeId,
+      dueDate: data.dueDate,
+      textValue: data.textValue,
+      numberValue: data.numberValue,
+      dateValue: data.dateValue,
+      keywordValue: data.keywordValue,
+      fileUrl: data.fileUrl,
+      userValue: data.userValue,
+    },
+    include: taskAssignmentInclude,
+  });
+
+  eventBus.emit("project.taskUpdated", {
+    entity: "ProjectTaskAssignment",
+    entityId: assignment.id,
+    actor: userId,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      projectId: input.projectId,
+      taskId: input.taskId,
+      phaseId: input.phaseId,
+    },
+  });
+
+  childLogger.info(
+    { projectId: input.projectId, taskId: input.taskId },
+    "Task assignment upserted",
+  );
+
+  return formatTaskAssignment(assignment);
+}
+
+export async function updateTaskStatus(input: UpdateTaskStatusInput, userId: string) {
+  const project = await prisma.project.findUnique({ where: { id: input.projectId } });
+  if (!project) {
+    throw new ProjectServiceError("PROJECT_NOT_FOUND", `Project ${input.projectId} not found`);
+  }
+
+  const existing = await prisma.projectTaskAssignment.findUnique({
+    where: {
+      projectId_taskId: {
+        projectId: input.projectId,
+        taskId: input.taskId,
+      },
+    },
+    include: {
+      task: true,
+    },
+  });
+
+  if (!existing) {
+    throw new ProjectServiceError(
+      "TASK_ASSIGNMENT_NOT_FOUND",
+      `Task assignment for task ${input.taskId} in project ${input.projectId} not found`,
+    );
+  }
+
+  const updateData: Prisma.ProjectTaskAssignmentUpdateInput = {
+    status: input.status,
+  };
+
+  if (input.status === "COMPLETED" && existing.status !== "COMPLETED") {
+    updateData.completedAt = new Date();
+  } else if (input.status !== "COMPLETED") {
+    updateData.completedAt = null;
+  }
+
+  const assignment = await prisma.projectTaskAssignment.update({
+    where: {
+      projectId_taskId: {
+        projectId: input.projectId,
+        taskId: input.taskId,
+      },
+    },
+    data: updateData,
+    include: taskAssignmentInclude,
+  });
+
+  if (input.status === "COMPLETED" && existing.status !== "COMPLETED") {
+    eventBus.emit("project.taskCompleted", {
+      entity: "ProjectTaskAssignment",
+      entityId: assignment.id,
+      actor: userId,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        projectId: input.projectId,
+        taskId: input.taskId,
+        phaseId: existing.phaseId,
+        taskName: existing.task.name,
+        isMandatory: existing.task.isMandatory,
+      },
+    });
+  } else {
+    eventBus.emit("project.taskUpdated", {
+      entity: "ProjectTaskAssignment",
+      entityId: assignment.id,
+      actor: userId,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        projectId: input.projectId,
+        taskId: input.taskId,
+        status: input.status,
+      },
+    });
+  }
+
+  childLogger.info(
+    { projectId: input.projectId, taskId: input.taskId, status: input.status },
+    "Task status updated",
+  );
+
+  return formatTaskAssignment(assignment);
+}
+
+export async function checkMandatoryTasksComplete(projectId: string, phaseId: string) {
+  const mandatoryTasks = await prisma.processPhaseActivityTask.findMany({
+    where: {
+      activity: { phaseId },
+      isMandatory: true,
+    },
+    select: { id: true },
+  });
+
+  if (mandatoryTasks.length === 0) {
+    return { allComplete: true, totalMandatory: 0, completedMandatory: 0 };
+  }
+
+  const mandatoryTaskIds = mandatoryTasks.map((t) => t.id);
+
+  const completedCount = await prisma.projectTaskAssignment.count({
+    where: {
+      projectId,
+      taskId: { in: mandatoryTaskIds },
+      status: "COMPLETED",
+    },
+  });
+
+  return {
+    allComplete: completedCount >= mandatoryTasks.length,
+    totalMandatory: mandatoryTasks.length,
+    completedMandatory: completedCount,
+  };
 }

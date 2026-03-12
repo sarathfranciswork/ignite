@@ -81,9 +81,58 @@ export const updatePhaseDatesInput = z.object({
   plannedEndAt: z.string().datetime().optional().nullable(),
 });
 
+// ── Task Assignment Schemas ─────────────────────────────────
+
+const projectTaskStatusEnum = z.enum(["TODO", "IN_PROGRESS", "COMPLETED"]);
+
+export const listTaskAssignmentsInput = z.object({
+  projectId: z.string().cuid(),
+  phaseId: z.string().cuid().optional(),
+  assigneeId: z.string().cuid().optional(),
+  status: projectTaskStatusEnum.optional(),
+  activityId: z.string().cuid().optional(),
+  mandatoryOnly: z.boolean().optional(),
+  overdue: z.boolean().optional(),
+});
+
+export const getTaskAssignmentInput = z.object({
+  projectId: z.string().cuid(),
+  taskId: z.string().cuid(),
+});
+
+export const upsertTaskAssignmentInput = z.object({
+  projectId: z.string().cuid(),
+  taskId: z.string().cuid(),
+  phaseId: z.string().cuid(),
+  assigneeId: z.string().cuid().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  textValue: z.string().max(50000).optional().nullable(),
+  numberValue: z.number().optional().nullable(),
+  dateValue: z.string().datetime().optional().nullable(),
+  keywordValue: z.array(z.string().max(100)).max(50).optional(),
+  fileUrl: z.string().max(2000).optional().nullable(),
+  userValue: z.string().cuid().optional().nullable(),
+});
+
+export const updateTaskStatusInput = z.object({
+  projectId: z.string().cuid(),
+  taskId: z.string().cuid(),
+  status: projectTaskStatusEnum,
+});
+
+export const listPhaseActivitiesInput = z.object({
+  projectId: z.string().cuid(),
+  phaseId: z.string().cuid(),
+});
+
 export type ProjectAddTeamMemberInput = z.infer<typeof projectAddTeamMemberInput>;
 export type ProjectRemoveTeamMemberInput = z.infer<typeof projectRemoveTeamMemberInput>;
 export type RequestGateReviewInput = z.infer<typeof requestGateReviewInput>;
 export type SubmitGateDecisionInput = z.infer<typeof submitGateDecisionInput>;
 export type GetPhaseInstancesInput = z.infer<typeof getPhaseInstancesInput>;
 export type UpdatePhaseDatesInput = z.infer<typeof updatePhaseDatesInput>;
+export type ListTaskAssignmentsInput = z.infer<typeof listTaskAssignmentsInput>;
+export type GetTaskAssignmentInput = z.infer<typeof getTaskAssignmentInput>;
+export type UpsertTaskAssignmentInput = z.infer<typeof upsertTaskAssignmentInput>;
+export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusInput>;
+export type ListPhaseActivitiesInput = z.infer<typeof listPhaseActivitiesInput>;

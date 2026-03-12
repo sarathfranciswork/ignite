@@ -13,6 +13,11 @@ import {
   submitGateDecisionInput,
   getPhaseInstancesInput,
   updatePhaseDatesInput,
+  listTaskAssignmentsInput,
+  getTaskAssignmentInput,
+  upsertTaskAssignmentInput,
+  updateTaskStatusInput,
+  listPhaseActivitiesInput,
 } from "@/server/services/project.schemas";
 import {
   listProjects,
@@ -26,6 +31,12 @@ import {
   requestGateReview,
   submitGateDecision,
   updatePhaseDates,
+  listPhaseActivities,
+  listTaskAssignments,
+  getTaskAssignment,
+  upsertTaskAssignment,
+  updateTaskStatus,
+  checkMandatoryTasksComplete,
   ProjectServiceError,
 } from "@/server/services/project.service";
 
@@ -46,6 +57,10 @@ function handleProjectError(error: unknown): never {
       INVALID_PHASE_STATUS: "BAD_REQUEST",
       PHASE_INSTANCE_MISMATCH: "BAD_REQUEST",
       NOT_A_GATEKEEPER: "FORBIDDEN",
+      TASK_NOT_FOUND: "NOT_FOUND",
+      TASK_ASSIGNMENT_NOT_FOUND: "NOT_FOUND",
+      ASSIGNEE_NOT_TEAM_MEMBER: "BAD_REQUEST",
+      PHASE_NOT_FOUND: "NOT_FOUND",
     };
 
     throw new TRPCError({
@@ -170,6 +185,76 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await updatePhaseDates(input, ctx.session.user.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  listPhaseActivities: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(listPhaseActivitiesInput)
+    .query(async ({ input }) => {
+      try {
+        return await listPhaseActivities(input);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  listTaskAssignments: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(listTaskAssignmentsInput)
+    .query(async ({ input }) => {
+      try {
+        return await listTaskAssignments(input);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  getTaskAssignment: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(getTaskAssignmentInput)
+    .query(async ({ input }) => {
+      try {
+        return await getTaskAssignment(input);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  upsertTaskAssignment: protectedProcedure
+    .use(requirePermission(Action.PROJECT_MANAGE_TASKS))
+    .input(upsertTaskAssignmentInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await upsertTaskAssignment(input, ctx.session.user.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  updateTaskStatus: protectedProcedure
+    .use(requirePermission(Action.PROJECT_MANAGE_TASKS))
+    .input(updateTaskStatusInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await updateTaskStatus(input, ctx.session.user.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  checkMandatoryTasks: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(getPhaseInstancesInput)
+    .query(async ({ input }) => {
+      try {
+        const project = await getProjectById(input.projectId);
+        if (!project.currentPhase) {
+          return { allComplete: true, totalMandatory: 0, completedMandatory: 0 };
+        }
+        return await checkMandatoryTasksComplete(input.projectId, project.currentPhase.id);
       } catch (error) {
         handleProjectError(error);
       }
