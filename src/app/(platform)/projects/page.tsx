@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
-import { FolderKanban, Plus, Search, Workflow } from "lucide-react";
+import { BarChart3, FolderKanban, Plus, Search, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -68,6 +68,12 @@ export default function ProjectsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/projects/dashboard">
+            <Button variant="outline">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Dashboard
+            </Button>
+          </Link>
           <Link href="/projects/templates">
             <Button variant="outline">
               <Workflow className="mr-2 h-4 w-4" />

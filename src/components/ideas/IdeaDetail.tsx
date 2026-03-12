@@ -25,6 +25,7 @@ import { VotingWidget } from "@/components/ideas/VotingWidget";
 import { GraduationProgress } from "@/components/ideas/GraduationProgress";
 import { ActivityFeed } from "@/components/ideas/ActivityFeed";
 import { SimilarIdeas } from "@/components/ideas/SimilarIdeas";
+import { IdeaLineage } from "@/components/ideas/IdeaLineage";
 import {
   Dialog,
   DialogContent,
@@ -274,6 +275,8 @@ export function IdeaDetail({ ideaId }: IdeaDetailProps) {
         <MetricCard label="Confidential" value={idea.isConfidential ? "Yes" : "No"} />
         <MetricCard label="Invention Disclosure" value={idea.inventionDisclosure ? "Yes" : "No"} />
       </div>
+
+      {!isDraft && <IdeaLineage ideaId={idea.id} />}
 
       {!isDraft && <VotingWidget ideaId={idea.id} />}
 

@@ -12,11 +12,11 @@ import {
   FolderKanban,
   Trash2,
   Users,
-  Lightbulb,
   Workflow,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { ProjectSourceSection } from "@/components/projects/ProjectSourceSection";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useState } from "react";
@@ -179,16 +179,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             )}
           </Card>
 
-          {/* Source idea */}
-          {project.sourceIdea && (
-            <Card className="p-5">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5 text-yellow-500" />
-                <h2 className="font-display text-lg font-semibold text-gray-900">Source Idea</h2>
-              </div>
-              <p className="mt-2 text-sm text-gray-600">{project.sourceIdea.title}</p>
-            </Card>
-          )}
+          {/* Source: idea and/or concept */}
+          <ProjectSourceSection projectId={id} />
         </div>
 
         {/* Sidebar */}

@@ -136,3 +136,26 @@ export type GetTaskAssignmentInput = z.infer<typeof getTaskAssignmentInput>;
 export type UpsertTaskAssignmentInput = z.infer<typeof upsertTaskAssignmentInput>;
 export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusInput>;
 export type ListPhaseActivitiesInput = z.infer<typeof listPhaseActivitiesInput>;
+
+// ── Traceability & Dashboard Schemas ────────────────────────
+
+export const ideaLineageInput = z.object({
+  ideaId: z.string().cuid(),
+});
+
+export const dashboardStatsInput = z.object({
+  processDefinitionId: z.string().cuid().optional(),
+  status: projectStatusEnum.optional(),
+  teamMemberId: z.string().cuid().optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+});
+
+export const pipelineStatsInput = z.object({
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+});
+
+export type IdeaLineageInput = z.infer<typeof ideaLineageInput>;
+export type DashboardStatsInput = z.infer<typeof dashboardStatsInput>;
+export type PipelineStatsInput = z.infer<typeof pipelineStatsInput>;
