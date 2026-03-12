@@ -19,6 +19,9 @@ import {
   evaluationResultsInput,
   evaluationSaveAsTemplateInput,
   evaluationListTemplatesInput,
+  evaluationMyPendingInput,
+  evaluationMyResponsesInput,
+  evaluationSendRemindersInput,
 } from "@/server/services/evaluation.schemas";
 import {
   listEvaluationSessions,
@@ -38,6 +41,9 @@ import {
   getEvaluationResults,
   saveSessionAsTemplate,
   listTemplates,
+  getMyPendingEvaluations,
+  getMyResponses,
+  sendReminders,
   EvaluationServiceError,
 } from "@/server/services/evaluation.service";
 
@@ -266,6 +272,35 @@ export const evaluationRouter = createTRPCRouter({
     .query(async ({ input }) => {
       try {
         return await listTemplates(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  myPending: protectedProcedure.input(evaluationMyPendingInput).query(async ({ ctx, input }) => {
+    try {
+      return await getMyPendingEvaluations(input, ctx.session.user.id);
+    } catch (error) {
+      handleEvaluationError(error);
+    }
+  }),
+
+  myResponses: protectedProcedure
+    .input(evaluationMyResponsesInput)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await getMyResponses(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  sendReminders: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_EVALUATORS))
+    .input(evaluationSendRemindersInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await sendReminders(input, ctx.session.user.id);
       } catch (error) {
         handleEvaluationError(error);
       }

@@ -16,6 +16,9 @@ import {
   getEvaluationResults,
   saveSessionAsTemplate,
   listTemplates,
+  getMyPendingEvaluations,
+  getMyResponses,
+  sendReminders,
   EvaluationServiceError,
 } from "./evaluation.service";
 
@@ -753,6 +756,137 @@ describe("evaluation.service", () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].criteriaCount).toBe(3);
+    });
+  });
+
+  describe("getMyPendingEvaluations", () => {
+    it("returns empty when user has no assignments", async () => {
+      vi.mocked(prisma.evaluationSessionEvaluator.findMany).mockResolvedValue([]);
+
+      const result = await getMyPendingEvaluations({ limit: 20 }, "user_1");
+
+      expect(result.items).toHaveLength(0);
+    });
+
+    it("returns active sessions user is assigned to with progress", async () => {
+      vi.mocked(prisma.evaluationSessionEvaluator.findMany).mockResolvedValue([
+        { sessionId: "session_1" },
+      ] as never);
+
+      vi.mocked(prisma.evaluationSession.findMany).mockResolvedValue([
+        {
+          ...mockSession,
+          status: "ACTIVE",
+          campaign: { id: "campaign_1", title: "Test Campaign" },
+          criteria: [{ id: "c_1" }],
+          ideas: [{ ideaId: "idea_1" }],
+          _count: { criteria: 1, ideas: 1, evaluators: 2 },
+        },
+      ] as never);
+
+      vi.mocked(prisma.evaluationResponse.groupBy).mockResolvedValue([
+        { sessionId: "session_1", _count: { id: 1 } },
+      ] as never);
+
+      const result = await getMyPendingEvaluations({ limit: 20 }, "user_1");
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].campaignTitle).toBe("Test Campaign");
+      expect(result.items[0].myProgress.percentage).toBe(100);
+    });
+  });
+
+  describe("getMyResponses", () => {
+    it("returns existing responses for a session and idea", async () => {
+      vi.mocked(prisma.evaluationSession.findUnique).mockResolvedValue({
+        id: "session_1",
+        status: "ACTIVE",
+      } as never);
+
+      vi.mocked(prisma.evaluationResponse.findMany).mockResolvedValue([
+        {
+          criterionId: "c_1",
+          scoreValue: 4,
+          textValue: null,
+          boolValue: null,
+          updatedAt: new Date("2026-03-01"),
+        },
+      ] as never);
+
+      const result = await getMyResponses({ sessionId: "session_1", ideaId: "idea_1" }, "user_1");
+
+      expect(result.responses).toHaveLength(1);
+      expect(result.responses[0].scoreValue).toBe(4);
+    });
+
+    it("throws when session not found", async () => {
+      vi.mocked(prisma.evaluationSession.findUnique).mockResolvedValue(null);
+
+      await expect(
+        getMyResponses({ sessionId: "nonexistent", ideaId: "idea_1" }, "user_1"),
+      ).rejects.toThrow(EvaluationServiceError);
+    });
+  });
+
+  describe("sendReminders", () => {
+    it("identifies incomplete evaluators and emits event", async () => {
+      vi.mocked(prisma.evaluationSession.findUnique).mockResolvedValue({
+        ...mockSession,
+        status: "ACTIVE",
+        evaluators: [{ userId: "user_1" }, { userId: "user_2" }],
+        criteria: [{ id: "c_1" }],
+        ideas: [{ ideaId: "idea_1" }],
+      } as never);
+
+      vi.mocked(prisma.evaluationResponse.groupBy).mockResolvedValue([
+        { evaluatorId: "user_1", _count: { id: 1 } },
+      ] as never);
+
+      const result = await sendReminders({ sessionId: "session_1" }, "admin_1");
+
+      expect(result.sent).toBe(1);
+      expect(result.evaluatorIds).toEqual(["user_2"]);
+    });
+
+    it("returns zero when all evaluators are complete", async () => {
+      vi.mocked(prisma.evaluationSession.findUnique).mockResolvedValue({
+        ...mockSession,
+        status: "ACTIVE",
+        evaluators: [{ userId: "user_1" }],
+        criteria: [{ id: "c_1" }],
+        ideas: [{ ideaId: "idea_1" }],
+      } as never);
+
+      vi.mocked(prisma.evaluationResponse.groupBy).mockResolvedValue([
+        { evaluatorId: "user_1", _count: { id: 1 } },
+      ] as never);
+
+      const result = await sendReminders({ sessionId: "session_1" }, "admin_1");
+
+      expect(result.sent).toBe(0);
+      expect(result.evaluatorIds).toEqual([]);
+    });
+
+    it("throws when session is not active", async () => {
+      vi.mocked(prisma.evaluationSession.findUnique).mockResolvedValue({
+        ...mockSession,
+        status: "DRAFT",
+        evaluators: [],
+        criteria: [],
+        ideas: [],
+      } as never);
+
+      await expect(sendReminders({ sessionId: "session_1" }, "admin_1")).rejects.toThrow(
+        EvaluationServiceError,
+      );
+    });
+
+    it("throws when session not found", async () => {
+      vi.mocked(prisma.evaluationSession.findUnique).mockResolvedValue(null);
+
+      await expect(sendReminders({ sessionId: "nonexistent" }, "admin_1")).rejects.toThrow(
+        EvaluationServiceError,
+      );
     });
   });
 });
