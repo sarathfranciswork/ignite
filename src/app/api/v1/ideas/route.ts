@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { IdeaStatus } from "@prisma/client";
 import { prisma } from "@/server/lib/prisma";
 import { authenticateApiKey, checkScope } from "@/server/lib/api-key-auth";
 
@@ -23,12 +24,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     100,
   );
   const campaignId = url.searchParams.get("campaignId") ?? undefined;
-  const status = url.searchParams.get("status") ?? undefined;
+  const statusParam = url.searchParams.get("status") ?? undefined;
+
+  const validStatuses = Object.values(IdeaStatus);
+  if (statusParam && !validStatuses.includes(statusParam as IdeaStatus)) {
+    return NextResponse.json(
+      { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },
+      { status: 400 },
+    );
+  }
+
+  const status: IdeaStatus | undefined = statusParam as IdeaStatus | undefined;
 
   const ideas = await prisma.idea.findMany({
     where: {
       ...(campaignId ? { campaignId } : {}),
-      ...(status ? { status: status as never } : {}),
+      ...(status ? { status } : {}),
       isConfidential: false,
     },
     take: limit + 1,

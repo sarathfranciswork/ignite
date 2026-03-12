@@ -8,6 +8,8 @@ import {
   regenerateWebhookSecret,
   listWebhookDeliveries,
   getAvailableEventNames,
+  isPrivateIP,
+  validateWebhookUrl,
   WebhookServiceError,
 } from "./webhook.service";
 
@@ -47,8 +49,22 @@ vi.mock("@/server/events/event-bus", () => ({
   eventBus: { emit: vi.fn() },
 }));
 
+vi.mock("dns/promises", () => {
+  const resolve4 = vi.fn().mockResolvedValue(["93.184.216.34"]);
+  const resolve6 = vi.fn().mockResolvedValue([]);
+  return {
+    default: { resolve4, resolve6 },
+    resolve4,
+    resolve6,
+  };
+});
+
 const { prisma } = await import("@/server/lib/prisma");
 const { eventBus } = await import("@/server/events/event-bus");
+const dns = await import("dns/promises");
+
+const mockResolve4 = dns.resolve4 as unknown as Mock;
+const mockResolve6 = dns.resolve6 as unknown as Mock;
 
 const webhookCreate = prisma.webhook.create as unknown as Mock;
 const webhookFindUnique = prisma.webhook.findUnique as unknown as Mock;
@@ -263,6 +279,177 @@ describe("webhook.service", () => {
       expect(events.length).toBeGreaterThan(0);
       expect(events).toContain("idea.created");
       expect(events).toContain("campaign.created");
+    });
+  });
+
+  describe("isPrivateIP", () => {
+    it("detects 127.x.x.x (loopback)", () => {
+      expect(isPrivateIP("127.0.0.1")).toBe(true);
+      expect(isPrivateIP("127.255.255.255")).toBe(true);
+    });
+
+    it("detects 10.x.x.x (private)", () => {
+      expect(isPrivateIP("10.0.0.1")).toBe(true);
+      expect(isPrivateIP("10.255.255.255")).toBe(true);
+    });
+
+    it("detects 172.16-31.x.x (private)", () => {
+      expect(isPrivateIP("172.16.0.1")).toBe(true);
+      expect(isPrivateIP("172.31.255.255")).toBe(true);
+      expect(isPrivateIP("172.15.0.1")).toBe(false);
+      expect(isPrivateIP("172.32.0.1")).toBe(false);
+    });
+
+    it("detects 192.168.x.x (private)", () => {
+      expect(isPrivateIP("192.168.0.1")).toBe(true);
+      expect(isPrivateIP("192.168.255.255")).toBe(true);
+    });
+
+    it("detects 169.254.x.x (link-local / cloud metadata)", () => {
+      expect(isPrivateIP("169.254.169.254")).toBe(true);
+      expect(isPrivateIP("169.254.0.1")).toBe(true);
+    });
+
+    it("detects 0.x.x.x", () => {
+      expect(isPrivateIP("0.0.0.0")).toBe(true);
+      expect(isPrivateIP("0.1.2.3")).toBe(true);
+    });
+
+    it("allows public IPv4 addresses", () => {
+      expect(isPrivateIP("8.8.8.8")).toBe(false);
+      expect(isPrivateIP("1.1.1.1")).toBe(false);
+      expect(isPrivateIP("203.0.113.1")).toBe(false);
+    });
+
+    it("detects IPv6 loopback (::1) and unspecified (::)", () => {
+      expect(isPrivateIP("::1")).toBe(true);
+      expect(isPrivateIP("::")).toBe(true);
+    });
+
+    it("detects IPv6 link-local (fe80:)", () => {
+      expect(isPrivateIP("fe80::1")).toBe(true);
+    });
+
+    it("detects IPv6 ULA (fc/fd)", () => {
+      expect(isPrivateIP("fc00::1")).toBe(true);
+      expect(isPrivateIP("fd12:3456::1")).toBe(true);
+    });
+
+    it("detects IPv4-mapped IPv6 addresses with private IPs", () => {
+      expect(isPrivateIP("::ffff:127.0.0.1")).toBe(true);
+      expect(isPrivateIP("::ffff:10.0.0.1")).toBe(true);
+      expect(isPrivateIP("::ffff:192.168.1.1")).toBe(true);
+    });
+
+    it("allows IPv4-mapped IPv6 addresses with public IPs", () => {
+      expect(isPrivateIP("::ffff:8.8.8.8")).toBe(false);
+    });
+  });
+
+  describe("validateWebhookUrl", () => {
+    it("rejects non-http(s) protocols", async () => {
+      await expect(validateWebhookUrl("ftp://example.com")).rejects.toThrow(
+        "Webhook URL must use http or https",
+      );
+    });
+
+    it("rejects localhost", async () => {
+      await expect(validateWebhookUrl("https://localhost/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+    });
+
+    it("rejects .local hostnames", async () => {
+      await expect(validateWebhookUrl("https://myhost.local/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+    });
+
+    it("rejects private IP literals", async () => {
+      await expect(validateWebhookUrl("https://127.0.0.1/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+      await expect(validateWebhookUrl("https://10.0.0.1/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+      await expect(validateWebhookUrl("https://192.168.1.1/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+    });
+
+    it("allows public IP literals", async () => {
+      await expect(validateWebhookUrl("https://93.184.216.34/hook")).resolves.toBeUndefined();
+    });
+
+    it("rejects when DNS resolves to private IP", async () => {
+      mockResolve4.mockResolvedValue(["10.0.0.1"]);
+      mockResolve6.mockResolvedValue([]);
+
+      await expect(validateWebhookUrl("https://evil.example.com/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+    });
+
+    it("rejects when DNS resolves to private IPv6", async () => {
+      mockResolve4.mockResolvedValue([]);
+      mockResolve6.mockResolvedValue(["::1"]);
+
+      await expect(validateWebhookUrl("https://evil.example.com/hook")).rejects.toThrow(
+        "Webhook URL must not target private/internal networks",
+      );
+    });
+
+    it("rejects when hostname cannot be resolved", async () => {
+      mockResolve4.mockRejectedValue(new Error("ENOTFOUND"));
+      mockResolve6.mockRejectedValue(new Error("ENOTFOUND"));
+
+      await expect(validateWebhookUrl("https://nonexistent.example.com/hook")).rejects.toThrow(
+        "Could not resolve webhook URL hostname",
+      );
+    });
+
+    it("allows valid public URLs", async () => {
+      mockResolve4.mockResolvedValue(["93.184.216.34"]);
+      mockResolve6.mockResolvedValue([]);
+
+      await expect(validateWebhookUrl("https://example.com/webhook")).resolves.toBeUndefined();
+    });
+  });
+
+  describe("createWebhook with URL validation", () => {
+    it("rejects webhook creation with private URL", async () => {
+      await expect(
+        createWebhook(
+          {
+            name: "Bad Webhook",
+            url: "https://localhost/hook",
+            events: ["idea.created"],
+          },
+          "user1",
+        ),
+      ).rejects.toThrow("Webhook URL must not target private/internal networks");
+
+      expect(webhookCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateWebhook with URL validation", () => {
+    it("rejects webhook update with private URL", async () => {
+      webhookFindUnique.mockResolvedValue(mockWebhook);
+
+      await expect(
+        updateWebhook({ id: "clx123", url: "https://127.0.0.1/hook" }, "user1"),
+      ).rejects.toThrow("Webhook URL must not target private/internal networks");
+
+      expect(webhookUpdate).not.toHaveBeenCalled();
+    });
+
+    it("allows update without URL change", async () => {
+      webhookFindUnique.mockResolvedValue(mockWebhook);
+      webhookUpdate.mockResolvedValue({ ...mockWebhook, name: "Renamed" });
+
+      const result = await updateWebhook({ id: "clx123", name: "Renamed" }, "user1");
+      expect(result.name).toBe("Renamed");
     });
   });
 });

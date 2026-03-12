@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { prisma } from "@/server/lib/prisma";
+import { CampaignStatus } from "@prisma/client";
 import { authenticateApiKey, checkScope } from "@/server/lib/api-key-auth";
+import { prisma } from "@/server/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     Math.max(parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 1),
     100,
   );
-  const status = url.searchParams.get("status") ?? undefined;
+  const statusParam = url.searchParams.get("status") ?? undefined;
+
+  const validStatuses = Object.values(CampaignStatus);
+  if (statusParam && !validStatuses.includes(statusParam as CampaignStatus)) {
+    return NextResponse.json(
+      { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },
+      { status: 400 },
+    );
+  }
+
+  const status = statusParam as CampaignStatus | undefined;
 
   const campaigns = await prisma.campaign.findMany({
     where: {
-      ...(status ? { status: status as never } : {}),
+      ...(status ? { status } : {}),
     },
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
