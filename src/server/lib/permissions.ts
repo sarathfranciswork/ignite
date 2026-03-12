@@ -207,6 +207,15 @@ export const Action = {
   API_KEY_REVOKE: "apiKey.revoke",
   API_KEY_DELETE: "apiKey.delete",
 
+  // Concept management
+  CONCEPT_CREATE: "concept.create",
+  CONCEPT_READ: "concept.read",
+  CONCEPT_UPDATE: "concept.update",
+  CONCEPT_DELETE: "concept.delete",
+  CONCEPT_MANAGE_TEAM: "concept.manageTeam",
+  CONCEPT_SUBMIT_DECISION: "concept.submitDecision",
+  CONCEPT_CONVERT_TO_PROJECT: "concept.convertToProject",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -345,6 +354,13 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PROJECT_SUBMIT_GATE_DECISION,
     Action.PROJECT_UPDATE_PHASE_DATES,
     Action.PROJECT_MANAGE_TASKS,
+    Action.CONCEPT_CREATE,
+    Action.CONCEPT_READ,
+    Action.CONCEPT_UPDATE,
+    Action.CONCEPT_DELETE,
+    Action.CONCEPT_MANAGE_TEAM,
+    Action.CONCEPT_SUBMIT_DECISION,
+    Action.CONCEPT_CONVERT_TO_PROJECT,
     Action.EXTERNAL_INVITATION_CREATE,
     Action.EXTERNAL_INVITATION_LIST,
     Action.EXTERNAL_INVITATION_REVOKE,
@@ -405,6 +421,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PROCESS_DEFINITION_READ,
     Action.PROJECT_READ,
     Action.PROJECT_MANAGE_TASKS,
+    Action.CONCEPT_READ,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,

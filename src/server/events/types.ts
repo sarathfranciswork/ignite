@@ -215,6 +215,15 @@ export interface EventMap {
   "apiKey.created": EventPayload;
   "apiKey.revoked": EventPayload;
   "apiKey.deleted": EventPayload;
+  "concept.created": EventPayload;
+  "concept.updated": EventPayload;
+  "concept.deleted": EventPayload;
+  "concept.statusChanged": EventPayload;
+  "concept.teamMemberAdded": EventPayload;
+  "concept.teamMemberRemoved": EventPayload;
+  "concept.approved": EventPayload;
+  "concept.rejected": EventPayload;
+  "concept.convertedToProject": EventPayload;
 }
 
 export type EventName = keyof EventMap;
