@@ -178,6 +178,19 @@ export const Action = {
   PORTFOLIO_UPDATE: "portfolio.update",
   PORTFOLIO_DELETE: "portfolio.delete",
 
+  // Process definition management
+  PROCESS_DEFINITION_CREATE: "processDefinition.create",
+  PROCESS_DEFINITION_READ: "processDefinition.read",
+  PROCESS_DEFINITION_UPDATE: "processDefinition.update",
+  PROCESS_DEFINITION_DELETE: "processDefinition.delete",
+
+  // Project management
+  PROJECT_CREATE: "project.create",
+  PROJECT_READ: "project.read",
+  PROJECT_UPDATE: "project.update",
+  PROJECT_DELETE: "project.delete",
+  PROJECT_MANAGE_TEAM: "project.manageTeam",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -303,6 +316,15 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PORTFOLIO_READ,
     Action.PORTFOLIO_UPDATE,
     Action.PORTFOLIO_DELETE,
+    Action.PROCESS_DEFINITION_CREATE,
+    Action.PROCESS_DEFINITION_READ,
+    Action.PROCESS_DEFINITION_UPDATE,
+    Action.PROCESS_DEFINITION_DELETE,
+    Action.PROJECT_CREATE,
+    Action.PROJECT_READ,
+    Action.PROJECT_UPDATE,
+    Action.PROJECT_DELETE,
+    Action.PROJECT_MANAGE_TEAM,
     Action.EXTERNAL_INVITATION_CREATE,
     Action.EXTERNAL_INVITATION_LIST,
     Action.EXTERNAL_INVITATION_REVOKE,
@@ -352,6 +374,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.INSIGHT_CREATE,
     Action.INSIGHT_READ,
     Action.PORTFOLIO_READ,
+    Action.PROCESS_DEFINITION_READ,
+    Action.PROJECT_READ,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,

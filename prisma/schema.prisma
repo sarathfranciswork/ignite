@@ -81,6 +81,9 @@ model User {
   createdPortfolios          InnovationPortfolio[]       @relation("PortfolioCreatedBy")
   externalCampaignIds        String[]                    @default([]) @map("external_campaign_ids")
   sentExternalInvitations    ExternalInvitation[]        @relation("ExternalInvitationInviter")
+  createdProcessDefinitions  ProcessDefinition[]         @relation("ProcessDefinitionCreatedBy")
+  createdProjects            Project[]                   @relation("ProjectCreatedBy")
+  projectTeamMemberships     ProjectTeamMember[]         @relation("ProjectTeamMember")
   scimExternalId             String?                     @unique @map("scim_external_id")
   createdScimTokens          ScimToken[]                 @relation("ScimTokenCreatedBy")
   sentCampaignMessages       CampaignMessage[]           @relation("CampaignMessageSentBy")
@@ -619,6 +622,7 @@ model Idea {
   shortlistItems         EvaluationShortlistItem[]
   pairwiseAsIdeaA        PairwiseComparison[]      @relation("PairwiseIdeaA")
   pairwiseAsIdeaB        PairwiseComparison[]      @relation("PairwiseIdeaB")
+  sourceForProjects      Project[]                 @relation("ProjectSourceIdea")
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1844,6 +1848,145 @@ model PortfolioItem {
   @@index([portfolioId])
   @@index([entityType, entityId])
   @@map("portfolio_items")
+}
+
+// ── Phase-Gate Projects ─────────────────────────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  TERMINATED
+
+  @@map("project_status")
+}
+
+enum ProjectTeamRole {
+  LEADER
+  MEMBER
+  GATEKEEPER
+
+  @@map("project_team_role")
+}
+
+enum ProcessFieldType {
+  TEXT
+  NUMBER
+  KEYWORD
+  ATTACHMENT
+  DATE
+  USER
+
+  @@map("process_field_type")
+}
+
+model ProcessDefinition {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User             @relation("ProcessDefinitionCreatedBy", fields: [createdById], references: [id])
+  phases    ProcessPhase[]
+  projects  Project[]
+
+  @@index([createdById])
+  @@map("process_definitions")
+}
+
+model ProcessPhase {
+  id                    String   @id @default(cuid())
+  processDefinitionId   String   @map("process_definition_id")
+  name                  String
+  description           String?  @db.Text
+  plannedDurationDays   Int?     @map("planned_duration_days")
+  position              Int
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  processDefinition ProcessDefinition      @relation(fields: [processDefinitionId], references: [id], onDelete: Cascade)
+  activities        ProcessPhaseActivity[]
+  currentProjects   Project[]              @relation("ProjectCurrentPhase")
+
+  @@index([processDefinitionId])
+  @@map("process_phases")
+}
+
+model ProcessPhaseActivity {
+  id          String   @id @default(cuid())
+  phaseId     String   @map("phase_id")
+  name        String
+  description String?  @db.Text
+  isMandatory Boolean  @default(false) @map("is_mandatory")
+  position    Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  phase ProcessPhase              @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  tasks ProcessPhaseActivityTask[]
+
+  @@index([phaseId])
+  @@map("process_phase_activities")
+}
+
+model ProcessPhaseActivityTask {
+  id          String           @id @default(cuid())
+  activityId  String           @map("activity_id")
+  name        String
+  fieldType   ProcessFieldType @map("field_type")
+  isMandatory Boolean          @default(false) @map("is_mandatory")
+  position    Int
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  activity ProcessPhaseActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@index([activityId])
+  @@map("process_phase_activity_tasks")
+}
+
+model Project {
+  id                    String        @id @default(cuid())
+  title                 String
+  description           String?       @db.Text
+  processDefinitionId   String        @map("process_definition_id")
+  status                ProjectStatus @default(ACTIVE)
+  currentPhaseId        String?       @map("current_phase_id")
+  isConfidential        Boolean       @default(false) @map("is_confidential")
+  createdById           String        @map("created_by_id")
+  sourceIdeaId          String?       @map("source_idea_id")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  processDefinition ProcessDefinition  @relation(fields: [processDefinitionId], references: [id])
+  currentPhase      ProcessPhase?      @relation("ProjectCurrentPhase", fields: [currentPhaseId], references: [id], onDelete: SetNull)
+  createdBy         User               @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+  sourceIdea        Idea?              @relation("ProjectSourceIdea", fields: [sourceIdeaId], references: [id], onDelete: SetNull)
+  teamMembers       ProjectTeamMember[]
+
+  @@index([processDefinitionId])
+  @@index([createdById])
+  @@index([sourceIdeaId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectTeamMember {
+  id        String          @id @default(cuid())
+  projectId String          @map("project_id")
+  userId    String          @map("user_id")
+  role      ProjectTeamRole
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("ProjectTeamMember", fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_team_members")
 }
 
 // ── SCIM Provisioning Models ─────────────────────────────────
