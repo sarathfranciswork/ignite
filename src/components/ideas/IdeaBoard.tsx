@@ -3,12 +3,22 @@
 import * as React from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Search, Columns3, Heart, MessageSquare, Eye, ChevronDown, RotateCcw } from "lucide-react";
+import {
+  Search,
+  Columns3,
+  Heart,
+  MessageSquare,
+  Eye,
+  ChevronDown,
+  RotateCcw,
+  Columns2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { BulkActionsToolbar } from "./BulkActionsToolbar";
+import { DualWindowComparison } from "./DualWindowComparison";
 import { trpc } from "@/lib/trpc";
 import {
   useIdeaBoardStore,
@@ -83,6 +93,7 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
     sortField,
     sortDirection,
     selectedRows,
+    comparison,
     toggleColumn,
     setFilter,
     resetFilters,
@@ -90,6 +101,8 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
     toggleRowSelection,
     selectAllRows,
     clearSelection,
+    toggleComparisonMode,
+    setComparisonSlot,
   } = useIdeaBoardStore();
 
   const [showColumnPicker, setShowColumnPicker] = React.useState(false);
@@ -124,7 +137,28 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
 
   const hasActiveFilters = filters.search || filters.status || filters.category || filters.tag;
 
-  const tableColumns = buildTableColumns(columns);
+  function handleCompareSelect(ideaId: string) {
+    if (!comparison.leftIdeaId) {
+      setComparisonSlot("left", ideaId);
+    } else if (!comparison.rightIdeaId && ideaId !== comparison.leftIdeaId) {
+      setComparisonSlot("right", ideaId);
+    } else if (ideaId !== comparison.rightIdeaId) {
+      // If both slots are filled, replace left and shift right to left
+      setComparisonSlot("left", comparison.rightIdeaId ?? ideaId);
+      setComparisonSlot("right", ideaId);
+    }
+  }
+
+  const tableColumns = buildTableColumns(
+    columns,
+    comparison.isComparisonMode
+      ? {
+          onSelect: handleCompareSelect,
+          leftIdeaId: comparison.leftIdeaId,
+          rightIdeaId: comparison.rightIdeaId,
+        }
+      : null,
+  );
 
   function handleSort(field: string) {
     if (SORTABLE_COLUMNS.includes(field as IdeaBoardSortField)) {
@@ -196,6 +230,16 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
           </Button>
         )}
 
+        {/* Comparison mode toggle */}
+        <Button
+          variant={comparison.isComparisonMode ? "default" : "outline"}
+          size="sm"
+          onClick={toggleComparisonMode}
+        >
+          <Columns2 className="mr-1.5 h-3.5 w-3.5" />
+          Compare
+        </Button>
+
         {/* Column picker */}
         <div className="relative" ref={columnPickerRef}>
           <Button
@@ -260,6 +304,9 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
         />
       )}
 
+      {/* Dual-window comparison */}
+      {comparison.isComparisonMode && <DualWindowComparison />}
+
       {/* Load more */}
       {data?.nextCursor && (
         <div className="flex justify-center pt-2">
@@ -280,7 +327,16 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
   );
 }
 
-function buildTableColumns(visibleColumns: IdeaBoardColumn[]): DataTableColumn<BoardIdeaItem>[] {
+interface ComparisonColumnConfig {
+  onSelect: (ideaId: string) => void;
+  leftIdeaId: string | null;
+  rightIdeaId: string | null;
+}
+
+function buildTableColumns(
+  visibleColumns: IdeaBoardColumn[],
+  comparisonConfig: ComparisonColumnConfig | null,
+): DataTableColumn<BoardIdeaItem>[] {
   const columnDefs: Record<IdeaBoardColumn, DataTableColumn<BoardIdeaItem>> = {
     title: {
       id: "title",
@@ -406,5 +462,37 @@ function buildTableColumns(visibleColumns: IdeaBoardColumn[]): DataTableColumn<B
     },
   };
 
-  return visibleColumns.map((colId) => columnDefs[colId]).filter(Boolean);
+  const result = visibleColumns.map((colId) => columnDefs[colId]).filter(Boolean);
+
+  if (comparisonConfig) {
+    const compareColumn: DataTableColumn<BoardIdeaItem> = {
+      id: "__compare",
+      header: "Compare",
+      sortable: false,
+      className: "w-24 text-center",
+      render: (item) => {
+        const isLeft = comparisonConfig.leftIdeaId === item.id;
+        const isRight = comparisonConfig.rightIdeaId === item.id;
+        const isSelected = isLeft || isRight;
+        const slotLabel = isLeft ? "L" : isRight ? "R" : "";
+
+        return (
+          <button
+            type="button"
+            onClick={() => comparisonConfig.onSelect(item.id)}
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+              isSelected
+                ? "bg-primary-600 text-white"
+                : "border border-gray-300 bg-white text-gray-500 hover:border-primary-400 hover:text-primary-600"
+            }`}
+          >
+            {slotLabel || "+"}
+          </button>
+        );
+      },
+    };
+    result.push(compareColumn);
+  }
+
+  return result;
 }

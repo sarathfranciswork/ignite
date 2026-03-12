@@ -43,12 +43,19 @@ interface IdeaBoardFilters {
   tag: string | undefined;
 }
 
+interface ComparisonState {
+  isComparisonMode: boolean;
+  leftIdeaId: string | null;
+  rightIdeaId: string | null;
+}
+
 interface IdeaBoardState {
   columns: IdeaBoardColumn[];
   filters: IdeaBoardFilters;
   sortField: IdeaBoardSortField;
   sortDirection: SortDirection;
   selectedRows: Set<string>;
+  comparison: ComparisonState;
 
   setColumns: (columns: IdeaBoardColumn[]) => void;
   toggleColumn: (column: IdeaBoardColumn) => void;
@@ -59,6 +66,11 @@ interface IdeaBoardState {
   toggleRowSelection: (id: string) => void;
   selectAllRows: (ids: string[]) => void;
   clearSelection: () => void;
+  toggleComparisonMode: () => void;
+  setComparisonSlot: (slot: "left" | "right", ideaId: string) => void;
+  clearComparisonSlot: (slot: "left" | "right") => void;
+  swapComparisonSlots: () => void;
+  resetComparison: () => void;
 }
 
 const DEFAULT_FILTERS: IdeaBoardFilters = {
@@ -66,6 +78,12 @@ const DEFAULT_FILTERS: IdeaBoardFilters = {
   status: undefined,
   category: undefined,
   tag: undefined,
+};
+
+const DEFAULT_COMPARISON: ComparisonState = {
+  isComparisonMode: false,
+  leftIdeaId: null,
+  rightIdeaId: null,
 };
 
 export const useIdeaBoardStore = create<IdeaBoardState>()(
@@ -76,6 +94,7 @@ export const useIdeaBoardStore = create<IdeaBoardState>()(
       sortField: "createdAt",
       sortDirection: "desc",
       selectedRows: new Set<string>(),
+      comparison: DEFAULT_COMPARISON,
 
       setColumns: (columns) => set({ columns }),
 
@@ -118,6 +137,44 @@ export const useIdeaBoardStore = create<IdeaBoardState>()(
       selectAllRows: (ids) => set({ selectedRows: new Set(ids) }),
 
       clearSelection: () => set({ selectedRows: new Set() }),
+
+      toggleComparisonMode: () => {
+        const current = get().comparison;
+        if (current.isComparisonMode) {
+          set({ comparison: DEFAULT_COMPARISON });
+        } else {
+          set({
+            comparison: { ...current, isComparisonMode: true },
+          });
+        }
+      },
+
+      setComparisonSlot: (slot, ideaId) =>
+        set((state) => ({
+          comparison: {
+            ...state.comparison,
+            [slot === "left" ? "leftIdeaId" : "rightIdeaId"]: ideaId,
+          },
+        })),
+
+      clearComparisonSlot: (slot) =>
+        set((state) => ({
+          comparison: {
+            ...state.comparison,
+            [slot === "left" ? "leftIdeaId" : "rightIdeaId"]: null,
+          },
+        })),
+
+      swapComparisonSlots: () =>
+        set((state) => ({
+          comparison: {
+            ...state.comparison,
+            leftIdeaId: state.comparison.rightIdeaId,
+            rightIdeaId: state.comparison.leftIdeaId,
+          },
+        })),
+
+      resetComparison: () => set({ comparison: DEFAULT_COMPARISON }),
     }),
     {
       name: "ignite-idea-board",
@@ -125,6 +182,7 @@ export const useIdeaBoardStore = create<IdeaBoardState>()(
         columns: state.columns,
         sortField: state.sortField,
         sortDirection: state.sortDirection,
+        // Don't persist comparison state — it's session-only
       }),
     },
   ),
