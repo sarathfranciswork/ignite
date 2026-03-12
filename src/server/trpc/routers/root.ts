@@ -6,6 +6,7 @@ import { aiRouter } from "./ai";
 import { apiKeyRouter } from "./api-key";
 import { authRouter } from "./auth";
 import { bucketRouter } from "./bucket";
+import { campaignComparisonRouter } from "./campaign-comparison";
 import { campaignRouter } from "./campaign";
 import { channelRouter } from "./channel";
 import { conceptRouter } from "./concept";
@@ -47,6 +48,7 @@ export const appRouter = createTRPCRouter({
   apiKey: apiKeyRouter,
   auth: authRouter,
   bucket: bucketRouter,
+  campaignComparison: campaignComparisonRouter,
   campaign: campaignRouter,
   channel: channelRouter,
   comment: commentRouter,
