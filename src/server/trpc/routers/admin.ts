@@ -2,6 +2,18 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, publicProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
 import {
+  scimTokenCreateInput,
+  scimTokenRevokeInput,
+  scimTokenListInput,
+} from "@/server/services/scim.schemas";
+import {
+  createScimToken,
+  listScimTokens,
+  revokeScimToken,
+  getScimStats,
+  ScimServiceError,
+} from "@/server/services/scim.service";
+import {
   notificationTemplateGetInput,
   notificationTemplateUpsertInput,
   notificationTemplateToggleInput,
@@ -134,6 +146,25 @@ function handleNotificationTemplateError(error: unknown): never {
       TEMPLATE_NOT_FOUND: "NOT_FOUND",
       INVALID_VARIABLES: "BAD_REQUEST",
       WHITE_LABEL_NOT_FOUND: "NOT_FOUND",
+    };
+
+    throw new TRPCError({
+      code: codeMap[error.code] ?? "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
+  throw error;
+}
+
+function handleScimError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+
+  if (error instanceof ScimServiceError) {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT"> = {
+      TOKEN_NOT_FOUND: "NOT_FOUND",
+      TOKEN_EXPIRED: "BAD_REQUEST",
+      TOKEN_REVOKED: "BAD_REQUEST",
     };
 
     throw new TRPCError({
@@ -519,5 +550,40 @@ export const adminRouter = createTRPCRouter({
 
   loginCustomizationGetPublic: publicProcedure.query(async () => {
     return getLoginCustomization();
+  }),
+
+  // ── SCIM Token Management Procedures ──────────────────────────
+
+  scimTokenCreate: protectedProcedure
+    .use(requirePermission(Action.ADMIN_MANAGE_SCIM))
+    .input(scimTokenCreateInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await createScimToken(input, ctx.session.user.id);
+      } catch (error) {
+        handleScimError(error);
+      }
+    }),
+
+  scimTokenList: protectedProcedure
+    .use(requirePermission(Action.ADMIN_MANAGE_SCIM))
+    .input(scimTokenListInput)
+    .query(async ({ input }) => {
+      return listScimTokens(input);
+    }),
+
+  scimTokenRevoke: protectedProcedure
+    .use(requirePermission(Action.ADMIN_MANAGE_SCIM))
+    .input(scimTokenRevokeInput)
+    .mutation(async ({ input }) => {
+      try {
+        return await revokeScimToken(input.id);
+      } catch (error) {
+        handleScimError(error);
+      }
+    }),
+
+  scimStats: protectedProcedure.use(requirePermission(Action.ADMIN_MANAGE_SCIM)).query(async () => {
+    return getScimStats();
   }),
 });

@@ -83,6 +83,7 @@ export const Action = {
   ADMIN_VIEW_METRICS: "admin.viewMetrics",
   ADMIN_MANAGE_SPACES: "admin.manageSpaces",
   ADMIN_MANAGE_SSO: "admin.manageSso",
+  ADMIN_MANAGE_SCIM: "admin.manageScim",
 
   // Organization (partner) management
   ORGANIZATION_CREATE: "organization.create",
