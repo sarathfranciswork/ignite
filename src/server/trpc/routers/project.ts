@@ -18,6 +18,9 @@ import {
   upsertTaskAssignmentInput,
   updateTaskStatusInput,
   listPhaseActivitiesInput,
+  ideaLineageInput,
+  dashboardStatsInput,
+  pipelineStatsInput,
 } from "@/server/services/project.schemas";
 import {
   listProjects,
@@ -39,6 +42,13 @@ import {
   checkMandatoryTasksComplete,
   ProjectServiceError,
 } from "@/server/services/project.service";
+import {
+  getIdeaLineage,
+  getProjectSourceDetails,
+  getDashboardStats,
+  getPipelineStats,
+  TraceabilityServiceError,
+} from "@/server/services/traceability.service";
 
 function handleProjectError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -61,6 +71,18 @@ function handleProjectError(error: unknown): never {
       TASK_ASSIGNMENT_NOT_FOUND: "NOT_FOUND",
       ASSIGNEE_NOT_TEAM_MEMBER: "BAD_REQUEST",
       PHASE_NOT_FOUND: "NOT_FOUND",
+    };
+
+    throw new TRPCError({
+      code: codeMap[error.code] ?? "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
+  if (error instanceof TraceabilityServiceError) {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST"> = {
+      IDEA_NOT_FOUND: "NOT_FOUND",
+      PROJECT_NOT_FOUND: "NOT_FOUND",
     };
 
     throw new TRPCError({
@@ -255,6 +277,52 @@ export const projectRouter = createTRPCRouter({
           return { allComplete: true, totalMandatory: 0, completedMandatory: 0 };
         }
         return await checkMandatoryTasksComplete(input.projectId, project.currentPhase.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  // ── Traceability & Dashboard ──────────────────────────────
+
+  ideaLineage: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(ideaLineageInput)
+    .query(async ({ input }) => {
+      try {
+        return await getIdeaLineage(input);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  sourceDetails: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(projectGetByIdInput)
+    .query(async ({ input }) => {
+      try {
+        return await getProjectSourceDetails(input.id);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  dashboardStats: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(dashboardStatsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getDashboardStats(input);
+      } catch (error) {
+        handleProjectError(error);
+      }
+    }),
+
+  pipelineStats: protectedProcedure
+    .use(requirePermission(Action.PROJECT_READ))
+    .input(pipelineStatsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getPipelineStats(input);
       } catch (error) {
         handleProjectError(error);
       }
