@@ -3,20 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import {
-  Search,
-  X,
-  Columns3,
-  Heart,
-  MessageSquare,
-  Eye,
-  ChevronDown,
-  RotateCcw,
-} from "lucide-react";
+import { Search, Columns3, Heart, MessageSquare, Eye, ChevronDown, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
+import { BulkActionsToolbar } from "./BulkActionsToolbar";
 import { trpc } from "@/lib/trpc";
 import {
   useIdeaBoardStore,
@@ -236,18 +228,13 @@ export function IdeaBoard({ campaignId }: IdeaBoardProps) {
         </div>
       </div>
 
-      {/* Selection bar */}
-      {selectedRows.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg bg-primary-50 px-4 py-2 text-sm">
-          <span className="font-medium text-primary-700">
-            {selectedRows.size} idea{selectedRows.size === 1 ? "" : "s"} selected
-          </span>
-          <Button variant="ghost" size="sm" onClick={clearSelection}>
-            <X className="mr-1 h-3.5 w-3.5" />
-            Clear
-          </Button>
-        </div>
-      )}
+      {/* Bulk actions toolbar */}
+      <BulkActionsToolbar
+        selectedIds={selectedRows}
+        campaignId={campaignId}
+        onClearSelection={clearSelection}
+        onActionComplete={() => void ideasQuery.refetch()}
+      />
 
       {/* Error state */}
       {ideasQuery.isError && (

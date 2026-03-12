@@ -146,3 +146,51 @@ export const ideaBoardListInput = z.object({
 
 export type IdeaBoardListInput = z.infer<typeof ideaBoardListInput>;
 export type IdeaBoardSortField = z.infer<typeof ideaBoardSortField>;
+
+// ── Split / Merge / Bulk Schemas ────────────────────────────
+
+export const ideaSplitInput = z.object({
+  id: z.string(),
+  newIdeas: z
+    .array(
+      z.object({
+        title: z.string().min(1, "Title is required").max(200),
+        teaser: z.string().max(1000).optional(),
+        description: z.string().max(50000).optional(),
+        category: z.string().max(200).optional(),
+        tags: z.array(z.string()).optional(),
+      }),
+    )
+    .min(2, "Split must produce at least 2 ideas")
+    .max(10, "Split can produce at most 10 ideas"),
+});
+
+export const ideaMergeInput = z.object({
+  targetIdeaId: z.string(),
+  sourceIdeaIds: z.array(z.string()).min(1, "At least one source idea is required").max(20),
+});
+
+export const ideaBulkAssignBucketInput = z.object({
+  ideaIds: z.array(z.string()).min(1).max(100),
+  bucketId: z.string(),
+});
+
+export const ideaBulkArchiveInput = z.object({
+  ideaIds: z.array(z.string()).min(1).max(100),
+  reason: z.string().min(1, "Archive reason is required").max(2000),
+});
+
+export const ideaBulkExportInput = z.object({
+  ideaIds: z.array(z.string()).min(1).max(500),
+  campaignId: z.string(),
+});
+
+export const ideaMergeHistoryInput = z.object({
+  ideaId: z.string(),
+});
+
+export type IdeaSplitInput = z.infer<typeof ideaSplitInput>;
+export type IdeaMergeInput = z.infer<typeof ideaMergeInput>;
+export type IdeaBulkAssignBucketInput = z.infer<typeof ideaBulkAssignBucketInput>;
+export type IdeaBulkArchiveInput = z.infer<typeof ideaBulkArchiveInput>;
+export type IdeaBulkExportInput = z.infer<typeof ideaBulkExportInput>;
