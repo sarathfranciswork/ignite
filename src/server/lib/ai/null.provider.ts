@@ -20,11 +20,14 @@ export class NullAIProvider implements AIProvider {
     return { embedding: [], dimensions: 0 };
   }
 
-  async findSimilar(_embedding: number[], _limit: number): Promise<SimilarityResult[]> {
-    return [];
+  async generateText(
+    _prompt: string,
+    _systemPrompt?: string,
+  ): Promise<TextGenerationResult | null> {
+    return null;
   }
 
-  async generateText(_prompt: string, _systemPrompt?: string): Promise<TextGenerationResult> {
-    return { text: "", success: false };
+  async findSimilar(_embedding: number[], _limit: number): Promise<SimilarityResult[]> {
+    return [];
   }
 }

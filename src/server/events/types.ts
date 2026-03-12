@@ -109,6 +109,8 @@ export interface EventMap {
   "bucket.deleted": EventPayload;
   "bucket.ideaAssigned": EventPayload;
   "bucket.ideaUnassigned": EventPayload;
+  "copilot.suggestionAccepted": EventPayload;
+  "copilot.suggestionDismissed": EventPayload;
 }
 
 export type EventName = keyof EventMap;

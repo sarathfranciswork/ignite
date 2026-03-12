@@ -65,6 +65,17 @@ export class LocalAIProvider implements AIProvider {
     return this.available;
   }
 
+  supportsTextGeneration(): boolean {
+    return false;
+  }
+
+  async generateText(
+    _prompt: string,
+    _systemPrompt?: string,
+  ): Promise<TextGenerationResult | null> {
+    return null;
+  }
+
   private async init(): Promise<void> {
     if (this.initPromise) return this.initPromise;
 
@@ -160,14 +171,6 @@ export class LocalAIProvider implements AIProvider {
       );
       return { embedding: [], dimensions: 0 };
     }
-  }
-
-  supportsTextGeneration(): boolean {
-    return false;
-  }
-
-  async generateText(_prompt: string, _systemPrompt?: string): Promise<TextGenerationResult> {
-    return { text: "", success: false };
   }
 
   async findSimilar(embedding: number[], limit: number): Promise<SimilarityResult[]> {

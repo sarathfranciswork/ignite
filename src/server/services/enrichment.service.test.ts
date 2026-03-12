@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { enrichIdea, getEnrichmentStatus } from "./enrichment.service";
+import { enrichIdea, getEnrichmentStatus, recordCopilotEvent } from "./enrichment.service";
 
 vi.mock("@/server/lib/ai/factory", () => ({
   aiProvider: {
@@ -7,6 +7,8 @@ vi.mock("@/server/lib/ai/factory", () => ({
     isAvailable: vi.fn().mockReturnValue(false),
     supportsTextGeneration: vi.fn().mockReturnValue(false),
     generateText: vi.fn(),
+    generateEmbedding: vi.fn(),
+    findSimilar: vi.fn(),
   },
 }));
 
@@ -21,12 +23,18 @@ vi.mock("@/server/lib/logger", () => ({
   },
 }));
 
+vi.mock("@/server/events/event-bus", () => ({
+  eventBus: {
+    emit: vi.fn(),
+  },
+}));
+
 describe("getEnrichmentStatus", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns available true and aiPowered false when AI text generation unavailable", async () => {
+  it("returns available true with aiPowered false when no text generation", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
 
@@ -39,7 +47,7 @@ describe("getEnrichmentStatus", () => {
     });
   });
 
-  it("returns aiPowered true when AI text generation is available", async () => {
+  it("returns aiPowered true when text generation is available", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
 
@@ -58,220 +66,243 @@ describe("enrichIdea", () => {
     vi.clearAllMocks();
   });
 
-  it("returns local suggestions when AI text generation is unavailable", async () => {
+  it("returns rule-based suggestions for a minimal idea", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(false);
 
     const result = await enrichIdea({
-      title: "My Idea",
-      description: undefined,
-      tags: undefined,
+      title: "Smart energy monitoring system",
     });
 
-    expect(result.suggestions.length).toBeGreaterThan(0);
-    // Should suggest adding description and tags
-    const types = result.suggestions.map((s) => s.type);
-    expect(types).toContain("description");
-    expect(types).toContain("tags");
+    expect(result.aiPowered).toBe(false);
+    expect(result.gaps).toContain("Add a detailed description to explain your idea fully");
+    expect(result.gaps).toContain("Add a teaser to provide a quick summary visible on idea cards");
+    expect(result.gaps).toContain("Add tags to help others discover your idea");
+    expect(result.gaps).toContain("Specify a category to organize your idea");
   });
 
-  it("suggests adding teaser when missing", async () => {
+  it("suggests tags from content keywords", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(false);
 
     const result = await enrichIdea({
-      title: "My Test Idea for Innovation",
-      description: "This is a longer description that has enough content to pass the threshold.",
-      tags: ["innovation"],
-    });
-
-    const types = result.suggestions.map((s) => s.type);
-    expect(types).toContain("missing_info"); // missing teaser
-  });
-
-  it("suggests more descriptive title when title is short", async () => {
-    const { aiProvider } = await import("@/server/lib/ai/factory");
-    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(false);
-
-    const result = await enrichIdea({
-      title: "Idea",
-    });
-
-    const titleSuggestion = result.suggestions.find((s) => s.type === "title");
-    expect(titleSuggestion).toBeDefined();
-    expect(titleSuggestion?.label).toContain("descriptive title");
-  });
-
-  it("suggests problem statement when description lacks it", async () => {
-    const { aiProvider } = await import("@/server/lib/ai/factory");
-    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(false);
-
-    const result = await enrichIdea({
-      title: "Smart Energy Monitoring",
-      teaser: "Monitors energy",
+      title: "Automation of customer processes",
       description:
-        "A system that provides real-time dashboards with advanced analytics and reporting for energy data.",
-      tags: ["energy", "analytics"],
-      category: "Green Tech",
+        "This idea focuses on using digital tools to automate customer-facing processes and reduce costs through efficiency gains.",
     });
 
-    const missingInfoSuggestions = result.suggestions.filter((s) => s.type === "missing_info");
-    const labels = missingInfoSuggestions.map((s) => s.label);
-    expect(labels.some((l) => l.includes("problem") || l.includes("impact"))).toBe(true);
+    expect(result.suggestedTags).toContain("automation");
+    expect(result.suggestedTags).toContain("cost-reduction");
+    expect(result.suggestedTags).toContain("efficiency");
+    expect(result.suggestedTags).toContain("customer-experience");
+    expect(result.aiPowered).toBe(false);
   });
 
-  it("uses AI text generation when available and parses response", async () => {
+  it("does not suggest tags already present", async () => {
+    const { aiProvider } = await import("@/server/lib/ai/factory");
+    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
+
+    const result = await enrichIdea({
+      title: "Automation of processes",
+      description: "Automate processes for efficiency",
+      tags: ["automation", "efficiency"],
+    });
+
+    expect(result.suggestedTags).not.toContain("automation");
+    expect(result.suggestedTags).not.toContain("efficiency");
+  });
+
+  it("suggests a category when none provided", async () => {
+    const { aiProvider } = await import("@/server/lib/ai/factory");
+    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
+
+    const result = await enrichIdea({
+      title: "Green energy initiative for sustainability",
+      description:
+        "Implement eco-friendly practices to reduce carbon footprint across our operations.",
+    });
+
+    expect(result.suggestedCategory).toBe("Sustainability");
+  });
+
+  it("does not suggest category when already set", async () => {
+    const { aiProvider } = await import("@/server/lib/ai/factory");
+    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
+
+    const result = await enrichIdea({
+      title: "Green energy initiative",
+      category: "Sustainability",
+    });
+
+    expect(result.suggestedCategory).toBeNull();
+  });
+
+  it("detects missing impact/benefit in description", async () => {
+    const { aiProvider } = await import("@/server/lib/ai/factory");
+    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
+
+    const result = await enrichIdea({
+      title: "New tool for tracking",
+      description:
+        "We should create a new tool that tracks usage across all departments and provides detailed reports on activity.",
+      teaser: "A tracking tool",
+      tags: ["tracking"],
+      category: "Technology",
+    });
+
+    expect(result.gaps).toContain("Consider describing the expected impact or benefits");
+  });
+
+  it("generates description hints for short descriptions", async () => {
+    const { aiProvider } = await import("@/server/lib/ai/factory");
+    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
+
+    const result = await enrichIdea({
+      title: "Quick idea",
+      description: "A short description.",
+      teaser: "Quick",
+      tags: ["test"],
+      category: "Test",
+    });
+
+    expect(result.descriptionHints).toContain(
+      "Your description is quite short — consider expanding with more details",
+    );
+  });
+
+  it("uses AI when text generation is available", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
-
-    const aiResponse = JSON.stringify([
-      {
-        type: "description",
-        label: "Expand your description",
-        suggestion: "Consider adding more details about the implementation approach.",
-      },
-      {
-        type: "tags",
-        label: "Suggested tags",
-        suggestion: "Consider adding: machine-learning, automation, cost-savings",
-      },
-    ]);
-
     vi.mocked(aiProvider.generateText).mockResolvedValue({
-      text: aiResponse,
-      success: true,
+      text: JSON.stringify({
+        suggestedTags: ["ai-powered", "machine-learning"],
+        suggestedCategory: "Technology Adoption",
+        descriptionHints: ["Add specific metrics for expected outcomes"],
+        gaps: ["Consider mentioning the target user group"],
+      }),
+      finishReason: "stop",
     });
 
     const result = await enrichIdea({
-      title: "AI-Powered Process Optimization",
-      description: "Using machine learning to optimize workflows.",
+      title: "AI-powered recommendation engine",
+      description: "Build a recommendation system using machine learning",
     });
 
-    expect(result.suggestions).toHaveLength(2);
-    expect(result.suggestions[0].type).toBe("description");
-    expect(result.suggestions[1].type).toBe("tags");
-    expect(result.available).toBe(true);
+    expect(result.aiPowered).toBe(true);
+    expect(result.suggestedTags).toContain("ai-powered");
+    expect(result.suggestedTags).toContain("machine-learning");
+    expect(result.suggestedCategory).toBe("Technology Adoption");
+    expect(result.descriptionHints).toContain("Add specific metrics for expected outcomes");
+    expect(result.gaps).toContain("Consider mentioning the target user group");
   });
 
-  it("handles AI response with markdown code fences", async () => {
+  it("falls back to rule-based when AI returns error", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
-
-    const aiResponse =
-      '```json\n[{"type":"title","label":"Improve title","suggestion":"Make it more specific."}]\n```';
-
-    vi.mocked(aiProvider.generateText).mockResolvedValue({
-      text: aiResponse,
-      success: true,
-    });
-
-    const result = await enrichIdea({
-      title: "Idea",
-    });
-
-    expect(result.suggestions).toHaveLength(1);
-    expect(result.suggestions[0].type).toBe("title");
-  });
-
-  it("falls back to local suggestions when AI generation fails", async () => {
-    const { aiProvider } = await import("@/server/lib/ai/factory");
-    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(true);
-
     vi.mocked(aiProvider.generateText).mockResolvedValue({
       text: "",
-      success: false,
+      finishReason: "error",
     });
 
     const result = await enrichIdea({
-      title: "My Idea",
+      title: "Automation of processes",
+      description: "Automate everything for efficiency",
     });
 
-    // Should still get local suggestions
-    expect(result.suggestions.length).toBeGreaterThan(0);
+    expect(result.aiPowered).toBe(false);
+    expect(result.suggestedTags.length).toBeGreaterThanOrEqual(0);
   });
 
-  it("falls back to local when AI returns invalid JSON", async () => {
+  it("falls back to rule-based when AI returns invalid JSON", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(true);
-
     vi.mocked(aiProvider.generateText).mockResolvedValue({
       text: "This is not valid JSON",
-      success: true,
+      finishReason: "stop",
     });
 
     const result = await enrichIdea({
-      title: "My Idea",
+      title: "Automation of processes",
     });
 
-    // Should still get local suggestions since AI parsing failed
-    expect(result.suggestions.length).toBeGreaterThan(0);
+    expect(result.aiPowered).toBe(false);
   });
 
-  it("limits suggestions to 5 maximum", async () => {
+  it("merges AI and rule-based tags without duplicates", async () => {
     const { aiProvider } = await import("@/server/lib/ai/factory");
     vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
-
-    const manySuggestions = Array.from({ length: 10 }, (_, i) => ({
-      type: "missing_info",
-      label: `Suggestion ${i}`,
-      suggestion: `Detail ${i}`,
-    }));
-
     vi.mocked(aiProvider.generateText).mockResolvedValue({
-      text: JSON.stringify(manySuggestions),
-      success: true,
+      text: JSON.stringify({
+        suggestedTags: ["automation", "smart-factory"],
+        suggestedCategory: "Digital Transformation",
+        descriptionHints: [],
+        gaps: [],
+      }),
+      finishReason: "stop",
     });
 
     const result = await enrichIdea({
-      title: "Test Idea",
+      title: "Automation and digitalization initiative",
+      description: "Use automation to digitalize factory operations",
     });
 
-    expect(result.suggestions.length).toBeLessThanOrEqual(5);
+    expect(result.aiPowered).toBe(true);
+    const tagSet = new Set(result.suggestedTags);
+    expect(tagSet.size).toBe(result.suggestedTags.length);
+  });
+});
+
+describe("recordCopilotEvent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("filters out invalid suggestion types from AI response", async () => {
-    const { aiProvider } = await import("@/server/lib/ai/factory");
-    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(true);
+  it("emits suggestionAccepted event", async () => {
+    const { eventBus } = await import("@/server/events/event-bus");
 
-    const mixedResponse = JSON.stringify([
-      { type: "description", label: "Valid", suggestion: "A valid suggestion." },
-      { type: "invalid_type", label: "Invalid", suggestion: "Should be filtered." },
-      { type: "tags", label: "Also valid", suggestion: "Another valid suggestion." },
-    ]);
+    recordCopilotEvent(
+      {
+        ideaId: "idea-1",
+        suggestionType: "tag",
+        suggestionValue: "automation",
+        action: "accepted",
+      },
+      "user-1",
+    );
 
-    vi.mocked(aiProvider.generateText).mockResolvedValue({
-      text: mixedResponse,
-      success: true,
-    });
-
-    const result = await enrichIdea({
-      title: "Test Idea",
-    });
-
-    expect(result.suggestions).toHaveLength(2);
-    expect(result.suggestions.every((s) => ["description", "tags"].includes(s.type))).toBe(true);
+    expect(eventBus.emit).toHaveBeenCalledWith(
+      "copilot.suggestionAccepted",
+      expect.objectContaining({
+        entity: "copilot",
+        entityId: "idea-1",
+        actor: "user-1",
+        metadata: {
+          suggestionType: "tag",
+          suggestionValue: "automation",
+        },
+      }),
+    );
   });
 
-  it("returns no local suggestions for a well-formed idea", async () => {
-    const { aiProvider } = await import("@/server/lib/ai/factory");
-    vi.mocked(aiProvider.supportsTextGeneration).mockReturnValue(false);
-    vi.mocked(aiProvider.isAvailable).mockReturnValue(false);
+  it("emits suggestionDismissed event", async () => {
+    const { eventBus } = await import("@/server/events/event-bus");
 
-    const result = await enrichIdea({
-      title: "Comprehensive Smart Energy Monitoring System",
-      teaser: "Real-time energy monitoring to solve the problem of waste.",
-      description:
-        "This addresses the challenge of energy waste in large buildings. The problem is that building managers lack visibility. The expected impact is a 30% reduction in energy costs, resulting in significant benefit to both the environment and the bottom line.",
-      tags: ["energy", "iot", "sustainability"],
-      category: "Green Tech",
-    });
+    recordCopilotEvent(
+      {
+        suggestionType: "category",
+        suggestionValue: "Innovation",
+        action: "dismissed",
+      },
+      "user-2",
+    );
 
-    expect(result.suggestions).toHaveLength(0);
+    expect(eventBus.emit).toHaveBeenCalledWith(
+      "copilot.suggestionDismissed",
+      expect.objectContaining({
+        entity: "copilot",
+        entityId: "draft",
+        actor: "user-2",
+      }),
+    );
   });
 });

@@ -54,4 +54,13 @@ describe("LocalAIProvider", () => {
     const results = await provider.findSimilar(embedding, 5);
     expect(results).toEqual([]);
   });
+
+  it("does not support text generation", () => {
+    expect(provider.supportsTextGeneration()).toBe(false);
+  });
+
+  it("returns null for text generation", async () => {
+    const result = await provider.generateText("test prompt");
+    expect(result).toBeNull();
+  });
 });

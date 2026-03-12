@@ -100,6 +100,68 @@ describe("OpenAIProvider", () => {
     expect(results).toEqual([]);
   });
 
+  it("supports text generation", () => {
+    expect(provider.supportsTextGeneration()).toBe(true);
+  });
+
+  it("does not support text generation with empty key", () => {
+    const emptyProvider = new OpenAIProvider("");
+    expect(emptyProvider.supportsTextGeneration()).toBe(false);
+  });
+
+  it("generates text via chat completions API", async () => {
+    const mockResponse = {
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        choices: [
+          {
+            message: { content: "Generated text response" },
+            finish_reason: "stop",
+          },
+        ],
+      }),
+    };
+
+    vi.spyOn(global, "fetch").mockResolvedValue(mockResponse as unknown as Response);
+
+    const result = await provider.generateText("test prompt", "system prompt");
+
+    expect(result).toEqual({
+      text: "Generated text response",
+      finishReason: "stop",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer test-api-key",
+        }),
+      }),
+    );
+  });
+
+  it("returns error result on chat API failure", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue("Server error"),
+    } as unknown as Response);
+
+    const result = await provider.generateText("test prompt");
+
+    expect(result).toEqual({ text: "", finishReason: "error" });
+  });
+
+  it("returns error result on network failure during text generation", async () => {
+    vi.spyOn(global, "fetch").mockRejectedValue(new Error("Network error"));
+
+    const result = await provider.generateText("test prompt");
+
+    expect(result).toEqual({ text: "", finishReason: "error" });
+  });
+
   it("queries pgvector for similar ideas with correct dimensions", async () => {
     const { prisma } = await import("@/server/lib/prisma");
     vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([

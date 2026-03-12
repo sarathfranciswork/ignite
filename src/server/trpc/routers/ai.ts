@@ -2,8 +2,12 @@ import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc
 import { Action } from "@/server/lib/permissions";
 import { findSimilarIdeasInput } from "@/server/services/similarity.schemas";
 import { findSimilarIdeas, getAiStatus } from "@/server/services/similarity.service";
-import { enrichIdeaInput } from "@/server/services/enrichment.schemas";
-import { enrichIdea, getEnrichmentStatus } from "@/server/services/enrichment.service";
+import { enrichIdeaInput, copilotEventInput } from "@/server/services/enrichment.schemas";
+import {
+  enrichIdea,
+  recordCopilotEvent,
+  getEnrichmentStatus,
+} from "@/server/services/enrichment.service";
 
 export const aiRouter = createTRPCRouter({
   status: protectedProcedure.use(requirePermission(Action.AI_VIEW_STATUS)).query(() => {
@@ -21,10 +25,18 @@ export const aiRouter = createTRPCRouter({
     return getEnrichmentStatus();
   }),
 
-  enrichIdea: protectedProcedure
+  enrich: protectedProcedure
     .use(requirePermission(Action.AI_ENRICH_IDEA))
     .input(enrichIdeaInput)
     .mutation(async ({ input }) => {
       return enrichIdea(input);
+    }),
+
+  copilotEvent: protectedProcedure
+    .use(requirePermission(Action.AI_ENRICH_IDEA))
+    .input(copilotEventInput)
+    .mutation(({ ctx, input }) => {
+      recordCopilotEvent(input, ctx.session.user.id);
+      return { success: true };
     }),
 });

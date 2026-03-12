@@ -22,4 +22,13 @@ describe("NullAIProvider", () => {
     const results = await provider.findSimilar([0.1, 0.2], 5);
     expect(results).toEqual([]);
   });
+
+  it("does not support text generation", () => {
+    expect(provider.supportsTextGeneration()).toBe(false);
+  });
+
+  it("returns null for text generation", async () => {
+    const result = await provider.generateText("test prompt");
+    expect(result).toBeNull();
+  });
 });
