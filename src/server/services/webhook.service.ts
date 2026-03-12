@@ -77,6 +77,11 @@ function isPrivateIP(ip: string): boolean {
     if (normalized === "::1" || normalized === "::") return true;
     if (normalized.startsWith("fe80:")) return true;
     if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+    // IPv4-mapped IPv6 (::ffff:x.x.x.x)
+    if (normalized.startsWith("::ffff:")) {
+      const mapped = normalized.slice(7);
+      if (net.isIPv4(mapped)) return isPrivateIP(mapped);
+    }
   }
   return false;
 }
@@ -103,8 +108,12 @@ async function validateWebhookUrl(url: string): Promise<void> {
     throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
   }
 
-  // Resolve DNS and check all addresses
-  const addresses = await dns.resolve(hostname).catch(() => [] as string[]);
+  // Resolve DNS (both A and AAAA records) and check all addresses
+  const [v4Addresses, v6Addresses] = await Promise.all([
+    dns.resolve4(hostname).catch(() => [] as string[]),
+    dns.resolve6(hostname).catch(() => [] as string[]),
+  ]);
+  const addresses = [...v4Addresses, ...v6Addresses];
   if (addresses.length === 0) {
     throw new WebhookServiceError("INVALID_URL", "Could not resolve webhook URL hostname");
   }
