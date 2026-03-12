@@ -20,12 +20,61 @@ interface EnrichmentSidebarProps {
   onAcceptSuggestion?: (type: string, suggestion: string) => void;
 }
 
+interface DisplaySuggestion {
+  type: string;
+  label: string;
+  suggestion: string;
+}
+
 const SUGGESTION_ICONS: Record<string, React.ReactNode> = {
   description: <FileText className="h-4 w-4" />,
   tags: <Tag className="h-4 w-4" />,
-  missing_info: <Lightbulb className="h-4 w-4" />,
-  title: <Type className="h-4 w-4" />,
+  gap: <Lightbulb className="h-4 w-4" />,
+  category: <Type className="h-4 w-4" />,
 };
+
+function buildDisplaySuggestions(data: {
+  suggestedTags: string[];
+  suggestedCategory: string | null;
+  descriptionHints: string[];
+  gaps: string[];
+}): DisplaySuggestion[] {
+  const suggestions: DisplaySuggestion[] = [];
+
+  if (data.suggestedTags.length > 0) {
+    suggestions.push({
+      type: "tags",
+      label: "Suggested tags",
+      suggestion: `Consider adding: ${data.suggestedTags.join(", ")}`,
+    });
+  }
+
+  if (data.suggestedCategory) {
+    suggestions.push({
+      type: "category",
+      label: "Suggested category",
+      suggestion: data.suggestedCategory,
+    });
+  }
+
+  for (const hint of data.descriptionHints) {
+    suggestions.push({
+      type: "description",
+      label: "Description improvement",
+      suggestion: hint,
+    });
+  }
+
+  for (const gap of data.gaps) {
+    suggestions.push({
+      type: "gap",
+      label: "Missing information",
+      suggestion: gap,
+    });
+  }
+
+  return suggestions;
+}
 
 export function EnrichmentSidebar({ draft, onAcceptSuggestion }: EnrichmentSidebarProps) {
   const [dismissed, setDismissed] = React.useState<Set<number>>(new Set());
@@ -35,7 +84,7 @@ export function EnrichmentSidebar({ draft, onAcceptSuggestion }: EnrichmentSideb
     staleTime: 60_000,
   });
 
-  const enrichMutation = trpc.ai.enrichIdea.useMutation();
+  const enrichMutation = trpc.ai.enrich.useMutation();
 
   const canEnrich = draft.title.length >= 3;
 
@@ -64,8 +113,12 @@ export function EnrichmentSidebar({ draft, onAcceptSuggestion }: EnrichmentSideb
     return null;
   }
 
-  const suggestions = enrichMutation.data?.suggestions ?? [];
-  const visibleSuggestions = suggestions.filter((_, i) => !dismissed.has(i) && !accepted.has(i));
+  const suggestions: DisplaySuggestion[] = enrichMutation.data
+    ? buildDisplaySuggestions(enrichMutation.data)
+    : [];
+  const visibleSuggestions = suggestions.filter(
+    (_: DisplaySuggestion, i: number) => !dismissed.has(i) && !accepted.has(i),
+  );
 
   return (
     <Card>
@@ -118,7 +171,7 @@ export function EnrichmentSidebar({ draft, onAcceptSuggestion }: EnrichmentSideb
 
         {visibleSuggestions.length > 0 && (
           <div className="space-y-2">
-            {suggestions.map((suggestion, index) => {
+            {suggestions.map((suggestion: DisplaySuggestion, index: number) => {
               if (dismissed.has(index) || accepted.has(index)) return null;
 
               return (

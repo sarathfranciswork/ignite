@@ -10,13 +10,25 @@ export const enrichIdeaInput = z.object({
 
 export type EnrichIdeaInput = z.infer<typeof enrichIdeaInput>;
 
+export const copilotEventInput = z.object({
+  ideaId: z.string().min(1).optional(),
+  suggestionType: z.enum(["tag", "category", "description", "gap"]),
+  suggestionValue: z.string().max(2000),
+  action: z.enum(["accepted", "dismissed"]),
+});
+
+export type CopilotEventInput = z.infer<typeof copilotEventInput>;
+
 export interface EnrichmentSuggestion {
-  type: "description" | "tags" | "missing_info" | "title";
-  label: string;
-  suggestion: string;
+  type: "tag" | "category" | "description" | "gap";
+  value: string;
+  confidence: "high" | "medium" | "low";
 }
 
 export interface EnrichmentResult {
-  suggestions: EnrichmentSuggestion[];
-  available: boolean;
+  suggestedTags: string[];
+  suggestedCategory: string | null;
+  descriptionHints: string[];
+  gaps: string[];
+  aiPowered: boolean;
 }

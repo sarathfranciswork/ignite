@@ -10,7 +10,7 @@ export interface SimilarityResult {
 
 export interface TextGenerationResult {
   text: string;
-  success: boolean;
+  finishReason: "stop" | "length" | "error";
 }
 
 export interface AIProvider {
@@ -22,7 +22,7 @@ export interface AIProvider {
 
   generateEmbedding(text: string): Promise<EmbeddingResult>;
 
-  findSimilar(embedding: number[], limit: number): Promise<SimilarityResult[]>;
+  generateText(prompt: string, systemPrompt?: string): Promise<TextGenerationResult | null>;
 
-  generateText(prompt: string, systemPrompt?: string): Promise<TextGenerationResult>;
+  findSimilar(embedding: number[], limit: number): Promise<SimilarityResult[]>;
 }

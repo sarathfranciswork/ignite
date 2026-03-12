@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { EnrichmentCoPilot } from "@/components/ideas/EnrichmentCoPilot";
 import { trpc } from "@/lib/trpc";
-import { EnrichmentSidebar } from "./EnrichmentSidebar";
 
 const ideaFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title must be 200 characters or less"),
@@ -78,6 +78,7 @@ export function IdeaForm({ campaignId, idea, onSuccess }: IdeaFormProps) {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<IdeaFormValues>({
     resolver: ideaFormResolver,
@@ -91,6 +92,14 @@ export function IdeaForm({ campaignId, idea, onSuccess }: IdeaFormProps) {
       inventionDisclosure: idea?.inventionDisclosure ?? false,
     },
   });
+
+  const watchedTitle = watch("title");
+  const watchedTeaser = watch("teaser");
+  const watchedDescription = watch("description");
+  const watchedCategory = watch("category");
+  const watchedTagsInput = watch("tagsInput");
+
+  const currentTags = React.useMemo(() => parseTags(watchedTagsInput ?? ""), [watchedTagsInput]);
 
   const createMutation = trpc.idea.create.useMutation();
   const updateMutation = trpc.idea.update.useMutation();
@@ -196,32 +205,21 @@ export function IdeaForm({ campaignId, idea, onSuccess }: IdeaFormProps) {
     }
   }
 
+  function handleAcceptTag(tag: string) {
+    const existing = watchedTagsInput ?? "";
+    const newTags = existing.length > 0 ? `${existing}, ${tag}` : tag;
+    setValue("tagsInput", newTags, { shouldDirty: true });
+  }
+
+  function handleAcceptCategory(category: string) {
+    setValue("category", category, { shouldDirty: true });
+  }
+
   const mutationError = createMutation.error ?? updateMutation.error ?? submitMutation.error;
 
-  const watchedTitle = watch("title");
-  const watchedTeaser = watch("teaser");
-  const watchedDescription = watch("description");
-  const watchedCategory = watch("category");
-  const watchedTagsInput = watch("tagsInput");
-
-  const enrichmentDraft = React.useMemo(
-    () => ({
-      title: watchedTitle,
-      teaser: watchedTeaser || undefined,
-      description: watchedDescription || undefined,
-      category: watchedCategory || undefined,
-      tags: parseTags(watchedTagsInput ?? ""),
-    }),
-    [watchedTitle, watchedTeaser, watchedDescription, watchedCategory, watchedTagsInput],
-  );
-
-  const handleAcceptSuggestion = React.useCallback((_type: string, _suggestion: string) => {
-    // Suggestion acknowledgment — user can apply changes manually
-  }, []);
-
   return (
-    <div className="flex gap-6">
-      <form className="min-w-0 flex-1 space-y-6" onSubmit={handleSubmit(onSubmitIdea)}>
+    <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
+      <form className="space-y-6" onSubmit={handleSubmit(onSubmitIdea)}>
         <div className="space-y-4">
           <div>
             <Label htmlFor="title">Title *</Label>
@@ -306,8 +304,17 @@ export function IdeaForm({ campaignId, idea, onSuccess }: IdeaFormProps) {
         </div>
       </form>
 
-      <aside className="hidden w-72 shrink-0 lg:block">
-        <EnrichmentSidebar draft={enrichmentDraft} onAcceptSuggestion={handleAcceptSuggestion} />
+      <aside className="space-y-4">
+        <EnrichmentCoPilot
+          title={watchedTitle}
+          teaser={watchedTeaser}
+          description={watchedDescription}
+          category={watchedCategory}
+          tags={currentTags}
+          onAcceptTag={handleAcceptTag}
+          onAcceptCategory={handleAcceptCategory}
+          ideaId={idea?.id}
+        />
       </aside>
     </div>
   );

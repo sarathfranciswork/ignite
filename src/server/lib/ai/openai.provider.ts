@@ -44,58 +44,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   supportsTextGeneration(): boolean {
-    return this.apiKey.length > 0;
-  }
-
-  async generateText(prompt: string, systemPrompt?: string): Promise<TextGenerationResult> {
-    try {
-      const messages: Array<{ role: string; content: string }> = [];
-      if (systemPrompt) {
-        messages.push({ role: "system", content: systemPrompt });
-      }
-      messages.push({ role: "user", content: prompt });
-
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages,
-          max_tokens: 1500,
-          temperature: 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        childLogger.error(
-          { status: response.status, body: errorBody },
-          "OpenAI chat completions API request failed",
-        );
-        return { text: "", success: false };
-      }
-
-      const data = (await response.json()) as {
-        choices: Array<{ message: { content: string } }>;
-      };
-
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) {
-        childLogger.error("OpenAI response missing message content");
-        return { text: "", success: false };
-      }
-
-      return { text: content, success: true };
-    } catch (error) {
-      childLogger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Failed to generate text via OpenAI",
-      );
-      return { text: "", success: false };
-    }
+    return this.isAvailable();
   }
 
   async generateEmbedding(text: string): Promise<EmbeddingResult> {
@@ -146,6 +95,63 @@ export class OpenAIProvider implements AIProvider {
         "Failed to generate OpenAI embedding",
       );
       return { embedding: [], dimensions: 0 };
+    }
+  }
+
+  async generateText(prompt: string, systemPrompt?: string): Promise<TextGenerationResult | null> {
+    try {
+      const messages: Array<{ role: string; content: string }> = [];
+      if (systemPrompt) {
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      messages.push({ role: "user", content: prompt });
+
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages,
+          max_tokens: 1024,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        childLogger.error(
+          { status: response.status, body: errorBody },
+          "OpenAI chat completion API request failed",
+        );
+        return { text: "", finishReason: "error" };
+      }
+
+      const data = (await response.json()) as {
+        choices: Array<{
+          message: { content: string };
+          finish_reason: string;
+        }>;
+      };
+
+      const choice = data.choices?.[0];
+      if (!choice?.message?.content) {
+        childLogger.error("OpenAI response missing choice content");
+        return { text: "", finishReason: "error" };
+      }
+
+      return {
+        text: choice.message.content,
+        finishReason: choice.finish_reason === "stop" ? "stop" : "length",
+      };
+    } catch (error) {
+      childLogger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Failed to generate text via OpenAI",
+      );
+      return { text: "", finishReason: "error" };
     }
   }
 
