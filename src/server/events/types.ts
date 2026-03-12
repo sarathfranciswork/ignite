@@ -126,6 +126,9 @@ export interface EventMap {
   "copilot.suggestionAccepted": EventPayload;
   "copilot.suggestionDismissed": EventPayload;
   "whiteLabel.updated": EventPayload;
+  "push.subscribed": EventPayload;
+  "push.unsubscribed": EventPayload;
+  "push.sent": EventPayload;
 }
 
 export type EventName = keyof EventMap;

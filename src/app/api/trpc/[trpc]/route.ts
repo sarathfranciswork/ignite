@@ -5,12 +5,14 @@ import { registerNotificationListeners } from "@/server/events/listeners/notific
 import { registerGraduationListeners } from "@/server/events/listeners/graduation.listener";
 import { registerActivityListeners } from "@/server/events/listeners/activity.listener";
 import { registerEmbeddingListeners } from "@/server/events/listeners/embedding.listener";
+import { registerPushListeners } from "@/server/events/listeners/push.listener";
 import { initializeJobWorkers } from "@/server/jobs/init";
 
 registerNotificationListeners();
 registerGraduationListeners();
 registerActivityListeners();
 registerEmbeddingListeners();
+registerPushListeners();
 initializeJobWorkers().catch(() => {
   // Initialization errors are logged internally — non-blocking
 });
