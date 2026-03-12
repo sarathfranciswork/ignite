@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { EnrichmentSidebar } from "./EnrichmentSidebar";
 
 const ideaFormSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title must be 200 characters or less"),
@@ -76,6 +77,7 @@ export function IdeaForm({ campaignId, idea, onSuccess }: IdeaFormProps) {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<IdeaFormValues>({
     resolver: ideaFormResolver,
@@ -196,90 +198,117 @@ export function IdeaForm({ campaignId, idea, onSuccess }: IdeaFormProps) {
 
   const mutationError = createMutation.error ?? updateMutation.error ?? submitMutation.error;
 
+  const watchedTitle = watch("title");
+  const watchedTeaser = watch("teaser");
+  const watchedDescription = watch("description");
+  const watchedCategory = watch("category");
+  const watchedTagsInput = watch("tagsInput");
+
+  const enrichmentDraft = React.useMemo(
+    () => ({
+      title: watchedTitle,
+      teaser: watchedTeaser || undefined,
+      description: watchedDescription || undefined,
+      category: watchedCategory || undefined,
+      tags: parseTags(watchedTagsInput ?? ""),
+    }),
+    [watchedTitle, watchedTeaser, watchedDescription, watchedCategory, watchedTagsInput],
+  );
+
+  const handleAcceptSuggestion = React.useCallback((_type: string, _suggestion: string) => {
+    // Suggestion acknowledgment — user can apply changes manually
+  }, []);
+
   return (
-    <form className="space-y-6" onSubmit={handleSubmit(onSubmitIdea)}>
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="title">Title *</Label>
-          <Input
-            id="title"
-            placeholder="Give your idea a clear, concise title"
-            {...register("title")}
-          />
-          {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
+    <div className="flex gap-6">
+      <form className="min-w-0 flex-1 space-y-6" onSubmit={handleSubmit(onSubmitIdea)}>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="title">Title *</Label>
+            <Input
+              id="title"
+              placeholder="Give your idea a clear, concise title"
+              {...register("title")}
+            />
+            {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>}
+          </div>
+
+          <div>
+            <Label htmlFor="teaser">Teaser</Label>
+            <Textarea
+              id="teaser"
+              placeholder="A short summary of your idea (visible on cards)"
+              rows={2}
+              {...register("teaser")}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              placeholder="Describe your idea in detail..."
+              rows={8}
+              {...register("description")}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="category">Category</Label>
+            <Input
+              id="category"
+              placeholder="e.g., Sustainability, Digitalization"
+              {...register("category")}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="tagsInput">Tags (comma-separated)</Label>
+            <Input
+              id="tagsInput"
+              placeholder="e.g., AI, automation, cost-reduction"
+              {...register("tagsInput")}
+            />
+          </div>
+
+          <div className="flex gap-6">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="rounded" {...register("isConfidential")} />
+              Confidential idea
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="rounded" {...register("inventionDisclosure")} />
+              Invention disclosure
+            </label>
+          </div>
         </div>
 
-        <div>
-          <Label htmlFor="teaser">Teaser</Label>
-          <Textarea
-            id="teaser"
-            placeholder="A short summary of your idea (visible on cards)"
-            rows={2}
-            {...register("teaser")}
-          />
-        </div>
+        {mutationError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            {mutationError.message}
+          </div>
+        )}
 
-        <div>
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            placeholder="Describe your idea in detail..."
-            rows={8}
-            {...register("description")}
-          />
+        <div className="flex gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={handleSubmit(onSaveDraft)}
+          >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save as Draft
+          </Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Submit Idea
+          </Button>
         </div>
+      </form>
 
-        <div>
-          <Label htmlFor="category">Category</Label>
-          <Input
-            id="category"
-            placeholder="e.g., Sustainability, Digitalization"
-            {...register("category")}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="tagsInput">Tags (comma-separated)</Label>
-          <Input
-            id="tagsInput"
-            placeholder="e.g., AI, automation, cost-reduction"
-            {...register("tagsInput")}
-          />
-        </div>
-
-        <div className="flex gap-6">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="rounded" {...register("isConfidential")} />
-            Confidential idea
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="rounded" {...register("inventionDisclosure")} />
-            Invention disclosure
-          </label>
-        </div>
-      </div>
-
-      {mutationError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-          {mutationError.message}
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending}
-          onClick={handleSubmit(onSaveDraft)}
-        >
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save as Draft
-        </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Submit Idea
-        </Button>
-      </div>
-    </form>
+      <aside className="hidden w-72 shrink-0 lg:block">
+        <EnrichmentSidebar draft={enrichmentDraft} onAcceptSuggestion={handleAcceptSuggestion} />
+      </aside>
+    </div>
   );
 }

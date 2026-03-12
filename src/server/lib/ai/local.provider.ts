@@ -1,4 +1,9 @@
-import { type AIProvider, type EmbeddingResult, type SimilarityResult } from "./provider";
+import {
+  type AIProvider,
+  type EmbeddingResult,
+  type SimilarityResult,
+  type TextGenerationResult,
+} from "./provider";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 import path from "path";
@@ -155,6 +160,14 @@ export class LocalAIProvider implements AIProvider {
       );
       return { embedding: [], dimensions: 0 };
     }
+  }
+
+  supportsTextGeneration(): boolean {
+    return false;
+  }
+
+  async generateText(_prompt: string, _systemPrompt?: string): Promise<TextGenerationResult> {
+    return { text: "", success: false };
   }
 
   async findSimilar(embedding: number[], limit: number): Promise<SimilarityResult[]> {

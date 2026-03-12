@@ -1,9 +1,18 @@
-import { type AIProvider, type EmbeddingResult, type SimilarityResult } from "./provider";
+import {
+  type AIProvider,
+  type EmbeddingResult,
+  type SimilarityResult,
+  type TextGenerationResult,
+} from "./provider";
 
 export class NullAIProvider implements AIProvider {
   readonly name = "null";
 
   isAvailable(): boolean {
+    return false;
+  }
+
+  supportsTextGeneration(): boolean {
     return false;
   }
 
@@ -13,5 +22,9 @@ export class NullAIProvider implements AIProvider {
 
   async findSimilar(_embedding: number[], _limit: number): Promise<SimilarityResult[]> {
     return [];
+  }
+
+  async generateText(_prompt: string, _systemPrompt?: string): Promise<TextGenerationResult> {
+    return { text: "", success: false };
   }
 }

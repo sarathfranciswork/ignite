@@ -1,4 +1,9 @@
-import { type AIProvider, type EmbeddingResult, type SimilarityResult } from "./provider";
+import {
+  type AIProvider,
+  type EmbeddingResult,
+  type SimilarityResult,
+  type TextGenerationResult,
+} from "./provider";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 
@@ -36,6 +41,61 @@ export class OpenAIProvider implements AIProvider {
 
   isAvailable(): boolean {
     return this.apiKey.length > 0;
+  }
+
+  supportsTextGeneration(): boolean {
+    return this.apiKey.length > 0;
+  }
+
+  async generateText(prompt: string, systemPrompt?: string): Promise<TextGenerationResult> {
+    try {
+      const messages: Array<{ role: string; content: string }> = [];
+      if (systemPrompt) {
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      messages.push({ role: "user", content: prompt });
+
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages,
+          max_tokens: 1500,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        childLogger.error(
+          { status: response.status, body: errorBody },
+          "OpenAI chat completions API request failed",
+        );
+        return { text: "", success: false };
+      }
+
+      const data = (await response.json()) as {
+        choices: Array<{ message: { content: string } }>;
+      };
+
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        childLogger.error("OpenAI response missing message content");
+        return { text: "", success: false };
+      }
+
+      return { text: content, success: true };
+    } catch (error) {
+      childLogger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Failed to generate text via OpenAI",
+      );
+      return { text: "", success: false };
+    }
   }
 
   async generateEmbedding(text: string): Promise<EmbeddingResult> {

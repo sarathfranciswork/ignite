@@ -104,6 +104,7 @@ export const Action = {
   // AI features
   AI_VIEW_STATUS: "ai.viewStatus",
   AI_FIND_SIMILAR: "ai.findSimilar",
+  AI_ENRICH_IDEA: "ai.enrichIdea",
 
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
@@ -184,6 +185,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SEARCH_DELETE_OWN,
     Action.AI_VIEW_STATUS,
     Action.AI_FIND_SIMILAR,
+    Action.AI_ENRICH_IDEA,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -216,6 +218,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SEARCH_DELETE_OWN,
     Action.AI_VIEW_STATUS,
     Action.AI_FIND_SIMILAR,
+    Action.AI_ENRICH_IDEA,
   ],
 } as const;
 
