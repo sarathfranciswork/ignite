@@ -17,6 +17,7 @@ import { ssoRouter } from "./sso";
 import { scoutingBoardRouter } from "./scouting-board";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
+import { whiteLabelRouter } from "./white-label";
 
 export const appRouter = createTRPCRouter({
   activity: activityRouter,
@@ -37,6 +38,7 @@ export const appRouter = createTRPCRouter({
   sso: ssoRouter,
   useCase: useCaseRouter,
   user: userRouter,
+  whiteLabel: whiteLabelRouter,
 });
 
 export type AppRouter = typeof appRouter;

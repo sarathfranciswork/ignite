@@ -109,6 +109,10 @@ export const Action = {
   AI_FIND_SIMILAR: "ai.findSimilar",
   AI_ENRICH_IDEA: "ai.enrichIdea",
 
+  // White-label management
+  WHITE_LABEL_READ: "whiteLabel.read",
+  WHITE_LABEL_UPDATE: "whiteLabel.update",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
