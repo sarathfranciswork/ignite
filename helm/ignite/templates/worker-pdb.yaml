@@ -1,0 +1,14 @@
+{{- if and .Values.worker.enabled .Values.worker.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ignite.fullname" . }}-worker
+  labels:
+    {{- include "ignite.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  minAvailable: {{ .Values.worker.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "ignite.worker.selectorLabels" . | nindent 6 }}
+{{- end }}

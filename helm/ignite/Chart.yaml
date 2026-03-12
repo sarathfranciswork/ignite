@@ -1,0 +1,16 @@
+apiVersion: v2
+name: ignite
+description: Ignite Innovation Management Platform — Helm chart for production-grade Kubernetes deployments
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - innovation
+  - management
+  - nextjs
+  - t3-stack
+home: https://github.com/sarathfranciswork/ignite
+sources:
+  - https://github.com/sarathfranciswork/ignite
+maintainers:
+  - name: Ignite Team
