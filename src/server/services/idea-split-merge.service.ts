@@ -12,7 +12,6 @@ import type {
   IdeaBulkExportInput,
 } from "./idea.schemas";
 
-
 const childLogger = logger.child({ service: "idea-split-merge" });
 
 const ideaFullInclude = {

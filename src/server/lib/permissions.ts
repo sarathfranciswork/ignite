@@ -113,6 +113,10 @@ export const Action = {
   AI_FIND_SIMILAR: "ai.findSimilar",
   AI_ENRICH_IDEA: "ai.enrichIdea",
 
+  // Push notifications
+  PUSH_SUBSCRIBE: "push.subscribe",
+  PUSH_READ_OWN: "push.read.own",
+
   // White-label management
   WHITE_LABEL_READ: "whiteLabel.read",
   WHITE_LABEL_UPDATE: "whiteLabel.update",
@@ -177,6 +181,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.EVALUATION_MANAGE_EVALUATORS,
     Action.EVALUATION_MANAGE_IDEAS,
     Action.NOTIFICATION_READ_OWN,
+    Action.PUSH_SUBSCRIBE,
+    Action.PUSH_READ_OWN,
     Action.ORGANIZATION_CREATE,
     Action.ORGANIZATION_READ,
     Action.ORGANIZATION_UPDATE,
@@ -224,6 +230,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.IDEA_FOLLOW,
     Action.EVALUATION_PARTICIPATE,
     Action.NOTIFICATION_READ_OWN,
+    Action.PUSH_SUBSCRIBE,
+    Action.PUSH_READ_OWN,
     Action.BUCKET_READ,
     Action.ORGANIZATION_READ,
     Action.SCOUTING_BOARD_CREATE,
