@@ -44,6 +44,18 @@ vi.mock("@/server/jobs/email-queue", () => ({
   enqueueEmail: vi.fn(),
 }));
 
+vi.mock("@/server/services/notification-template.service", () => ({
+  resolveNotificationContent: vi.fn(() =>
+    Promise.resolve({
+      inAppTitle: "Test Title",
+      inAppBody: "Test Body",
+      emailSubject: "Test Subject",
+      emailBody: "Test Email Body",
+      isActive: true,
+    }),
+  ),
+}));
+
 const { prisma } = await import("@/server/lib/prisma");
 const { eventBus } = await import("@/server/events/event-bus");
 const { enqueueEmail } = await import("@/server/jobs/email-queue");

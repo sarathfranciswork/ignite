@@ -15,6 +15,7 @@ import {
   Bell,
   BookText,
   Globe,
+  LogIn,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ const systemAdminNav: AdminNavItem[] = [
 const innovationConfigNav: AdminNavItem[] = [
   { label: "Customization", href: "/admin/customization", icon: Palette },
   { label: "Notifications", href: "/admin/notifications", icon: Bell },
+  { label: "Login Page", href: "/admin/login-page", icon: LogIn },
   { label: "Terminology", href: "/admin/terminology", icon: BookText },
 ];
 

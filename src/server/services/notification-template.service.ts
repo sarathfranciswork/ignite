@@ -287,6 +287,36 @@ export function renderTemplate(template: string, variables: Record<string, strin
   });
 }
 
+/**
+ * Resolves a notification template with variable substitution.
+ * Returns rendered title/body for in-app and email, plus isActive flag.
+ * Falls back to built-in defaults if no custom template is stored.
+ */
+export async function resolveNotificationContent(
+  type: NotificationType,
+  variables: Record<string, string>,
+): Promise<{
+  inAppTitle: string;
+  inAppBody: string;
+  emailSubject: string;
+  emailBody: string;
+  isActive: boolean;
+}> {
+  const template = await prisma.notificationTemplate.findUnique({
+    where: { type },
+  });
+
+  const base = template ?? { ...DEFAULT_TEMPLATES[type], isActive: true };
+
+  return {
+    inAppTitle: renderTemplate(base.inAppTitle, variables),
+    inAppBody: renderTemplate(base.inAppBody, variables),
+    emailSubject: renderTemplate(base.emailSubject, variables),
+    emailBody: renderTemplate(base.emailBody, variables),
+    isActive: base.isActive,
+  };
+}
+
 // ── Login Customization ────────────────────────────────────────
 
 export async function getLoginCustomization() {

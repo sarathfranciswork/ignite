@@ -3,6 +3,7 @@ import { logger } from "@/server/lib/logger";
 import { prisma } from "@/server/lib/prisma";
 import { enqueueEmail } from "@/server/jobs/email-queue";
 import { sendPushNotification } from "@/server/services/push.service";
+import { resolveNotificationContent } from "@/server/services/notification-template.service";
 import type { NotificationType } from "@prisma/client";
 
 const childLogger = logger.child({ service: "notification-listener" });
@@ -13,9 +14,6 @@ const globalForListeners = globalThis as unknown as {
 
 interface NotificationTarget {
   userId: string;
-  type: NotificationType;
-  title: string;
-  body: string;
   entityType: string;
   entityId: string;
 }
@@ -30,18 +28,35 @@ function buildEntityUrl(entityType: string, entityId: string): string {
   return `${base}${entityId}`;
 }
 
-async function createNotifications(targets: NotificationTarget[]) {
+/**
+ * Creates notifications using the template engine.
+ * Resolves template content from DB (or defaults), checks isActive,
+ * creates in-app notifications, and dispatches email + push.
+ */
+async function createNotificationsFromTemplate(
+  type: NotificationType,
+  variables: Record<string, string>,
+  targets: NotificationTarget[],
+) {
   if (targets.length === 0) return;
 
   try {
+    const content = await resolveNotificationContent(type, variables);
+
+    // Skip entirely if template is disabled
+    if (!content.isActive) {
+      childLogger.info({ type }, "Notification template disabled, skipping");
+      return;
+    }
+
     const created = await prisma.$transaction(
       targets.map((t) =>
         prisma.notification.create({
           data: {
             userId: t.userId,
-            type: t.type,
-            title: t.title,
-            body: t.body,
+            type,
+            title: content.inAppTitle,
+            body: content.inAppBody,
             entityType: t.entityType,
             entityId: t.entityId,
           },
@@ -49,28 +64,28 @@ async function createNotifications(targets: NotificationTarget[]) {
       ),
     );
 
-    childLogger.info({ count: targets.length }, "Notifications created via listener");
+    childLogger.info({ count: targets.length, type }, "Notifications created via listener");
 
-    // Dispatch email notifications (fire-and-forget — respects user frequency preference)
+    // Dispatch email notifications (fire-and-forget)
     for (const notification of created) {
       enqueueEmail({
         notificationId: notification.id,
         userId: notification.userId,
         type: notification.type,
-        title: notification.title,
-        body: notification.body,
+        title: content.emailSubject,
+        body: content.emailBody,
         entityType: notification.entityType,
         entityId: notification.entityId,
       });
     }
 
-    // Dispatch push notifications (fire-and-forget — sends to all active push subscriptions)
+    // Dispatch push notifications (fire-and-forget)
     for (const notification of created) {
       const entityUrl = buildEntityUrl(notification.entityType, notification.entityId);
       void sendPushNotification({
         userId: notification.userId,
-        title: notification.title,
-        body: notification.body,
+        title: content.inAppTitle,
+        body: content.inAppBody,
         url: entityUrl,
         tag: notification.type,
         entityType: notification.entityType,
@@ -83,7 +98,7 @@ async function createNotifications(targets: NotificationTarget[]) {
       });
     }
   } catch (error) {
-    childLogger.error({ error }, "Failed to create notifications");
+    childLogger.error({ error, type }, "Failed to create notifications");
   }
 }
 
@@ -122,18 +137,18 @@ export function registerNotificationListeners() {
       select: { userId: true },
     });
 
-    const targets: NotificationTarget[] = managers
+    const targets = managers
       .filter((m) => m.userId !== payload.actor)
-      .map((m) => ({
-        userId: m.userId,
-        type: "IDEA_SUBMITTED" as NotificationType,
-        title: "New idea submitted",
-        body: `"${idea.title}" was submitted in campaign "${idea.campaign.title}"`,
-        entityType: "idea",
-        entityId: idea.id,
-      }));
+      .map((m) => ({ userId: m.userId, entityType: "idea", entityId: idea.id }));
 
-    await createNotifications(targets);
+    await createNotificationsFromTemplate(
+      "IDEA_SUBMITTED",
+      {
+        ideaTitle: idea.title,
+        campaignTitle: idea.campaign.title,
+      },
+      targets,
+    );
   });
 
   eventBus.on("idea.statusChanged", async (payload) => {
@@ -146,37 +161,24 @@ export function registerNotificationListeners() {
 
     const isHotGraduation = idea.status === "HOT";
     const type: NotificationType = isHotGraduation ? "HOT_GRADUATION" : "STATUS_CHANGE";
-    const title = isHotGraduation ? "Idea graduated to HOT" : "Idea status changed";
-    const body = isHotGraduation
-      ? `Your idea "${idea.title}" has graduated to HOT status!`
-      : `Your idea "${idea.title}" status changed to ${idea.status}`;
 
-    const targets: NotificationTarget[] = [
-      {
-        userId: idea.contributorId,
-        type,
-        title,
-        body,
-        entityType: "idea",
-        entityId: idea.id,
-      },
-    ];
+    const ownerTarget = { userId: idea.contributorId, entityType: "idea", entityId: idea.id };
 
     const followers = await getIdeaFollowers(idea.id, idea.contributorId);
-    for (const followerId of followers) {
-      targets.push({
-        userId: followerId,
-        type,
-        title,
-        body: isHotGraduation
-          ? `"${idea.title}" (followed) has graduated to HOT status!`
-          : `"${idea.title}" (followed) status changed to ${idea.status}`,
-        entityType: "idea",
-        entityId: idea.id,
-      });
-    }
+    const followerTargets = followers.map((uid) => ({
+      userId: uid,
+      entityType: "idea",
+      entityId: idea.id,
+    }));
 
-    await createNotifications(targets);
+    await createNotificationsFromTemplate(
+      type,
+      {
+        ideaTitle: idea.title,
+        newStatus: idea.status,
+      },
+      [ownerTarget, ...followerTargets],
+    );
   });
 
   eventBus.on("campaign.phaseChanged", async (payload) => {
@@ -194,18 +196,18 @@ export function registerNotificationListeners() {
 
     const uniqueUserIds = [...new Set(members.map((m) => m.userId))];
 
-    const targets: NotificationTarget[] = uniqueUserIds
+    const targets = uniqueUserIds
       .filter((uid) => uid !== payload.actor)
-      .map((uid) => ({
-        userId: uid,
-        type: "CAMPAIGN_PHASE_CHANGE" as NotificationType,
-        title: "Campaign phase changed",
-        body: `Campaign "${campaign.title}" moved to ${campaign.status} phase`,
-        entityType: "campaign",
-        entityId: campaign.id,
-      }));
+      .map((uid) => ({ userId: uid, entityType: "campaign", entityId: campaign.id }));
 
-    await createNotifications(targets);
+    await createNotificationsFromTemplate(
+      "CAMPAIGN_PHASE_CHANGE",
+      {
+        campaignTitle: campaign.title,
+        newPhase: campaign.status,
+      },
+      targets,
+    );
   });
 
   eventBus.on("comment.created", async (payload) => {
@@ -222,16 +224,19 @@ export function registerNotificationListeners() {
 
     if (!idea) return;
 
-    const targets: NotificationTarget[] = followers.map((uid) => ({
+    const targets = followers.map((uid) => ({
       userId: uid,
-      type: "COMMENT_ON_FOLLOWED" as NotificationType,
-      title: "New comment on followed idea",
-      body: `A new comment was posted on "${idea.title}"`,
       entityType: "idea",
       entityId: idea.id,
     }));
 
-    await createNotifications(targets);
+    await createNotificationsFromTemplate(
+      "COMMENT_ON_FOLLOWED",
+      {
+        entityTitle: idea.title,
+      },
+      targets,
+    );
   });
 
   eventBus.on("comment.mentioned", async (payload) => {
@@ -243,20 +248,14 @@ export function registerNotificationListeners() {
       ? await prisma.idea.findUnique({ where: { id: ideaId }, select: { id: true, title: true } })
       : null;
 
-    const targets: NotificationTarget[] = [
+    await createNotificationsFromTemplate(
+      "MENTION",
       {
-        userId: mentionedUserId,
-        type: "MENTION" as NotificationType,
-        title: "You were mentioned in a comment",
-        body: idea
-          ? `You were mentioned in a comment on "${idea.title}"`
-          : "You were mentioned in a comment",
-        entityType: "comment",
-        entityId: payload.entityId,
+        entityTitle: idea?.title ?? "a discussion",
+        mentionedBy: payload.actor,
       },
-    ];
-
-    await createNotifications(targets);
+      [{ userId: mentionedUserId, entityType: "comment", entityId: payload.entityId }],
+    );
   });
 
   eventBus.on("evaluation.completed", async (payload) => {
@@ -270,18 +269,13 @@ export function registerNotificationListeners() {
 
     if (!idea) return;
 
-    const targets: NotificationTarget[] = [
+    await createNotificationsFromTemplate(
+      "EVALUATION_REQUESTED",
       {
-        userId: idea.contributorId,
-        type: "EVALUATION_REQUESTED" as NotificationType,
-        title: "Evaluation completed",
-        body: `An evaluation has been completed for your idea "${idea.title}"`,
-        entityType: "idea",
-        entityId: idea.id,
+        ideaTitle: idea.title,
       },
-    ];
-
-    await createNotifications(targets);
+      [{ userId: idea.contributorId, entityType: "idea", entityId: idea.id }],
+    );
   });
 
   childLogger.info("Notification listeners registered");

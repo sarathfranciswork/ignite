@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
 import {
   notificationTemplateGetInput,
@@ -516,4 +516,8 @@ export const adminRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       return updateLoginCustomization(input, ctx.session.user.id);
     }),
+
+  loginCustomizationGetPublic: publicProcedure.query(async () => {
+    return getLoginCustomization();
+  }),
 });

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { trpc } from "@/lib/trpc";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const { data: loginConfig } = trpc.admin.loginCustomizationGetPublic.useQuery();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,8 +51,10 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary-100">
           <LogIn className="h-6 w-6 text-primary-600" />
         </div>
-        <CardTitle>Welcome back</CardTitle>
-        <CardDescription>Sign in to your Ignite account</CardDescription>
+        <CardTitle>{loginConfig?.loginWelcomeTitle ?? "Welcome back"}</CardTitle>
+        <CardDescription>
+          {loginConfig?.loginWelcomeMessage ?? "Sign in to your Ignite account"}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>}
