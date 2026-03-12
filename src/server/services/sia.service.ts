@@ -172,6 +172,17 @@ export async function updateSia(input: SiaUpdateInput, userId: string) {
   if (data.bannerUrl !== undefined) updateData.bannerUrl = data.bannerUrl;
   if (data.isActive !== undefined) {
     updateData.isActive = data.isActive;
+  }
+
+  const sia = await prisma.strategicInnovationArea.update({
+    where: { id },
+    data: updateData,
+    include: siaInclude,
+  });
+
+  childLogger.info({ siaId: sia.id }, "Strategic Innovation Area updated");
+
+  if (data.isActive !== undefined) {
     if (existing.isActive && !data.isActive) {
       eventBus.emit("sia.archived", {
         entity: "sia",
@@ -190,14 +201,6 @@ export async function updateSia(input: SiaUpdateInput, userId: string) {
       });
     }
   }
-
-  const sia = await prisma.strategicInnovationArea.update({
-    where: { id },
-    data: updateData,
-    include: siaInclude,
-  });
-
-  childLogger.info({ siaId: sia.id }, "Strategic Innovation Area updated");
 
   eventBus.emit("sia.updated", {
     entity: "sia",
@@ -220,15 +223,17 @@ export async function deleteSia(id: string, userId: string) {
     throw new SiaServiceError("SIA_NOT_FOUND", "Strategic Innovation Area not found");
   }
 
-  // Unlink campaigns before deleting
-  if (existing._count.campaigns > 0) {
-    await prisma.campaign.updateMany({
-      where: { siaId: id },
-      data: { siaId: null },
-    });
-  }
+  // Unlink campaigns and delete in a single transaction for atomicity
+  await prisma.$transaction(async (tx) => {
+    if (existing._count.campaigns > 0) {
+      await tx.campaign.updateMany({
+        where: { siaId: id },
+        data: { siaId: null },
+      });
+    }
 
-  await prisma.strategicInnovationArea.delete({ where: { id } });
+    await tx.strategicInnovationArea.delete({ where: { id } });
+  });
 
   childLogger.info({ siaId: id }, "Strategic Innovation Area deleted");
 
