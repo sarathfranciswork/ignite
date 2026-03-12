@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { PlatformSummaryTab } from "./PlatformSummaryTab";
 import { PortfolioAnalysisTab } from "./PortfolioAnalysisTab";
+import { PortfolioAnalyzerTab } from "./PortfolioAnalyzerTab";
 import { cn } from "@/lib/utils";
-import { BarChart3, FolderKanban } from "lucide-react";
+import { BarChart3, FolderKanban, GitBranch } from "lucide-react";
 
-type TabId = "platform" | "portfolio";
+type TabId = "platform" | "portfolio" | "analyzer";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
   { id: "platform", label: "Platform Summary", icon: BarChart3 },
   { id: "portfolio", label: "Portfolio Analysis", icon: FolderKanban },
+  { id: "analyzer", label: "Deep Analytics", icon: GitBranch },
 ];
 
 export function ReportsView() {
@@ -41,6 +43,7 @@ export function ReportsView() {
 
       {activeTab === "platform" && <PlatformSummaryTab />}
       {activeTab === "portfolio" && <PortfolioAnalysisTab />}
+      {activeTab === "analyzer" && <PortfolioAnalyzerTab />}
     </div>
   );
 }

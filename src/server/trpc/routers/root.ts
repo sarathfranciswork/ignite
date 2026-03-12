@@ -20,6 +20,7 @@ import { insightRouter } from "./insight";
 import { notificationRouter } from "./notification";
 import { organizationRouter } from "./organization";
 import { portfolioRouter } from "./portfolio";
+import { portfolioAnalyzerRouter } from "./portfolio-analyzer";
 import { processDefinitionRouter } from "./process-definition";
 import { projectRouter } from "./project";
 import { pushRouter } from "./push";
@@ -60,6 +61,7 @@ export const appRouter = createTRPCRouter({
   notification: notificationRouter,
   organization: organizationRouter,
   portfolio: portfolioRouter,
+  portfolioAnalyzer: portfolioAnalyzerRouter,
   processDefinition: processDefinitionRouter,
   project: projectRouter,
   push: pushRouter,
