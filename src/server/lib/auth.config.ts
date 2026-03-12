@@ -55,12 +55,24 @@ export const authConfig: NextAuthConfig = {
         return false; // NextAuth will redirect to signIn page
       }
 
+      const user = auth?.user;
+      const role = user && "globalRole" in user ? user.globalRole : undefined;
+
       // Admin routes require PLATFORM_ADMIN or INNOVATION_MANAGER role
       if (pathname.startsWith("/admin")) {
-        const user = auth?.user;
-        const role = user && "globalRole" in user ? user.globalRole : undefined;
         if (role !== "PLATFORM_ADMIN" && role !== "INNOVATION_MANAGER") {
           return Response.redirect(new URL("/dashboard", nextUrl.origin));
+        }
+      }
+
+      // External users can only access /external, /profile, and campaign detail pages
+      if (role === "EXTERNAL") {
+        const allowedPaths = ["/external", "/profile"];
+        const isAllowed =
+          allowedPaths.some((p) => pathname.startsWith(p)) || /^\/campaigns\/[^/]+$/.test(pathname);
+
+        if (!isAllowed) {
+          return Response.redirect(new URL("/external", nextUrl.origin));
         }
       }
 

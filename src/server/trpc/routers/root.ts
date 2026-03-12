@@ -9,6 +9,7 @@ import { channelRouter } from "./channel";
 import { dashboardRouter } from "./dashboard";
 import { commentRouter } from "./comment";
 import { engagementRouter } from "./engagement";
+import { externalInvitationRouter } from "./external-invitation";
 import { evaluationRouter } from "./evaluation";
 import { ideaRouter } from "./idea";
 import { insightRouter } from "./insight";
@@ -40,6 +41,7 @@ export const appRouter = createTRPCRouter({
   dashboard: dashboardRouter,
   engagement: engagementRouter,
   evaluation: evaluationRouter,
+  externalInvitation: externalInvitationRouter,
   idea: ideaRouter,
   insight: insightRouter,
   notification: notificationRouter,
