@@ -2,6 +2,25 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
 import {
+  notificationTemplateGetInput,
+  notificationTemplateUpsertInput,
+  notificationTemplateToggleInput,
+  notificationTemplateResetInput,
+  notificationTemplatePreviewInput,
+  loginCustomizationUpdateInput,
+} from "@/server/services/notification-template.schemas";
+import {
+  listNotificationTemplates,
+  getNotificationTemplate,
+  upsertNotificationTemplate,
+  toggleNotificationTemplate,
+  resetNotificationTemplate,
+  previewNotificationTemplate,
+  getLoginCustomization,
+  updateLoginCustomization,
+  NotificationTemplateServiceError,
+} from "@/server/services/notification-template.service";
+import {
   getSystemOverview,
   getSystemStats,
   getTerminology,
@@ -96,6 +115,25 @@ function handleUserAdminError(error: unknown): never {
       EMAIL_ALREADY_EXISTS: "CONFLICT",
       SELF_DEACTIVATION: "BAD_REQUEST",
       ORG_UNIT_NOT_FOUND: "NOT_FOUND",
+    };
+
+    throw new TRPCError({
+      code: codeMap[error.code] ?? "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
+  throw error;
+}
+
+function handleNotificationTemplateError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+
+  if (error instanceof NotificationTemplateServiceError) {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST"> = {
+      TEMPLATE_NOT_FOUND: "NOT_FOUND",
+      INVALID_VARIABLES: "BAD_REQUEST",
+      WHITE_LABEL_NOT_FOUND: "NOT_FOUND",
     };
 
     throw new TRPCError({
@@ -400,4 +438,82 @@ export const adminRouter = createTRPCRouter({
   terminologyReset: protectedProcedure.use(requirePermission(Action.ADMIN_ACCESS)).mutation(() => {
     return resetTerminology();
   }),
+
+  // ── Notification Template Procedures ─────────────────────────
+
+  notificationTemplateList: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .query(async () => {
+      return listNotificationTemplates();
+    }),
+
+  notificationTemplateGet: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(notificationTemplateGetInput)
+    .query(async ({ input }) => {
+      try {
+        return await getNotificationTemplate(input.type);
+      } catch (error) {
+        handleNotificationTemplateError(error);
+      }
+    }),
+
+  notificationTemplateUpsert: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(notificationTemplateUpsertInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await upsertNotificationTemplate(input, ctx.session.user.id);
+      } catch (error) {
+        handleNotificationTemplateError(error);
+      }
+    }),
+
+  notificationTemplateToggle: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(notificationTemplateToggleInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await toggleNotificationTemplate(input.type, input.isActive, ctx.session.user.id);
+      } catch (error) {
+        handleNotificationTemplateError(error);
+      }
+    }),
+
+  notificationTemplateReset: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(notificationTemplateResetInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await resetNotificationTemplate(input.type, ctx.session.user.id);
+      } catch (error) {
+        handleNotificationTemplateError(error);
+      }
+    }),
+
+  notificationTemplatePreview: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(notificationTemplatePreviewInput)
+    .query(async ({ input }) => {
+      try {
+        return previewNotificationTemplate(input.type, input.channel);
+      } catch (error) {
+        handleNotificationTemplateError(error);
+      }
+    }),
+
+  // ── Login Customization Procedures ───────────────────────────
+
+  loginCustomizationGet: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .query(async () => {
+      return getLoginCustomization();
+    }),
+
+  loginCustomizationUpdate: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(loginCustomizationUpdateInput)
+    .mutation(async ({ ctx, input }) => {
+      return updateLoginCustomization(input, ctx.session.user.id);
+    }),
 });
