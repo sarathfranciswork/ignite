@@ -19,6 +19,7 @@ import { spaceRouter } from "./space";
 import { ssoRouter } from "./sso";
 import { scoutingBoardRouter } from "./scouting-board";
 import { scoutingMissionRouter } from "./scouting-mission";
+import { siaRouter } from "./sia";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
 import { whiteLabelRouter } from "./white-label";
@@ -42,6 +43,7 @@ export const appRouter = createTRPCRouter({
   search: searchRouter,
   scoutingBoard: scoutingBoardRouter,
   scoutingMission: scoutingMissionRouter,
+  sia: siaRouter,
   space: spaceRouter,
   sso: ssoRouter,
   useCase: useCaseRouter,

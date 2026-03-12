@@ -73,6 +73,7 @@ model User {
   pushSubscriptions      PushSubscription[]
   lockedShortlists       EvaluationSession[]         @relation("EvalSessionShortlistLocker")
   addedShortlistItems    EvaluationShortlistItem[]    @relation("ShortlistItemAddedBy")
+  createdSias            StrategicInnovationArea[]    @relation("SiaCreatedBy")
 
   @@map("users")
 }
@@ -355,11 +356,13 @@ model Campaign {
 
   // References
   createdById String   @map("created_by_id")
+  siaId       String?  @map("sia_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy          User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdBy          User                      @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  sia                StrategicInnovationArea?   @relation("CampaignSia", fields: [siaId], references: [id], onDelete: SetNull)
   members            CampaignMember[]
   kpiSnapshots       CampaignKpiSnapshot[]
   ideas              Idea[]
@@ -370,6 +373,7 @@ model Campaign {
   @@index([status])
   @@index([submissionType])
   @@index([createdById])
+  @@index([siaId])
   @@map("campaigns")
 }
 
@@ -1578,4 +1582,25 @@ model PairwiseComparison {
   @@index([sessionId])
   @@index([sessionId, evaluatorId])
   @@map("pairwise_comparisons")
+}
+
+// ── Strategic Innovation Areas ──────────────────────────────
+
+model StrategicInnovationArea {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  color       String?
+  bannerUrl   String?  @map("banner_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User       @relation("SiaCreatedBy", fields: [createdById], references: [id])
+  campaigns Campaign[] @relation("CampaignSia")
+
+  @@index([isActive])
+  @@index([createdById])
+  @@map("strategic_innovation_areas")
 }
