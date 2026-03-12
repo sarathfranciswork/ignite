@@ -197,6 +197,7 @@ export interface EventMap {
   "communication.messageCreated": EventPayload;
   "communication.messageSent": EventPayload;
   "communication.messageDeleted": EventPayload;
+  "communication.emailDelivered": EventPayload;
 }
 
 export type EventName = keyof EventMap;

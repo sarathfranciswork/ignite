@@ -87,6 +87,7 @@ model User {
   scimExternalId             String?                     @unique @map("scim_external_id")
   createdScimTokens          ScimToken[]                 @relation("ScimTokenCreatedBy")
   sentCampaignMessages       CampaignMessage[]           @relation("CampaignMessageSentBy")
+  campaignMessageRecipients  CampaignMessageRecipient[]
 
   @@map("users")
 }
@@ -2062,6 +2063,7 @@ model CampaignMessage {
   campaign         Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   sentBy           User               @relation("CampaignMessageSentBy", fields: [sentById], references: [id])
   communicationLog CommunicationLog[]
+  recipients       CampaignMessageRecipient[]
 
   @@index([campaignId])
   @@index([campaignId, status])
@@ -2102,4 +2104,29 @@ model CommunicationLog {
   @@index([userId])
   @@index([messageId, status])
   @@map("communication_logs")
+}
+
+enum RecipientEmailStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+
+  @@map("recipient_email_status")
+}
+
+model CampaignMessageRecipient {
+  id          String               @id @default(cuid())
+  messageId   String               @map("message_id")
+  userId      String               @map("user_id")
+  emailStatus RecipientEmailStatus @default(PENDING) @map("email_status")
+  readAt      DateTime?            @map("read_at")
+
+  message CampaignMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("campaign_message_recipients")
 }

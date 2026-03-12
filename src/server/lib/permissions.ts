@@ -80,6 +80,7 @@ export const Action = {
   COMMUNICATION_READ: "communication.read",
   COMMUNICATION_SEND: "communication.send",
   COMMUNICATION_DELETE: "communication.delete",
+  COMMUNICATION_EXPORT: "communication.export",
 
   // Admin
   ADMIN_ACCESS: "admin.access",
@@ -257,6 +258,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.COMMUNICATION_READ,
     Action.COMMUNICATION_SEND,
     Action.COMMUNICATION_DELETE,
+    Action.COMMUNICATION_EXPORT,
     Action.PUSH_SUBSCRIBE,
     Action.PUSH_READ_OWN,
     Action.ORGANIZATION_CREATE,
