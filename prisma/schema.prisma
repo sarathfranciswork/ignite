@@ -353,12 +353,13 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy      User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  members        CampaignMember[]
-  kpiSnapshots   CampaignKpiSnapshot[]
-  ideas          Idea[]
-  activityEvents ActivityEvent[]
-  buckets        Bucket[]
+  createdBy          User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  members            CampaignMember[]
+  kpiSnapshots       CampaignKpiSnapshot[]
+  ideas              Idea[]
+  activityEvents     ActivityEvent[]
+  buckets            Bucket[]
+  evaluationSessions EvaluationSession[]
 
   @@index([status])
   @@index([submissionType])
@@ -538,19 +539,20 @@ model Idea {
   mergedIntoId String? @map("merged_into_id")
 
   // Relations
-  coAuthors            IdeaCoAuthor[]
-  comments             Comment[]
-  likes                IdeaLike[]
-  votes                IdeaVote[]
-  followers            IdeaFollow[]
-  activityEvents       ActivityEvent[]
-  bucketAssignments    IdeaBucketAssignment[]
-  splitFrom            Idea?                  @relation("IdeaSplitLineage", fields: [splitFromId], references: [id], onDelete: SetNull)
-  splitChildren        Idea[]                 @relation("IdeaSplitLineage")
-  mergedInto           Idea?                  @relation("IdeaMergeLineage", fields: [mergedIntoId], references: [id], onDelete: SetNull)
-  mergedSources        Idea[]                 @relation("IdeaMergeLineage")
-  mergeHistoryAsTarget IdeaMergeHistory[]     @relation("MergeTarget")
-  mergeHistoryAsSource IdeaMergeHistory[]     @relation("MergeSource")
+  coAuthors              IdeaCoAuthor[]
+  comments               Comment[]
+  likes                  IdeaLike[]
+  votes                  IdeaVote[]
+  followers              IdeaFollow[]
+  activityEvents         ActivityEvent[]
+  bucketAssignments      IdeaBucketAssignment[]
+  splitFrom              Idea?                   @relation("IdeaSplitLineage", fields: [splitFromId], references: [id], onDelete: SetNull)
+  splitChildren          Idea[]                  @relation("IdeaSplitLineage")
+  mergedInto             Idea?                   @relation("IdeaMergeLineage", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedSources          Idea[]                  @relation("IdeaMergeLineage")
+  mergeHistoryAsTarget   IdeaMergeHistory[]      @relation("MergeTarget")
+  mergeHistoryAsSource   IdeaMergeHistory[]      @relation("MergeSource")
+  evaluationSessionIdeas EvaluationSessionIdea[]
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1256,4 +1258,152 @@ model IdeaBucketAssignment {
   @@index([ideaId])
   @@index([bucketId, sortOrder])
   @@map("idea_bucket_assignments")
+}
+
+// ── Evaluation Session Models ─────────────────────────────────
+
+enum EvaluationSessionStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+
+  @@map("evaluation_session_status")
+}
+
+enum EvaluationSessionType {
+  SCORECARD
+  PAIRWISE
+
+  @@map("evaluation_session_type")
+}
+
+enum CriterionFieldType {
+  SELECTION_SCALE
+  TEXT
+  CHECKBOX
+
+  @@map("criterion_field_type")
+}
+
+model EvaluationSession {
+  id          String                  @id @default(cuid())
+  campaignId  String                  @map("campaign_id")
+  title       String
+  description String?                 @db.Text
+  type        EvaluationSessionType
+  status      EvaluationSessionStatus @default(DRAFT)
+  dueDate     DateTime?               @map("due_date")
+  isTemplate  Boolean                 @default(false) @map("is_template")
+  templateId  String?                 @map("template_id")
+
+  // References
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaign   Campaign                     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  criteria   EvaluationCriterion[]
+  evaluators EvaluationSessionEvaluator[]
+  ideas      EvaluationSessionIdea[]
+  responses  EvaluationResponse[]
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([createdById])
+  @@index([campaignId, status])
+  @@map("evaluation_sessions")
+}
+
+model EvaluationCriterion {
+  id           String             @id @default(cuid())
+  sessionId    String             @map("session_id")
+  title        String
+  description  String?            @db.Text
+  guidanceText String?            @map("guidance_text") @db.Text
+  fieldType    CriterionFieldType @map("field_type")
+  weight       Float              @default(1.0)
+  sortOrder    Int                @default(0) @map("sort_order")
+  isRequired   Boolean            @default(true) @map("is_required")
+
+  // Selection scale config (min/max for SELECTION_SCALE type)
+  scaleMin    Int?  @map("scale_min")
+  scaleMax    Int?  @map("scale_max")
+  scaleLabels Json? @map("scale_labels") // e.g., { "1": "Poor", "5": "Excellent" }
+
+  // Conditional visibility
+  visibleWhen Json? @map("visible_when") // e.g., { "criterionId": "xxx", "value": "true" }
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  session   EvaluationSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  responses EvaluationResponse[]
+
+  @@index([sessionId])
+  @@index([sessionId, sortOrder])
+  @@map("evaluation_criteria")
+}
+
+model EvaluationSessionEvaluator {
+  id         String   @id @default(cuid())
+  sessionId  String   @map("session_id")
+  userId     String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  assignedBy String?  @map("assigned_by")
+
+  // Relations
+  session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@index([userId])
+  @@map("evaluation_session_evaluators")
+}
+
+model EvaluationSessionIdea {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  ideaId    String   @map("idea_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  // Relations
+  session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  idea    Idea              @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, ideaId])
+  @@index([sessionId])
+  @@index([ideaId])
+  @@map("evaluation_session_ideas")
+}
+
+model EvaluationResponse {
+  id          String @id @default(cuid())
+  sessionId   String @map("session_id")
+  criterionId String @map("criterion_id")
+  evaluatorId String @map("evaluator_id")
+  ideaId      String @map("idea_id")
+
+  // Response value (polymorphic based on criterion field type)
+  scoreValue Int?     @map("score_value") // For SELECTION_SCALE
+  textValue  String?  @map("text_value") @db.Text // For TEXT
+  boolValue  Boolean? @map("bool_value") // For CHECKBOX
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  session   EvaluationSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  criterion EvaluationCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, criterionId, evaluatorId, ideaId])
+  @@index([sessionId])
+  @@index([evaluatorId])
+  @@index([ideaId])
+  @@index([sessionId, ideaId])
+  @@index([sessionId, evaluatorId])
+  @@map("evaluation_responses")
 }

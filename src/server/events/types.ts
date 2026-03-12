@@ -43,6 +43,15 @@ export interface EventMap {
   "comment.mentioned": EventPayload;
   "user.registered": EventPayload;
   "user.profileUpdated": EventPayload;
+  "evaluation.sessionCreated": EventPayload;
+  "evaluation.sessionUpdated": EventPayload;
+  "evaluation.sessionActivated": EventPayload;
+  "evaluation.sessionCompleted": EventPayload;
+  "evaluation.evaluatorAssigned": EventPayload;
+  "evaluation.evaluatorRemoved": EventPayload;
+  "evaluation.ideaAdded": EventPayload;
+  "evaluation.ideaRemoved": EventPayload;
+  "evaluation.responseSubmitted": EventPayload;
   "evaluation.completed": EventPayload;
   "notification.created": EventPayload;
   "rbac.roleAssigned": EventPayload;

@@ -62,8 +62,12 @@ export const Action = {
 
   // Evaluation
   EVALUATION_CREATE: "evaluation.create",
+  EVALUATION_UPDATE: "evaluation.update",
+  EVALUATION_DELETE: "evaluation.delete",
   EVALUATION_PARTICIPATE: "evaluation.participate",
   EVALUATION_VIEW_RESULTS: "evaluation.viewResults",
+  EVALUATION_MANAGE_EVALUATORS: "evaluation.manageEvaluators",
+  EVALUATION_MANAGE_IDEAS: "evaluation.manageIdeas",
 
   // Notifications
   NOTIFICATION_READ_OWN: "notification.read.own",
@@ -166,7 +170,12 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.IDEA_LIKE,
     Action.IDEA_VOTE,
     Action.IDEA_FOLLOW,
+    Action.EVALUATION_CREATE,
+    Action.EVALUATION_UPDATE,
+    Action.EVALUATION_DELETE,
     Action.EVALUATION_VIEW_RESULTS,
+    Action.EVALUATION_MANAGE_EVALUATORS,
+    Action.EVALUATION_MANAGE_IDEAS,
     Action.NOTIFICATION_READ_OWN,
     Action.ORGANIZATION_CREATE,
     Action.ORGANIZATION_READ,
@@ -257,7 +266,11 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.COMMENT_DELETE_ANY,
     Action.COMMENT_MODERATE,
     Action.EVALUATION_CREATE,
+    Action.EVALUATION_UPDATE,
+    Action.EVALUATION_DELETE,
     Action.EVALUATION_VIEW_RESULTS,
+    Action.EVALUATION_MANAGE_EVALUATORS,
+    Action.EVALUATION_MANAGE_IDEAS,
     Action.BUCKET_CREATE,
     Action.BUCKET_READ,
     Action.BUCKET_UPDATE,

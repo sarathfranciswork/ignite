@@ -1,0 +1,273 @@
+import { TRPCError } from "@trpc/server";
+import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
+import { Action } from "@/server/lib/permissions";
+import {
+  evaluationSessionCreateInput,
+  evaluationSessionUpdateInput,
+  evaluationSessionListInput,
+  evaluationSessionGetByIdInput,
+  evaluationSessionDeleteInput,
+  evaluationSessionActivateInput,
+  evaluationSessionCompleteInput,
+  evaluationAssignEvaluatorsInput,
+  evaluationRemoveEvaluatorInput,
+  evaluationAddIdeasInput,
+  evaluationRemoveIdeaInput,
+  evaluationAddIdeasFromBucketInput,
+  evaluationSubmitResponseInput,
+  evaluationProgressInput,
+  evaluationResultsInput,
+  evaluationSaveAsTemplateInput,
+  evaluationListTemplatesInput,
+} from "@/server/services/evaluation.schemas";
+import {
+  listEvaluationSessions,
+  getEvaluationSessionById,
+  createEvaluationSession,
+  updateEvaluationSession,
+  deleteEvaluationSession,
+  activateEvaluationSession,
+  completeEvaluationSession,
+  assignEvaluators,
+  removeEvaluator,
+  addIdeasToSession,
+  removeIdeaFromSession,
+  addIdeasFromBucket,
+  submitResponse,
+  getEvaluationProgress,
+  getEvaluationResults,
+  saveSessionAsTemplate,
+  listTemplates,
+  EvaluationServiceError,
+} from "@/server/services/evaluation.service";
+
+function handleEvaluationError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+
+  if (error instanceof EvaluationServiceError) {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "FORBIDDEN"> = {
+      SESSION_NOT_FOUND: "NOT_FOUND",
+      CAMPAIGN_NOT_FOUND: "NOT_FOUND",
+      EVALUATOR_NOT_FOUND: "NOT_FOUND",
+      IDEA_NOT_IN_SESSION: "NOT_FOUND",
+      IDEAS_NOT_FOUND: "NOT_FOUND",
+      BUCKET_NOT_FOUND: "NOT_FOUND",
+      SESSION_NOT_DRAFT: "BAD_REQUEST",
+      SESSION_NOT_ACTIVE: "BAD_REQUEST",
+      SESSION_ACTIVE: "BAD_REQUEST",
+      SESSION_CLOSED: "BAD_REQUEST",
+      NO_CRITERIA: "BAD_REQUEST",
+      NO_EVALUATORS: "BAD_REQUEST",
+      NO_IDEAS: "BAD_REQUEST",
+      INVALID_SCALE_CONFIG: "BAD_REQUEST",
+      INVALID_SCALE_RANGE: "BAD_REQUEST",
+      NOT_EVALUATOR: "FORBIDDEN",
+    };
+
+    throw new TRPCError({
+      code: codeMap[error.code] ?? "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
+  throw error;
+}
+
+export const evaluationRouter = createTRPCRouter({
+  list: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.EVALUATION_VIEW_RESULTS,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(evaluationSessionListInput)
+    .query(async ({ input }) => {
+      try {
+        return await listEvaluationSessions(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  getById: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(evaluationSessionGetByIdInput)
+    .query(async ({ input }) => {
+      try {
+        return await getEvaluationSessionById(input.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  create: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.EVALUATION_CREATE,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(evaluationSessionCreateInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await createEvaluationSession(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  update: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(evaluationSessionUpdateInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await updateEvaluationSession(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  delete: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_DELETE))
+    .input(evaluationSessionDeleteInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await deleteEvaluationSession(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  activate: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(evaluationSessionActivateInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await activateEvaluationSession(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  complete: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(evaluationSessionCompleteInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await completeEvaluationSession(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  assignEvaluators: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_EVALUATORS))
+    .input(evaluationAssignEvaluatorsInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await assignEvaluators(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  removeEvaluator: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_EVALUATORS))
+    .input(evaluationRemoveEvaluatorInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await removeEvaluator(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  addIdeas: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_IDEAS))
+    .input(evaluationAddIdeasInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await addIdeasToSession(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  removeIdea: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_IDEAS))
+    .input(evaluationRemoveIdeaInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await removeIdeaFromSession(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  addIdeasFromBucket: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_IDEAS))
+    .input(evaluationAddIdeasFromBucketInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await addIdeasFromBucket(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  submitResponse: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_PARTICIPATE))
+    .input(evaluationSubmitResponseInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await submitResponse(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  progress: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(evaluationProgressInput)
+    .query(async ({ input }) => {
+      try {
+        return await getEvaluationProgress(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  results: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(evaluationResultsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getEvaluationResults(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  saveAsTemplate: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_CREATE))
+    .input(evaluationSaveAsTemplateInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await saveSessionAsTemplate(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  listTemplates: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(evaluationListTemplatesInput)
+    .query(async ({ input }) => {
+      try {
+        return await listTemplates(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+});
