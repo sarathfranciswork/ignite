@@ -1125,6 +1125,19 @@ export async function getMyResponses(input: EvaluationMyResponsesInput, evaluato
     throw new EvaluationServiceError("Evaluation session not found", "SESSION_NOT_FOUND");
   }
 
+  const evaluator = await prisma.evaluationSessionEvaluator.findUnique({
+    where: {
+      sessionId_userId: {
+        sessionId: input.sessionId,
+        userId: evaluatorId,
+      },
+    },
+  });
+
+  if (!evaluator) {
+    throw new EvaluationServiceError("You are not an evaluator for this session", "NOT_EVALUATOR");
+  }
+
   const responses = await prisma.evaluationResponse.findMany({
     where: {
       sessionId: input.sessionId,
