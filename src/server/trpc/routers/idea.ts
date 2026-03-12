@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
+import { checkPermission } from "@/server/services/rbac.service";
 import {
   ideaCreateInput,
   ideaUpdateInput,
@@ -14,9 +15,10 @@ import {
   ideaUnarchiveInput,
   ideaCoachQualifyInput,
   ideaBoardListInput,
-  listIdeas,
+  ideaSetConfidentialInput,
+  listIdeasWithConfidentialFilter,
   listIdeasForBoard,
-  getIdeaById,
+  getIdeaByIdWithConfidentialCheck,
   createIdea,
   updateIdea,
   submitIdea,
@@ -26,6 +28,7 @@ import {
   archiveIdea,
   unarchiveIdea,
   coachQualifyIdea,
+  setIdeaConfidential,
   IdeaServiceError,
 } from "@/server/services/idea.service";
 import {
@@ -54,6 +57,7 @@ function handleIdeaError(error: unknown): never {
       CAMPAIGN_NOT_FOUND: "NOT_FOUND",
       BUCKET_NOT_FOUND: "NOT_FOUND",
       CAMPAIGN_NOT_ACCEPTING: "BAD_REQUEST",
+      CONFIDENTIAL_NOT_ALLOWED: "BAD_REQUEST",
       INVALID_STATUS: "BAD_REQUEST",
       INVALID_TRANSITION: "BAD_REQUEST",
       INVALID_MERGE_TARGET: "BAD_REQUEST",
@@ -77,8 +81,18 @@ export const ideaRouter = createTRPCRouter({
   list: protectedProcedure
     .use(requirePermission<{ campaignId: string }>(Action.IDEA_READ, (input) => input.campaignId))
     .input(ideaListInput)
-    .query(async ({ input }) => {
-      return listIdeas(input);
+    .query(async ({ ctx, input }) => {
+      try {
+        const userId = ctx.session.user.id;
+        const canReadConfidential = await checkPermission(
+          userId,
+          Action.IDEA_READ_CONFIDENTIAL,
+          input.campaignId,
+        );
+        return await listIdeasWithConfidentialFilter(input, userId, canReadConfidential);
+      } catch (error) {
+        handleIdeaError(error);
+      }
     }),
 
   listForBoard: protectedProcedure
@@ -91,9 +105,11 @@ export const ideaRouter = createTRPCRouter({
   getById: protectedProcedure
     .use(requirePermission(Action.IDEA_READ))
     .input(ideaGetByIdInput)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       try {
-        return await getIdeaById(input.id);
+        const userId = ctx.session.user.id;
+        const canReadConfidential = await checkPermission(userId, Action.IDEA_READ_CONFIDENTIAL);
+        return await getIdeaByIdWithConfidentialCheck(input.id, userId, canReadConfidential);
       } catch (error) {
         handleIdeaError(error);
       }
@@ -138,6 +154,17 @@ export const ideaRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await deleteIdea(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  setConfidential: protectedProcedure
+    .use(requirePermission(Action.IDEA_SET_CONFIDENTIAL))
+    .input(ideaSetConfidentialInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await setIdeaConfidential(input, ctx.session.user.id);
       } catch (error) {
         handleIdeaError(error);
       }

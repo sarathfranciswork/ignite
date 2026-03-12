@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, MessageCircle, Eye, Tag } from "lucide-react";
+import { Heart, MessageCircle, Eye, Tag, Lock } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ interface IdeaCardProps {
     likesCount: number;
     commentsCount: number;
     viewsCount: number;
+    isConfidential?: boolean;
     contributor?: {
       id: string;
       name: string | null;
@@ -44,6 +45,7 @@ export function IdeaCard({ idea }: IdeaCardProps) {
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="line-clamp-2 text-base group-hover:text-primary-600">
               {idea.title}
+              {idea.isConfidential && <Lock className="ml-1.5 inline h-3.5 w-3.5 text-amber-500" />}
             </CardTitle>
             <StatusBadge status={idea.status} />
           </div>
