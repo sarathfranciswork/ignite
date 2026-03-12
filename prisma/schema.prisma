@@ -67,6 +67,8 @@ model User {
   savedSearches          SavedSearch[]
   createdScoutingBoards  ScoutingBoard[]             @relation("ScoutingBoardCreator")
   scoutingBoardShares    ScoutingBoardShare[]
+  createdScoutingMissions ScoutingMission[]          @relation("ScoutingMissionCreatedBy")
+  scoutingMissionAssignments ScoutingMissionScout[]
   activityEvents         ActivityEvent[]
   pushSubscriptions      PushSubscription[]
   lockedShortlists       EvaluationSession[]         @relation("EvalSessionShortlistLocker")
@@ -280,6 +282,7 @@ enum SubmissionType {
   CALL_FOR_IDEAS
   CALL_FOR_PROPOSALS
   CALL_FOR_GENERIC
+  PARTNERSHIP_PROPOSALS
 
   @@map("submission_type")
 }
@@ -953,6 +956,7 @@ model ScoutingBoard {
   columns   ScoutingBoardColumn[]
   cards     ScoutingBoardCard[]
   shares    ScoutingBoardShare[]
+  missions  ScoutingMission[]     @relation("ScoutingMissionBoard")
 
   @@index([createdById])
   @@index([isArchived])
@@ -1014,6 +1018,56 @@ model ScoutingBoardShare {
   @@index([boardId])
   @@index([userId])
   @@map("scouting_board_shares")
+}
+
+// ── Scouting Mission Models ───────────────────────────────────
+
+enum ScoutingMissionStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+
+  @@map("scouting_mission_status")
+}
+
+model ScoutingMission {
+  id               String                @id @default(cuid())
+  title            String
+  problemStatement String                @map("problem_statement") @db.Text
+  requirements     Json?
+  targetIndustries String[]              @default([]) @map("target_industries")
+  targetRegions    String[]              @default([]) @map("target_regions")
+  deadline         DateTime?
+  status           ScoutingMissionStatus @default(OPEN)
+  previousStatus   ScoutingMissionStatus? @map("previous_status")
+  createdById      String                @map("created_by_id")
+  boardId          String?               @map("board_id")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  createdBy User                   @relation("ScoutingMissionCreatedBy", fields: [createdById], references: [id])
+  board     ScoutingBoard?         @relation("ScoutingMissionBoard", fields: [boardId], references: [id], onDelete: SetNull)
+  scouts    ScoutingMissionScout[]
+
+  @@index([createdById])
+  @@index([status])
+  @@index([deadline])
+  @@map("scouting_missions")
+}
+
+model ScoutingMissionScout {
+  id        String   @id @default(cuid())
+  missionId String   @map("mission_id")
+  userId    String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  mission ScoutingMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, userId])
+  @@index([missionId])
+  @@index([userId])
+  @@map("scouting_mission_scouts")
 }
 
 // ── White-Label Configuration ─────────────────────────────────

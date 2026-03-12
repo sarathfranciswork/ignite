@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Megaphone } from "lucide-react";
+import { ArrowLeft, Megaphone, Lightbulb, FileText, Handshake, Package } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ export default function NewCampaignPage() {
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [teaser, setTeaser] = React.useState("");
+  const [submissionType, setSubmissionType] = React.useState<
+    "CALL_FOR_IDEAS" | "CALL_FOR_PROPOSALS" | "CALL_FOR_GENERIC" | "PARTNERSHIP_PROPOSALS"
+  >("CALL_FOR_IDEAS");
   const [submissionCloseDate, setSubmissionCloseDate] = React.useState("");
   const [plannedCloseDate, setPlannedCloseDate] = React.useState("");
 
@@ -37,6 +40,7 @@ export default function NewCampaignPage() {
         title: title.trim(),
         description: description.trim() || undefined,
         teaser: teaser.trim() || undefined,
+        submissionType,
         submissionCloseDate: submissionCloseDate
           ? new Date(submissionCloseDate).toISOString()
           : undefined,
@@ -78,6 +82,65 @@ export default function NewCampaignPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-3">
+              <Label>Campaign Type</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {
+                    value: "CALL_FOR_IDEAS" as const,
+                    label: "Call for Ideas",
+                    description: "Collect ideas with full discussion & voting workflow",
+                    icon: Lightbulb,
+                  },
+                  {
+                    value: "CALL_FOR_PROPOSALS" as const,
+                    label: "Call for Proposals",
+                    description: "Collect detailed proposals with evaluation",
+                    icon: FileText,
+                  },
+                  {
+                    value: "PARTNERSHIP_PROPOSALS" as const,
+                    label: "Partnership Proposals",
+                    description: "Simplified workflow for partner proposals (no discussion/voting)",
+                    icon: Handshake,
+                  },
+                  {
+                    value: "CALL_FOR_GENERIC" as const,
+                    label: "Generic",
+                    description: "Flexible campaign with customizable workflow",
+                    icon: Package,
+                  },
+                ].map((type) => {
+                  const Icon = type.icon;
+                  const isSelected = submissionType === type.value;
+                  return (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => setSubmissionType(type.value)}
+                      className={`flex items-start gap-3 rounded-lg border-2 p-3 text-left transition-colors ${
+                        isSelected
+                          ? "border-primary-500 bg-primary-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <Icon
+                        className={`mt-0.5 h-5 w-5 shrink-0 ${isSelected ? "text-primary-600" : "text-gray-400"}`}
+                      />
+                      <div>
+                        <p
+                          className={`text-sm font-medium ${isSelected ? "text-primary-700" : "text-gray-900"}`}
+                        >
+                          {type.label}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-500">{type.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="title">
                 Campaign Title <span className="text-red-500">*</span>

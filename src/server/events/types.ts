@@ -122,6 +122,12 @@ export interface EventMap {
   "scoutingBoard.cardAdded": EventPayload;
   "scoutingBoard.cardRemoved": EventPayload;
   "scoutingBoard.cardMoved": EventPayload;
+  "scoutingMission.created": EventPayload;
+  "scoutingMission.updated": EventPayload;
+  "scoutingMission.deleted": EventPayload;
+  "scoutingMission.statusChanged": EventPayload;
+  "scoutingMission.scoutAssigned": EventPayload;
+  "scoutingMission.scoutRemoved": EventPayload;
   "embedding.generated": EventPayload;
   "embedding.failed": EventPayload;
   "bucket.created": EventPayload;
