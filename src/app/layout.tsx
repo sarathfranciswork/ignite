@@ -9,7 +9,6 @@ export const metadata: Metadata = {
   description:
     "Open-source innovation management platform for idea generation, evaluation, and implementation.",
   manifest: "/manifest.json",
-  themeColor: "#6366F1",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
