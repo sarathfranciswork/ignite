@@ -166,6 +166,7 @@ jobs:
           exit 0
 
       # ── Claude for NEW ISSUES (full implementation) ──
+      # Uses Opus for code generation — the only step that needs the best model
       - name: Run Claude Code (implement issue)
         if: steps.validate.outputs.valid != 'false' && steps.issue.outputs.trigger != 'pr_comment'
         id: claude-issue
@@ -173,6 +174,7 @@ jobs:
         env:
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         with:
+          model: claude-opus-4-6
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: "claude[bot],github-actions[bot]"
           additional_permissions: |
@@ -380,6 +382,7 @@ jobs:
           **Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" || true
 
       # ── Claude for PR COMMENTS (targeted fix/rebase only) ──
+      # Uses Sonnet — cheaper model sufficient for targeted fixes
       - name: Run Claude Code (PR feedback)
         if: steps.issue.outputs.trigger == 'pr_comment'
         id: claude-pr
@@ -387,6 +390,7 @@ jobs:
         env:
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         with:
+          model: claude-sonnet-4-6
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: "claude[bot],github-actions[bot]"
           additional_permissions: |
