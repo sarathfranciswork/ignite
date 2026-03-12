@@ -185,6 +185,37 @@ export const pairwiseResultsInput = z.object({
   sessionId: z.string(),
 });
 
+// ── Shortlist Management ────────────────────────────────
+
+export const shortlistAddItemInput = z.object({
+  sessionId: z.string(),
+  ideaId: z.string(),
+});
+
+export const shortlistRemoveItemInput = z.object({
+  sessionId: z.string(),
+  ideaId: z.string(),
+});
+
+export const shortlistLockInput = z.object({
+  sessionId: z.string(),
+});
+
+export const shortlistGetInput = z.object({
+  sessionId: z.string(),
+});
+
+export const shortlistForwardInput = z.object({
+  sessionId: z.string(),
+  ideaId: z.string(),
+  target: z.enum(["SELECTED_IMPLEMENTATION", "CONCEPT", "ARCHIVED"]),
+});
+
+export const shortlistForwardAllInput = z.object({
+  sessionId: z.string(),
+  target: z.enum(["SELECTED_IMPLEMENTATION", "CONCEPT", "ARCHIVED"]),
+});
+
 // ── Error Class ──────────────────────────────────────────────
 
 export class EvaluationServiceError extends Error {
@@ -221,3 +252,9 @@ export type PairwiseGetPairsInput = z.infer<typeof pairwiseGetPairsInput>;
 export type PairwiseGetMyComparisonInput = z.infer<typeof pairwiseGetMyComparisonInput>;
 export type PairwiseProgressInput = z.infer<typeof pairwiseProgressInput>;
 export type PairwiseResultsInput = z.infer<typeof pairwiseResultsInput>;
+export type ShortlistAddItemInput = z.infer<typeof shortlistAddItemInput>;
+export type ShortlistRemoveItemInput = z.infer<typeof shortlistRemoveItemInput>;
+export type ShortlistLockInput = z.infer<typeof shortlistLockInput>;
+export type ShortlistGetInput = z.infer<typeof shortlistGetInput>;
+export type ShortlistForwardInput = z.infer<typeof shortlistForwardInput>;
+export type ShortlistForwardAllInput = z.infer<typeof shortlistForwardAllInput>;

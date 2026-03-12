@@ -11,6 +11,11 @@ import {
   pairwiseSubmitComparisonInput,
   pairwiseGetMyComparisonInput,
   evaluationSendRemindersInput,
+  shortlistAddItemInput,
+  shortlistRemoveItemInput,
+  shortlistLockInput,
+  shortlistForwardInput,
+  shortlistForwardAllInput,
 } from "./evaluation.schemas";
 
 describe("evaluation.schemas", () => {
@@ -342,6 +347,98 @@ describe("evaluation.schemas", () => {
         sessionId: "s1",
         ideaBId: "b",
       });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  // ── Shortlist Schemas ────────────────────────────────────
+
+  describe("shortlistAddItemInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistAddItemInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects missing sessionId", () => {
+      const result = shortlistAddItemInput.safeParse({ ideaId: "idea_1" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects missing ideaId", () => {
+      const result = shortlistAddItemInput.safeParse({ sessionId: "session_1" });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("shortlistRemoveItemInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistRemoveItemInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("shortlistLockInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistLockInput.safeParse({ sessionId: "session_1" });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("shortlistForwardInput", () => {
+    it("accepts SELECTED_IMPLEMENTATION target", () => {
+      const result = shortlistForwardInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+        target: "SELECTED_IMPLEMENTATION",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts CONCEPT target", () => {
+      const result = shortlistForwardInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+        target: "CONCEPT",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts ARCHIVED target", () => {
+      const result = shortlistForwardInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+        target: "ARCHIVED",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects invalid target", () => {
+      const result = shortlistForwardInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+        target: "INVALID",
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("shortlistForwardAllInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistForwardAllInput.safeParse({
+        sessionId: "session_1",
+        target: "SELECTED_IMPLEMENTATION",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects missing target", () => {
+      const result = shortlistForwardAllInput.safeParse({ sessionId: "session_1" });
       expect(result.success).toBe(false);
     });
   });

@@ -28,6 +28,12 @@ import {
   pairwiseGetMyComparisonInput,
   pairwiseProgressInput,
   pairwiseResultsInput,
+  shortlistAddItemInput,
+  shortlistRemoveItemInput,
+  shortlistLockInput,
+  shortlistGetInput,
+  shortlistForwardInput,
+  shortlistForwardAllInput,
 } from "@/server/services/evaluation.schemas";
 import {
   listEvaluationSessions,
@@ -62,6 +68,15 @@ import {
   getPairwiseProgress,
   getPairwiseResults,
 } from "@/server/services/pairwise-ranking.service";
+import {
+  getEnhancedResults,
+  getShortlist,
+  addToShortlist,
+  removeFromShortlist,
+  lockShortlist,
+  forwardShortlistItem,
+  forwardAllShortlistItems,
+} from "@/server/services/results.service";
 
 function handleEvaluationError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -84,6 +99,10 @@ function handleEvaluationError(error: unknown): never {
       INVALID_SCALE_CONFIG: "BAD_REQUEST",
       INVALID_SCALE_RANGE: "BAD_REQUEST",
       SESSION_NOT_PAIRWISE: "BAD_REQUEST",
+      SHORTLIST_LOCKED: "BAD_REQUEST",
+      SHORTLIST_ALREADY_LOCKED: "BAD_REQUEST",
+      SHORTLIST_NOT_LOCKED: "BAD_REQUEST",
+      NOT_IN_SHORTLIST: "NOT_FOUND",
       NOT_EVALUATOR: "FORBIDDEN",
     };
 
@@ -390,6 +409,85 @@ export const evaluationRouter = createTRPCRouter({
     .query(async ({ input }) => {
       try {
         return await getPairwiseResults(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  // ── Enhanced Results & Shortlist ─────────────────────────
+
+  enhancedResults: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(evaluationResultsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getEnhancedResults(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistGet: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(shortlistGetInput)
+    .query(async ({ input }) => {
+      try {
+        return await getShortlist(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistAdd: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(shortlistAddItemInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await addToShortlist(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistRemove: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(shortlistRemoveItemInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await removeFromShortlist(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistLock: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(shortlistLockInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await lockShortlist(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistForward: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(shortlistForwardInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await forwardShortlistItem(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistForwardAll: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_UPDATE))
+    .input(shortlistForwardAllInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await forwardAllShortlistItems(input, ctx.session.user.id);
       } catch (error) {
         handleEvaluationError(error);
       }

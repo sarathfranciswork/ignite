@@ -547,15 +547,16 @@ model Idea {
   followers              IdeaFollow[]
   activityEvents         ActivityEvent[]
   bucketAssignments      IdeaBucketAssignment[]
-  splitFrom              Idea?                   @relation("IdeaSplitLineage", fields: [splitFromId], references: [id], onDelete: SetNull)
-  splitChildren          Idea[]                  @relation("IdeaSplitLineage")
-  mergedInto             Idea?                   @relation("IdeaMergeLineage", fields: [mergedIntoId], references: [id], onDelete: SetNull)
-  mergedSources          Idea[]                  @relation("IdeaMergeLineage")
-  mergeHistoryAsTarget   IdeaMergeHistory[]      @relation("MergeTarget")
-  mergeHistoryAsSource   IdeaMergeHistory[]      @relation("MergeSource")
+  splitFrom              Idea?                     @relation("IdeaSplitLineage", fields: [splitFromId], references: [id], onDelete: SetNull)
+  splitChildren          Idea[]                    @relation("IdeaSplitLineage")
+  mergedInto             Idea?                     @relation("IdeaMergeLineage", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedSources          Idea[]                    @relation("IdeaMergeLineage")
+  mergeHistoryAsTarget   IdeaMergeHistory[]        @relation("MergeTarget")
+  mergeHistoryAsSource   IdeaMergeHistory[]        @relation("MergeSource")
   evaluationSessionIdeas EvaluationSessionIdea[]
-  pairwiseAsIdeaA        PairwiseComparison[]    @relation("PairwiseIdeaA")
-  pairwiseAsIdeaB        PairwiseComparison[]    @relation("PairwiseIdeaB")
+  shortlistItems         EvaluationShortlistItem[]
+  pairwiseAsIdeaA        PairwiseComparison[]      @relation("PairwiseIdeaA")
+  pairwiseAsIdeaB        PairwiseComparison[]      @relation("PairwiseIdeaB")
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1318,6 +1319,11 @@ model EvaluationSession {
   isTemplate  Boolean                 @default(false) @map("is_template")
   templateId  String?                 @map("template_id")
 
+  // Shortlist management
+  shortlistLocked     Boolean   @default(false) @map("shortlist_locked")
+  shortlistLockedAt   DateTime? @map("shortlist_locked_at")
+  shortlistLockedById String?   @map("shortlist_locked_by_id")
+
   // References
   createdById String   @map("created_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -1330,6 +1336,7 @@ model EvaluationSession {
   ideas               EvaluationSessionIdea[]
   responses           EvaluationResponse[]
   pairwiseComparisons PairwiseComparison[]
+  shortlistItems      EvaluationShortlistItem[]
 
   @@index([campaignId])
   @@index([status])
@@ -1429,6 +1436,35 @@ model EvaluationResponse {
   @@index([sessionId, ideaId])
   @@index([sessionId, evaluatorId])
   @@map("evaluation_responses")
+}
+
+// ── Evaluation Shortlist Model ─────────────────────────────────
+
+enum ShortlistForwardTarget {
+  SELECTED_IMPLEMENTATION
+  CONCEPT
+  ARCHIVED
+
+  @@map("shortlist_forward_target")
+}
+
+model EvaluationShortlistItem {
+  id          String                  @id @default(cuid())
+  sessionId   String                  @map("session_id")
+  ideaId      String                  @map("idea_id")
+  addedById   String                  @map("added_by_id")
+  addedAt     DateTime                @default(now()) @map("added_at")
+  forwardedTo ShortlistForwardTarget? @map("forwarded_to")
+  forwardedAt DateTime?               @map("forwarded_at")
+
+  // Relations
+  session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  idea    Idea              @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, ideaId])
+  @@index([sessionId])
+  @@index([ideaId])
+  @@map("evaluation_shortlist_items")
 }
 
 // ── Pairwise Comparison Model ──────────────────────────────────
