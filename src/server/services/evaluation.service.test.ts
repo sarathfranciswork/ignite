@@ -803,6 +803,12 @@ describe("evaluation.service", () => {
         status: "ACTIVE",
       } as never);
 
+      vi.mocked(prisma.evaluationSessionEvaluator.findUnique).mockResolvedValue({
+        id: "eval_1",
+        sessionId: "session_1",
+        userId: "user_1",
+      } as never);
+
       vi.mocked(prisma.evaluationResponse.findMany).mockResolvedValue([
         {
           criterionId: "c_1",
