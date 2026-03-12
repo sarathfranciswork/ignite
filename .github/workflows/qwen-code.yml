@@ -246,6 +246,7 @@ jobs:
           - ALWAYS create the PR LAST (Step 5), even if implementation is partial.
 
           ## CRITICAL RULES
+          - ALWAYS run `npx prettier --write .` and `npx eslint . --fix` BEFORE committing
           - NEVER recreate project scaffolding if it already exists
           - NEVER modify CLAUDE.md, settings.json, or lock files unless explicitly told to
           - NEVER hardcode secrets or API URLs — use environment variables
@@ -325,8 +326,11 @@ jobs:
           - Write tests where applicable (Vitest for unit, Playwright for E2E)
           - Follow naming conventions: camelCase for functions/variables, PascalCase for components/types
 
-          ## STEP 4: Validate
-          - Run available checks via bash: npm run typecheck, npm run lint, npm run test, npm run build
+          ## STEP 4: Format & Validate
+          - Auto-format ALL code before committing:
+            npx prettier --write .
+            npx eslint . --fix
+          - Run validation checks via bash: npm run typecheck, npm run lint, npm run test
           - Fix ALL errors before proceeding
           - If a check command doesn't exist yet (early stories), skip it
           - Commit your changes:

@@ -235,8 +235,13 @@ jobs:
             - Write tests where applicable (Vitest for unit, Playwright for E2E)
             - Follow naming conventions: camelCase for functions/variables, PascalCase for components/types, snake_case for database columns
 
-            ## STEP 4: Validate
-            - Run available checks: `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`
+            ## STEP 4: Format & Validate
+            - Auto-format ALL code before committing:
+              ```
+              npx prettier --write .
+              npx eslint . --fix
+              ```
+            - Run validation checks: `npm run typecheck`, `npm run lint`, `npm run test`
             - Fix ALL errors before proceeding
             - If a check command doesn't exist yet (early stories), skip it
             - Commit your changes with a descriptive message:

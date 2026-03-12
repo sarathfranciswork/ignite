@@ -3,8 +3,6 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 env:
@@ -13,10 +11,10 @@ env:
   ARTIFACT_REGISTRY: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ignite
   IMAGE_TAG: ${{ github.sha }}
 
-# Cancel in-progress PR runs but NEVER cancel main deployments
+# NEVER cancel main deployments
 concurrency:
   group: ci-cd-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: false
 
 jobs:
   # ════════════════════════════════════════════════════════════
