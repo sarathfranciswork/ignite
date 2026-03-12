@@ -163,14 +163,15 @@ export async function sendPushNotification(input: PushNotificationSendInput) {
     entityId: input.entityId,
   });
 
+  const { default: webpush } = await import("web-push");
+  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+
   let sent = 0;
   let failed = 0;
   const staleEndpoints: string[] = [];
 
   for (const sub of subscriptions) {
     try {
-      const { default: webpush } = await import("web-push");
-      webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
       await webpush.sendNotification(
         {
