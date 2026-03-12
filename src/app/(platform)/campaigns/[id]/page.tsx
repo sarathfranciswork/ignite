@@ -21,6 +21,7 @@ import { CopyCampaignButton } from "@/components/campaigns/CopyCampaignButton";
 import { CampaignIdeasTab } from "@/components/ideas/CampaignIdeasTab";
 import { IdeaBoard } from "@/components/ideas/IdeaBoard";
 import { BucketManager } from "@/components/buckets/BucketManager";
+import { EvaluationSessionList } from "@/components/evaluation/EvaluationSessionList";
 import { trpc } from "@/lib/trpc";
 
 const TABS = [
@@ -163,15 +164,7 @@ export default function CampaignDetailPage() {
 
         {activeTab === "buckets" && <BucketManager campaignId={campaign.id} />}
 
-        {activeTab === "evaluation" && (
-          <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">
-            <BarChart3 className="mx-auto h-12 w-12 text-gray-300" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Evaluation</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              Evaluation sessions will be available in a future story.
-            </p>
-          </div>
-        )}
+        {activeTab === "evaluation" && <EvaluationSessionList campaignId={campaign.id} />}
 
         {activeTab === "cockpit" && <CampaignCockpit campaignId={campaign.id} />}
 

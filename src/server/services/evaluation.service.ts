@@ -17,6 +17,9 @@ import {
   type EvaluationResultsInput,
   type EvaluationSaveAsTemplateInput,
   type EvaluationListTemplatesInput,
+  type EvaluationMyPendingInput,
+  type EvaluationMyResponsesInput,
+  type EvaluationSendRemindersInput,
 } from "./evaluation.schemas";
 export { EvaluationServiceError } from "./evaluation.schemas";
 
@@ -1030,4 +1033,177 @@ export async function listTemplates(input: EvaluationListTemplatesInput) {
     })),
     nextCursor,
   };
+}
+
+// ── Get My Pending Evaluations (Evaluator Dashboard) ────────
+
+export async function getMyPendingEvaluations(input: EvaluationMyPendingInput, userId: string) {
+  const assignments = await prisma.evaluationSessionEvaluator.findMany({
+    where: { userId },
+    select: { sessionId: true },
+  });
+
+  const sessionIds = assignments.map((a) => a.sessionId);
+  if (sessionIds.length === 0) {
+    return { items: [], nextCursor: undefined };
+  }
+
+  const items = await prisma.evaluationSession.findMany({
+    where: {
+      id: { in: sessionIds },
+      status: "ACTIVE",
+      isTemplate: false,
+    },
+    include: {
+      campaign: { select: { id: true, title: true } },
+      criteria: { select: { id: true } },
+      ideas: { select: { ideaId: true } },
+      _count: { select: { criteria: true, ideas: true, evaluators: true } },
+    },
+    take: input.limit + 1,
+    ...(input.cursor ? { skip: 1, cursor: { id: input.cursor } } : {}),
+    orderBy: { dueDate: "asc" },
+  });
+
+  let nextCursor: string | undefined;
+  if (items.length > input.limit) {
+    const next = items.pop();
+    nextCursor = next?.id;
+  }
+
+  const responseCountsBySession = await prisma.evaluationResponse.groupBy({
+    by: ["sessionId"],
+    where: {
+      sessionId: { in: items.map((s) => s.id) },
+      evaluatorId: userId,
+    },
+    _count: { id: true },
+  });
+
+  const responseCountMap = new Map(responseCountsBySession.map((r) => [r.sessionId, r._count.id]));
+
+  return {
+    items: items.map((s) => {
+      const expectedResponses = s._count.criteria * s._count.ideas;
+      const completedResponses = responseCountMap.get(s.id) ?? 0;
+      const percentage =
+        expectedResponses > 0 ? Math.round((completedResponses / expectedResponses) * 100) : 0;
+
+      return {
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        type: s.type,
+        status: s.status,
+        dueDate: s.dueDate?.toISOString() ?? null,
+        campaignId: s.campaign.id,
+        campaignTitle: s.campaign.title,
+        criteriaCount: s._count.criteria,
+        ideaCount: s._count.ideas,
+        evaluatorCount: s._count.evaluators,
+        myProgress: {
+          completed: completedResponses,
+          total: expectedResponses,
+          percentage,
+        },
+        createdAt: s.createdAt.toISOString(),
+      };
+    }),
+    nextCursor,
+  };
+}
+
+// ── Get My Responses for a Session + Idea ────────────────────
+
+export async function getMyResponses(input: EvaluationMyResponsesInput, evaluatorId: string) {
+  const session = await prisma.evaluationSession.findUnique({
+    where: { id: input.sessionId },
+    select: { id: true, status: true },
+  });
+
+  if (!session) {
+    throw new EvaluationServiceError("Evaluation session not found", "SESSION_NOT_FOUND");
+  }
+
+  const responses = await prisma.evaluationResponse.findMany({
+    where: {
+      sessionId: input.sessionId,
+      ideaId: input.ideaId,
+      evaluatorId,
+    },
+  });
+
+  return {
+    responses: responses.map((r) => ({
+      criterionId: r.criterionId,
+      scoreValue: r.scoreValue,
+      textValue: r.textValue,
+      boolValue: r.boolValue,
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+  };
+}
+
+// ── Send Reminders to Incomplete Evaluators ──────────────────
+
+export async function sendReminders(input: EvaluationSendRemindersInput, actor: string) {
+  const session = await prisma.evaluationSession.findUnique({
+    where: { id: input.sessionId },
+    include: {
+      evaluators: { select: { userId: true } },
+      criteria: { select: { id: true } },
+      ideas: { select: { ideaId: true } },
+    },
+  });
+
+  if (!session) {
+    throw new EvaluationServiceError("Evaluation session not found", "SESSION_NOT_FOUND");
+  }
+
+  if (session.status !== "ACTIVE") {
+    throw new EvaluationServiceError(
+      "Reminders can only be sent for active sessions",
+      "SESSION_NOT_ACTIVE",
+    );
+  }
+
+  const expectedPerEvaluator = session.criteria.length * session.ideas.length;
+  if (expectedPerEvaluator === 0) {
+    return { sent: 0, evaluatorIds: [] };
+  }
+
+  const responses = await prisma.evaluationResponse.groupBy({
+    by: ["evaluatorId"],
+    where: { sessionId: input.sessionId },
+    _count: { id: true },
+  });
+
+  const responseMap = new Map(responses.map((r) => [r.evaluatorId, r._count.id]));
+
+  const incompleteEvaluatorIds = session.evaluators
+    .filter((e) => (responseMap.get(e.userId) ?? 0) < expectedPerEvaluator)
+    .map((e) => e.userId);
+
+  if (incompleteEvaluatorIds.length === 0) {
+    return { sent: 0, evaluatorIds: [] };
+  }
+
+  eventBus.emit("evaluation.reminderSent", {
+    entity: "evaluationSession",
+    entityId: input.sessionId,
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      campaignId: session.campaignId,
+      evaluatorIds: incompleteEvaluatorIds,
+      sessionTitle: session.title,
+    },
+  });
+
+  childLogger.info(
+    { sessionId: input.sessionId, count: incompleteEvaluatorIds.length },
+    "Evaluation reminders sent",
+  );
+
+  return { sent: incompleteEvaluatorIds.length, evaluatorIds: incompleteEvaluatorIds };
 }

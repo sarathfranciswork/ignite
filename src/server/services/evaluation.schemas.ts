@@ -119,6 +119,24 @@ export const evaluationResultsInput = z.object({
   sessionId: z.string(),
 });
 
+// ── My Evaluations (Evaluator Dashboard) ────────────────────
+
+export const evaluationMyPendingInput = z.object({
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+export const evaluationMyResponsesInput = z.object({
+  sessionId: z.string(),
+  ideaId: z.string(),
+});
+
+// ── Send Reminders ──────────────────────────────────────────
+
+export const evaluationSendRemindersInput = z.object({
+  sessionId: z.string(),
+});
+
 // ── Template ─────────────────────────────────────────────────
 
 export const evaluationSaveAsTemplateInput = z.object({
@@ -158,3 +176,6 @@ export type EvaluationProgressInput = z.infer<typeof evaluationProgressInput>;
 export type EvaluationResultsInput = z.infer<typeof evaluationResultsInput>;
 export type EvaluationSaveAsTemplateInput = z.infer<typeof evaluationSaveAsTemplateInput>;
 export type EvaluationListTemplatesInput = z.infer<typeof evaluationListTemplatesInput>;
+export type EvaluationMyPendingInput = z.infer<typeof evaluationMyPendingInput>;
+export type EvaluationMyResponsesInput = z.infer<typeof evaluationMyResponsesInput>;
+export type EvaluationSendRemindersInput = z.infer<typeof evaluationSendRemindersInput>;

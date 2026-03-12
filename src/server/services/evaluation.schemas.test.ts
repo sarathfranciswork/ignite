@@ -6,6 +6,9 @@ import {
   evaluationAssignEvaluatorsInput,
   evaluationSubmitResponseInput,
   evaluationAddIdeasInput,
+  evaluationMyPendingInput,
+  evaluationMyResponsesInput,
+  evaluationSendRemindersInput,
 } from "./evaluation.schemas";
 
 describe("evaluation.schemas", () => {
@@ -213,6 +216,59 @@ describe("evaluation.schemas", () => {
         ideaIds: [],
       });
 
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("evaluationMyPendingInput", () => {
+    it("accepts minimal input", () => {
+      const result = evaluationMyPendingInput.safeParse({});
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts limit and cursor", () => {
+      const result = evaluationMyPendingInput.safeParse({
+        limit: 10,
+        cursor: "cursor_1",
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("evaluationMyResponsesInput", () => {
+    it("accepts valid input", () => {
+      const result = evaluationMyResponsesInput.safeParse({
+        sessionId: "session_1",
+        ideaId: "idea_1",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects missing sessionId", () => {
+      const result = evaluationMyResponsesInput.safeParse({
+        ideaId: "idea_1",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects missing ideaId", () => {
+      const result = evaluationMyResponsesInput.safeParse({
+        sessionId: "session_1",
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("evaluationSendRemindersInput", () => {
+    it("accepts valid input", () => {
+      const result = evaluationSendRemindersInput.safeParse({
+        sessionId: "session_1",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects missing sessionId", () => {
+      const result = evaluationSendRemindersInput.safeParse({});
       expect(result.success).toBe(false);
     });
   });

@@ -172,7 +172,6 @@ export async function sendPushNotification(input: PushNotificationSendInput) {
 
   for (const sub of subscriptions) {
     try {
-
       await webpush.sendNotification(
         {
           endpoint: sub.endpoint,
