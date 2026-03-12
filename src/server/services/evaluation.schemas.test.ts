@@ -8,6 +8,8 @@ import {
   evaluationAddIdeasInput,
   evaluationMyPendingInput,
   evaluationMyResponsesInput,
+  pairwiseSubmitComparisonInput,
+  pairwiseGetMyComparisonInput,
   evaluationSendRemindersInput,
 } from "./evaluation.schemas";
 
@@ -269,6 +271,77 @@ describe("evaluation.schemas", () => {
 
     it("rejects missing sessionId", () => {
       const result = evaluationSendRemindersInput.safeParse({});
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("pairwiseSubmitComparisonInput", () => {
+    it("accepts valid pairwise comparison input", () => {
+      const result = pairwiseSubmitComparisonInput.safeParse({
+        sessionId: "session_1",
+        ideaAId: "idea_a",
+        ideaBId: "idea_b",
+        comparisons: [
+          { criterionId: "c1", score: 3 },
+          { criterionId: "c2", score: -2 },
+        ],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects score out of range (-5 to +5)", () => {
+      const result = pairwiseSubmitComparisonInput.safeParse({
+        sessionId: "s1",
+        ideaAId: "a",
+        ideaBId: "b",
+        comparisons: [{ criterionId: "c1", score: 6 }],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("accepts score of 0 (tie)", () => {
+      const result = pairwiseSubmitComparisonInput.safeParse({
+        sessionId: "s1",
+        ideaAId: "a",
+        ideaBId: "b",
+        comparisons: [{ criterionId: "c1", score: 0 }],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts boundary scores -5 and +5", () => {
+      const neg = pairwiseSubmitComparisonInput.safeParse({
+        sessionId: "s1",
+        ideaAId: "a",
+        ideaBId: "b",
+        comparisons: [{ criterionId: "c1", score: -5 }],
+      });
+      const pos = pairwiseSubmitComparisonInput.safeParse({
+        sessionId: "s1",
+        ideaAId: "a",
+        ideaBId: "b",
+        comparisons: [{ criterionId: "c1", score: 5 }],
+      });
+      expect(neg.success).toBe(true);
+      expect(pos.success).toBe(true);
+    });
+  });
+
+  describe("pairwiseGetMyComparisonInput", () => {
+    it("accepts valid input", () => {
+      const result = pairwiseGetMyComparisonInput.safeParse({
+        sessionId: "s1",
+        ideaAId: "a",
+        ideaBId: "b",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects missing ideaAId", () => {
+      const result = pairwiseGetMyComparisonInput.safeParse({
+        sessionId: "s1",
+        ideaBId: "b",
+      });
       expect(result.success).toBe(false);
     });
   });
