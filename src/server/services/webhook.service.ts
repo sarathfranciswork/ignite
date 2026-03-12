@@ -56,7 +56,7 @@ function generateSecret(): string {
   return `whsec_${crypto.randomBytes(32).toString("hex")}`;
 }
 
-function isPrivateIP(ip: string): boolean {
+export function isPrivateIP(ip: string): boolean {
   if (net.isIPv4(ip)) {
     const parts = ip.split(".").map(Number);
     // 127.0.0.0/8
@@ -86,7 +86,7 @@ function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-async function validateWebhookUrl(url: string): Promise<void> {
+export async function validateWebhookUrl(url: string): Promise<void> {
   const parsed = new URL(url);
 
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
@@ -98,14 +98,20 @@ async function validateWebhookUrl(url: string): Promise<void> {
   // Reject if hostname is an IP literal
   if (net.isIP(hostname)) {
     if (isPrivateIP(hostname)) {
-      throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
+      throw new WebhookServiceError(
+        "INVALID_URL",
+        "Webhook URL must not target private/internal networks",
+      );
     }
     return;
   }
 
   // Reject localhost
   if (hostname === "localhost" || hostname.endsWith(".local")) {
-    throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
+    throw new WebhookServiceError(
+      "INVALID_URL",
+      "Webhook URL must not target private/internal networks",
+    );
   }
 
   // Resolve DNS (both A and AAAA records) and check all addresses
@@ -120,7 +126,10 @@ async function validateWebhookUrl(url: string): Promise<void> {
 
   for (const addr of addresses) {
     if (isPrivateIP(addr)) {
-      throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
+      throw new WebhookServiceError(
+        "INVALID_URL",
+        "Webhook URL must not target private/internal networks",
+      );
     }
   }
 }
@@ -177,6 +186,8 @@ export async function createWebhook(
   input: WebhookCreateInput,
   userId: string,
 ): Promise<SerializedWebhook> {
+  await validateWebhookUrl(input.url);
+
   const secret = generateSecret();
 
   const webhook = await prisma.webhook.create({
@@ -250,6 +261,10 @@ export async function updateWebhook(
   const existing = await prisma.webhook.findUnique({ where: { id: input.id } });
   if (!existing) {
     throw new WebhookServiceError("WEBHOOK_NOT_FOUND", "Webhook not found");
+  }
+
+  if (input.url !== undefined) {
+    await validateWebhookUrl(input.url);
   }
 
   const webhook = await prisma.webhook.update({

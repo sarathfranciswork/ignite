@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { CampaignStatus } from "@prisma/client";
 import { authenticateApiKey, checkScope } from "@/server/lib/api-key-auth";
-import { listCampaigns } from "@/server/services/campaign.service";
+import { prisma } from "@/server/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,42 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const status = statusParam as CampaignStatus | undefined;
-  const result = await listCampaigns({ cursor, limit, status });
 
-  return NextResponse.json(result);
+  const campaigns = await prisma.campaign.findMany({
+    where: {
+      ...(status ? { status } : {}),
+    },
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      submissionType: true,
+      submissionCloseDate: true,
+      votingCloseDate: true,
+      createdAt: true,
+      updatedAt: true,
+      createdById: true,
+    },
+  });
+
+  let nextCursor: string | undefined;
+  if (campaigns.length > limit) {
+    const next = campaigns.pop();
+    nextCursor = next?.id;
+  }
+
+  return NextResponse.json({
+    items: campaigns.map((c) => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+      submissionCloseDate: c.submissionCloseDate?.toISOString() ?? null,
+      votingCloseDate: c.votingCloseDate?.toISOString() ?? null,
+    })),
+    nextCursor,
+  });
 }
