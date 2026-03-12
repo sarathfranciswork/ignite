@@ -65,6 +65,14 @@ export const Action = {
   ORGANIZATION_UPDATE: "organization.update",
   ORGANIZATION_DELETE: "organization.delete",
   ORGANIZATION_MANAGE_CONTACTS: "organization.manageContacts",
+
+  // Strategic Innovation Areas
+  SIA_CREATE: "sia.create",
+  SIA_READ: "sia.read",
+  SIA_UPDATE: "sia.update",
+  SIA_DELETE: "sia.delete",
+  SIA_ARCHIVE: "sia.archive",
+  SIA_LINK_CAMPAIGN: "sia.linkCampaign",
 } as const;
 
 export type ActionType = (typeof Action)[keyof typeof Action];
@@ -92,6 +100,12 @@ const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType[]> = {
     Action.ORGANIZATION_UPDATE,
     Action.ORGANIZATION_DELETE,
     Action.ORGANIZATION_MANAGE_CONTACTS,
+    Action.SIA_CREATE,
+    Action.SIA_READ,
+    Action.SIA_UPDATE,
+    Action.SIA_DELETE,
+    Action.SIA_ARCHIVE,
+    Action.SIA_LINK_CAMPAIGN,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -105,6 +119,7 @@ const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType[]> = {
     Action.EVALUATION_PARTICIPATE,
     Action.NOTIFICATION_READ_OWN,
     Action.ORGANIZATION_READ,
+    Action.SIA_READ,
   ],
 } as const;
 

@@ -135,6 +135,8 @@ export const Action = {
   SIA_READ: "sia.read",
   SIA_UPDATE: "sia.update",
   SIA_DELETE: "sia.delete",
+  SIA_ARCHIVE: "sia.archive",
+  SIA_LINK_CAMPAIGN: "sia.linkCampaign",
 
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
@@ -237,6 +239,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SIA_READ,
     Action.SIA_UPDATE,
     Action.SIA_DELETE,
+    Action.SIA_ARCHIVE,
+    Action.SIA_LINK_CAMPAIGN,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -267,6 +271,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SCOUTING_BOARD_SHARE,
     Action.SCOUTING_MISSION_READ,
     Action.USE_CASE_READ,
+    Action.SIA_READ,
     Action.SEARCH_GLOBAL,
     Action.SEARCH_SAVE,
     Action.SEARCH_DELETE_OWN,
@@ -274,7 +279,6 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.AI_FIND_SIMILAR,
     Action.AI_ENRICH_IDEA,
     Action.AI_SUMMARIZE,
-    Action.SIA_READ,
   ],
 } as const;
 

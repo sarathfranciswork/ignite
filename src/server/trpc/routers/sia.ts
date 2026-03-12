@@ -1,10 +1,11 @@
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
 import {
-  siaListInput,
   siaCreateInput,
   siaUpdateInput,
+  siaListInput,
   siaGetByIdInput,
   siaDeleteInput,
   siaLinkCampaignInput,
@@ -15,9 +16,10 @@ import {
   getSiaById,
   createSia,
   updateSia,
+  archiveSia,
   deleteSia,
-  linkCampaignToSia,
-  unlinkCampaignFromSia,
+  linkCampaign,
+  unlinkCampaign,
   SiaServiceError,
 } from "@/server/services/sia.service";
 
@@ -25,9 +27,13 @@ function handleSiaError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
 
   if (error instanceof SiaServiceError) {
-    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST"> = {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "FORBIDDEN"> = {
       SIA_NOT_FOUND: "NOT_FOUND",
       CAMPAIGN_NOT_FOUND: "NOT_FOUND",
+      ALREADY_ARCHIVED: "BAD_REQUEST",
+      SIA_ARCHIVED: "BAD_REQUEST",
+      ALREADY_LINKED: "BAD_REQUEST",
+      NOT_LINKED: "BAD_REQUEST",
     };
 
     throw new TRPCError({
@@ -80,6 +86,17 @@ export const siaRouter = createTRPCRouter({
       }
     }),
 
+  archive: protectedProcedure
+    .use(requirePermission(Action.SIA_ARCHIVE))
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await archiveSia(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleSiaError(error);
+      }
+    }),
+
   delete: protectedProcedure
     .use(requirePermission(Action.SIA_DELETE))
     .input(siaDeleteInput)
@@ -92,22 +109,22 @@ export const siaRouter = createTRPCRouter({
     }),
 
   linkCampaign: protectedProcedure
-    .use(requirePermission(Action.SIA_UPDATE))
+    .use(requirePermission(Action.SIA_LINK_CAMPAIGN))
     .input(siaLinkCampaignInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await linkCampaignToSia(input, ctx.session.user.id);
+        return await linkCampaign(input, ctx.session.user.id);
       } catch (error) {
         handleSiaError(error);
       }
     }),
 
   unlinkCampaign: protectedProcedure
-    .use(requirePermission(Action.SIA_UPDATE))
+    .use(requirePermission(Action.SIA_LINK_CAMPAIGN))
     .input(siaUnlinkCampaignInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await unlinkCampaignFromSia(input, ctx.session.user.id);
+        return await unlinkCampaign(input, ctx.session.user.id);
       } catch (error) {
         handleSiaError(error);
       }

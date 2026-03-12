@@ -15,11 +15,11 @@ import { notificationRouter } from "./notification";
 import { organizationRouter } from "./organization";
 import { pushRouter } from "./push";
 import { searchRouter } from "./search";
+import { siaRouter } from "./sia";
 import { spaceRouter } from "./space";
 import { ssoRouter } from "./sso";
 import { scoutingBoardRouter } from "./scouting-board";
 import { scoutingMissionRouter } from "./scouting-mission";
-import { siaRouter } from "./sia";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
 import { whiteLabelRouter } from "./white-label";
@@ -41,9 +41,9 @@ export const appRouter = createTRPCRouter({
   organization: organizationRouter,
   push: pushRouter,
   search: searchRouter,
+  sia: siaRouter,
   scoutingBoard: scoutingBoardRouter,
   scoutingMission: scoutingMissionRouter,
-  sia: siaRouter,
   space: spaceRouter,
   sso: ssoRouter,
   useCase: useCaseRouter,

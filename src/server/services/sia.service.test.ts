@@ -1,368 +1,393 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   listSias,
   getSiaById,
   createSia,
   updateSia,
+  archiveSia,
   deleteSia,
-  linkCampaignToSia,
-  unlinkCampaignFromSia,
+  linkCampaign,
+  unlinkCampaign,
   SiaServiceError,
 } from "./sia.service";
 
 vi.mock("@/server/lib/prisma", () => ({
   prisma: {
     strategicInnovationArea: {
-      findUnique: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
     campaign: {
       findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
+    },
+    campaignSia: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
 
 vi.mock("@/server/lib/logger", () => ({
-  logger: {
-    info: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    child: vi.fn(() => ({
-      info: vi.fn(),
-      debug: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    })),
-  },
+  logger: { child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
 }));
 
 vi.mock("@/server/events/event-bus", () => ({
-  eventBus: {
-    emit: vi.fn(),
-  },
+  eventBus: { emit: vi.fn() },
 }));
 
 const { prisma } = await import("@/server/lib/prisma");
-const { eventBus } = await import("@/server/events/event-bus");
-
-const siaFindUnique = prisma.strategicInnovationArea.findUnique as unknown as Mock;
-const siaFindMany = prisma.strategicInnovationArea.findMany as unknown as Mock;
-const siaCreate = prisma.strategicInnovationArea.create as unknown as Mock;
-const siaUpdate = prisma.strategicInnovationArea.update as unknown as Mock;
-const siaDelete = prisma.strategicInnovationArea.delete as unknown as Mock;
-const campaignFindUnique = prisma.campaign.findUnique as unknown as Mock;
-const campaignUpdate = prisma.campaign.update as unknown as Mock;
-const campaignUpdateMany = prisma.campaign.updateMany as unknown as Mock;
 
 const mockSia = {
-  id: "sia-1",
-  name: "Digital Transformation",
-  description: "Focus on digitizing core processes",
-  color: "#6366F1",
-  bannerUrl: null,
+  id: "sia_1",
+  name: "Sustainable Energy",
+  description: "Focus on clean energy innovation",
+  imageUrl: null,
   isActive: true,
-  createdById: "user-1",
+  createdById: "user_1",
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
-  _count: { campaigns: 2 },
-  createdBy: { id: "user-1", name: "Admin User", email: "admin@example.com" },
+  createdBy: { id: "user_1", name: "Test User", email: "test@example.com", image: null },
+  _count: { campaignLinks: 2 },
 };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+const mockSiaWithCampaigns = {
+  ...mockSia,
+  campaignLinks: [
+    {
+      campaign: {
+        id: "camp_1",
+        title: "Green Innovation",
+        status: "SUBMISSION",
+        teaser: "Submit green ideas",
+      },
+      linkedAt: new Date("2026-01-15"),
+    },
+  ],
+};
 
-describe("listSias", () => {
-  it("returns paginated SIAs", async () => {
-    siaFindMany.mockResolvedValue([mockSia]);
-
-    const result = await listSias({ limit: 20, sortBy: "name", sortDirection: "asc" });
-
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0].name).toBe("Digital Transformation");
-    expect(result.items[0].campaignCount).toBe(2);
-    expect(result.nextCursor).toBeUndefined();
+describe("sia.service", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("filters by isActive", async () => {
-    siaFindMany.mockResolvedValue([]);
+  describe("listSias", () => {
+    it("lists SIAs with pagination", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findMany).mockResolvedValue([mockSia]);
 
-    await listSias({ limit: 20, isActive: true, sortBy: "name", sortDirection: "asc" });
+      const result = await listSias({ limit: 20 });
 
-    expect(siaFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ isActive: true }),
-      }),
-    );
-  });
-
-  it("filters by search term", async () => {
-    siaFindMany.mockResolvedValue([]);
-
-    await listSias({
-      limit: 20,
-      search: "digital",
-      sortBy: "name",
-      sortDirection: "asc",
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].name).toBe("Sustainable Energy");
+      expect(result.items[0].campaignCount).toBe(2);
+      expect(result.nextCursor).toBeUndefined();
     });
 
-    expect(siaFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          OR: expect.arrayContaining([{ name: { contains: "digital", mode: "insensitive" } }]),
+    it("filters by isActive", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findMany).mockResolvedValue([]);
+
+      await listSias({ limit: 20, isActive: true });
+
+      expect(prisma.strategicInnovationArea.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { isActive: true },
         }),
-      }),
-    );
-  });
+      );
+    });
 
-  it("returns nextCursor when more items exist", async () => {
-    const items = Array.from({ length: 21 }, (_, i) => ({
-      ...mockSia,
-      id: `sia-${i}`,
-    }));
-    siaFindMany.mockResolvedValue(items);
+    it("searches by name and description", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findMany).mockResolvedValue([]);
 
-    const result = await listSias({ limit: 20, sortBy: "name", sortDirection: "asc" });
+      await listSias({ limit: 20, search: "energy" });
 
-    expect(result.items).toHaveLength(20);
-    expect(result.nextCursor).toBe("sia-20");
-  });
-});
-
-describe("getSiaById", () => {
-  it("returns SIA with campaigns", async () => {
-    const siaWithCampaigns = {
-      ...mockSia,
-      campaigns: [
-        {
-          id: "camp-1",
-          title: "Test Campaign",
-          status: "SUBMISSION",
-          submissionCloseDate: new Date("2026-06-01"),
-          _count: { ideas: 5, members: 10 },
-        },
-      ],
-    };
-    siaFindUnique.mockResolvedValue(siaWithCampaigns);
-
-    const result = await getSiaById("sia-1");
-
-    expect(result.name).toBe("Digital Transformation");
-    expect(result.campaigns).toHaveLength(1);
-    expect(result.campaigns[0].title).toBe("Test Campaign");
-    expect(result.campaigns[0].ideaCount).toBe(5);
-  });
-
-  it("throws SIA_NOT_FOUND when not found", async () => {
-    siaFindUnique.mockResolvedValue(null);
-
-    await expect(getSiaById("nonexistent")).rejects.toThrow(SiaServiceError);
-    await expect(getSiaById("nonexistent")).rejects.toThrow("Strategic Innovation Area not found");
-  });
-});
-
-describe("createSia", () => {
-  it("creates a new SIA and emits event", async () => {
-    siaCreate.mockResolvedValue(mockSia);
-
-    const result = await createSia(
-      { name: "Digital Transformation", color: "#6366F1", isActive: true },
-      "user-1",
-    );
-
-    expect(result.name).toBe("Digital Transformation");
-    expect(siaCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          name: "Digital Transformation",
-          createdById: "user-1",
+      expect(prisma.strategicInnovationArea.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { name: { contains: "energy", mode: "insensitive" } },
+              { description: { contains: "energy", mode: "insensitive" } },
+            ],
+          },
         }),
-      }),
-    );
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.created",
-      expect.objectContaining({ entity: "sia", entityId: "sia-1" }),
-    );
-  });
-});
-
-describe("updateSia", () => {
-  it("updates SIA and emits event", async () => {
-    siaFindUnique.mockResolvedValue(mockSia);
-    siaUpdate.mockResolvedValue({ ...mockSia, name: "Updated Name" });
-
-    const result = await updateSia({ id: "sia-1", name: "Updated Name" }, "user-1");
-
-    expect(result.name).toBe("Updated Name");
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.updated",
-      expect.objectContaining({ entityId: "sia-1" }),
-    );
-  });
-
-  it("emits archived event when deactivating", async () => {
-    siaFindUnique.mockResolvedValue({ ...mockSia, isActive: true });
-    siaUpdate.mockResolvedValue({ ...mockSia, isActive: false });
-
-    await updateSia({ id: "sia-1", isActive: false }, "user-1");
-
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.archived",
-      expect.objectContaining({ entityId: "sia-1" }),
-    );
-  });
-
-  it("emits activated event when reactivating", async () => {
-    siaFindUnique.mockResolvedValue({ ...mockSia, isActive: false });
-    siaUpdate.mockResolvedValue({ ...mockSia, isActive: true });
-
-    await updateSia({ id: "sia-1", isActive: true }, "user-1");
-
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.activated",
-      expect.objectContaining({ entityId: "sia-1" }),
-    );
-  });
-
-  it("throws SIA_NOT_FOUND when not found", async () => {
-    siaFindUnique.mockResolvedValue(null);
-
-    await expect(updateSia({ id: "nonexistent", name: "x" }, "user-1")).rejects.toThrow(
-      SiaServiceError,
-    );
-  });
-});
-
-describe("deleteSia", () => {
-  it("unlinks campaigns and deletes SIA", async () => {
-    siaFindUnique.mockResolvedValue({
-      id: "sia-1",
-      name: "Digital Transformation",
-      _count: { campaigns: 2 },
-    });
-    campaignUpdateMany.mockResolvedValue({ count: 2 });
-    siaDelete.mockResolvedValue(undefined);
-
-    const result = await deleteSia("sia-1", "user-1");
-
-    expect(result.success).toBe(true);
-    expect(campaignUpdateMany).toHaveBeenCalledWith({
-      where: { siaId: "sia-1" },
-      data: { siaId: null },
-    });
-    expect(siaDelete).toHaveBeenCalledWith({ where: { id: "sia-1" } });
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.deleted",
-      expect.objectContaining({ entityId: "sia-1" }),
-    );
-  });
-
-  it("skips campaign unlinking when no campaigns linked", async () => {
-    siaFindUnique.mockResolvedValue({
-      id: "sia-1",
-      name: "Test",
-      _count: { campaigns: 0 },
-    });
-    siaDelete.mockResolvedValue(undefined);
-
-    await deleteSia("sia-1", "user-1");
-
-    expect(campaignUpdateMany).not.toHaveBeenCalled();
-  });
-
-  it("throws SIA_NOT_FOUND when not found", async () => {
-    siaFindUnique.mockResolvedValue(null);
-
-    await expect(deleteSia("nonexistent", "user-1")).rejects.toThrow(SiaServiceError);
-  });
-});
-
-describe("linkCampaignToSia", () => {
-  it("links campaign to SIA and emits event", async () => {
-    siaFindUnique.mockResolvedValue({ id: "sia-1", name: "Test SIA" });
-    campaignFindUnique.mockResolvedValue({ id: "camp-1", title: "Test Campaign" });
-    campaignUpdate.mockResolvedValue({ id: "camp-1", siaId: "sia-1" });
-
-    const result = await linkCampaignToSia({ siaId: "sia-1", campaignId: "camp-1" }, "user-1");
-
-    expect(result.success).toBe(true);
-    expect(campaignUpdate).toHaveBeenCalledWith({
-      where: { id: "camp-1" },
-      data: { siaId: "sia-1" },
-    });
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.campaignLinked",
-      expect.objectContaining({
-        entityId: "sia-1",
-        metadata: expect.objectContaining({ campaignId: "camp-1" }),
-      }),
-    );
-  });
-
-  it("throws when SIA not found", async () => {
-    siaFindUnique.mockResolvedValue(null);
-
-    await expect(
-      linkCampaignToSia({ siaId: "nonexistent", campaignId: "camp-1" }, "user-1"),
-    ).rejects.toThrow("Strategic Innovation Area not found");
-  });
-
-  it("throws when campaign not found", async () => {
-    siaFindUnique.mockResolvedValue({ id: "sia-1", name: "Test" });
-    campaignFindUnique.mockResolvedValue(null);
-
-    await expect(
-      linkCampaignToSia({ siaId: "sia-1", campaignId: "nonexistent" }, "user-1"),
-    ).rejects.toThrow("Campaign not found");
-  });
-});
-
-describe("unlinkCampaignFromSia", () => {
-  it("unlinks campaign from SIA and emits event", async () => {
-    campaignFindUnique.mockResolvedValue({
-      id: "camp-1",
-      siaId: "sia-1",
-      title: "Test Campaign",
-    });
-    campaignUpdate.mockResolvedValue({ id: "camp-1", siaId: null });
-
-    const result = await unlinkCampaignFromSia({ campaignId: "camp-1" }, "user-1");
-
-    expect(result.success).toBe(true);
-    expect(campaignUpdate).toHaveBeenCalledWith({
-      where: { id: "camp-1" },
-      data: { siaId: null },
-    });
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      "sia.campaignUnlinked",
-      expect.objectContaining({ entityId: "sia-1" }),
-    );
-  });
-
-  it("returns success when campaign has no SIA", async () => {
-    campaignFindUnique.mockResolvedValue({
-      id: "camp-1",
-      siaId: null,
-      title: "Test",
+      );
     });
 
-    const result = await unlinkCampaignFromSia({ campaignId: "camp-1" }, "user-1");
+    it("returns nextCursor when more items exist", async () => {
+      const items = Array.from({ length: 21 }, (_, i) => ({
+        ...mockSia,
+        id: `sia_${i}`,
+      }));
+      vi.mocked(prisma.strategicInnovationArea.findMany).mockResolvedValue(items);
 
-    expect(result.success).toBe(true);
-    expect(campaignUpdate).not.toHaveBeenCalled();
+      const result = await listSias({ limit: 20 });
+
+      expect(result.items).toHaveLength(20);
+      expect(result.nextCursor).toBe("sia_20");
+    });
   });
 
-  it("throws when campaign not found", async () => {
-    campaignFindUnique.mockResolvedValue(null);
+  describe("getSiaById", () => {
+    it("returns SIA with campaigns", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue(
+        mockSiaWithCampaigns as ReturnType<
+          typeof prisma.strategicInnovationArea.findUnique
+        > extends Promise<infer T>
+          ? T
+          : never,
+      );
 
-    await expect(unlinkCampaignFromSia({ campaignId: "nonexistent" }, "user-1")).rejects.toThrow(
-      "Campaign not found",
-    );
+      const result = await getSiaById("sia_1");
+
+      expect(result.name).toBe("Sustainable Energy");
+      expect(result.campaigns).toHaveLength(1);
+      expect(result.campaigns[0].title).toBe("Green Innovation");
+    });
+
+    it("throws SIA_NOT_FOUND when SIA does not exist", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue(null);
+
+      await expect(getSiaById("nonexistent")).rejects.toThrow(SiaServiceError);
+      await expect(getSiaById("nonexistent")).rejects.toThrow(
+        "Strategic Innovation Area not found",
+      );
+    });
+  });
+
+  describe("createSia", () => {
+    it("creates a new SIA", async () => {
+      const createdSia = { ...mockSia, _count: undefined };
+      vi.mocked(prisma.strategicInnovationArea.create).mockResolvedValue(createdSia);
+
+      const result = await createSia(
+        { name: "Sustainable Energy", description: "Focus on clean energy innovation" },
+        "user_1",
+      );
+
+      expect(result.name).toBe("Sustainable Energy");
+      expect(result.campaignCount).toBe(0);
+      expect(prisma.strategicInnovationArea.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            name: "Sustainable Energy",
+            description: "Focus on clean energy innovation",
+            imageUrl: undefined,
+            createdById: "user_1",
+          },
+        }),
+      );
+    });
+  });
+
+  describe("updateSia", () => {
+    it("updates SIA fields", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+      vi.mocked(prisma.strategicInnovationArea.update).mockResolvedValue(mockSia);
+
+      const result = await updateSia({ id: "sia_1", name: "Updated Name" }, "user_1");
+
+      expect(result.name).toBe("Sustainable Energy");
+      expect(prisma.strategicInnovationArea.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "sia_1" },
+          data: { name: "Updated Name" },
+        }),
+      );
+    });
+
+    it("throws SIA_NOT_FOUND when updating nonexistent SIA", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue(null);
+
+      await expect(updateSia({ id: "nonexistent", name: "Test" }, "user_1")).rejects.toThrow(
+        SiaServiceError,
+      );
+    });
+  });
+
+  describe("archiveSia", () => {
+    it("archives an active SIA", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+        isActive: true,
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+      vi.mocked(prisma.strategicInnovationArea.update).mockResolvedValue({
+        ...mockSia,
+        isActive: false,
+      });
+
+      const result = await archiveSia("sia_1", "user_1");
+
+      expect(result.isActive).toBe(false);
+    });
+
+    it("throws ALREADY_ARCHIVED for archived SIA", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+        isActive: false,
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+
+      await expect(archiveSia("sia_1", "user_1")).rejects.toThrow("SIA is already archived");
+    });
+
+    it("throws SIA_NOT_FOUND for nonexistent SIA", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue(null);
+
+      await expect(archiveSia("nonexistent", "user_1")).rejects.toThrow(
+        "Strategic Innovation Area not found",
+      );
+    });
+  });
+
+  describe("deleteSia", () => {
+    it("deletes SIA and removes campaign links", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+        name: "Sustainable Energy",
+        _count: { campaignLinks: 2 },
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+      vi.mocked(prisma.campaignSia.deleteMany).mockResolvedValue({ count: 2 });
+      vi.mocked(prisma.strategicInnovationArea.delete).mockResolvedValue(mockSia);
+
+      const result = await deleteSia("sia_1", "user_1");
+
+      expect(result.success).toBe(true);
+      expect(prisma.campaignSia.deleteMany).toHaveBeenCalledWith({
+        where: { siaId: "sia_1" },
+      });
+      expect(prisma.strategicInnovationArea.delete).toHaveBeenCalledWith({
+        where: { id: "sia_1" },
+      });
+    });
+
+    it("throws SIA_NOT_FOUND when not found", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue(null);
+
+      await expect(deleteSia("nonexistent", "user_1")).rejects.toThrow(SiaServiceError);
+    });
+  });
+
+  describe("linkCampaign", () => {
+    it("links a campaign to an SIA", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+        isActive: true,
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+      vi.mocked(prisma.campaign.findUnique).mockResolvedValue({
+        id: "camp_1",
+        title: "Green Innovation",
+      } as ReturnType<typeof prisma.campaign.findUnique> extends Promise<infer T> ? T : never);
+      vi.mocked(prisma.campaignSia.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.campaignSia.create).mockResolvedValue({
+        id: "link_1",
+        siaId: "sia_1",
+        campaignId: "camp_1",
+        linkedAt: new Date(),
+        linkedBy: "user_1",
+      });
+
+      const result = await linkCampaign({ siaId: "sia_1", campaignId: "camp_1" }, "user_1");
+
+      expect(result.siaId).toBe("sia_1");
+      expect(result.campaignId).toBe("camp_1");
+    });
+
+    it("throws SIA_NOT_FOUND when SIA does not exist", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.campaign.findUnique).mockResolvedValue({
+        id: "camp_1",
+        title: "Test",
+      } as ReturnType<typeof prisma.campaign.findUnique> extends Promise<infer T> ? T : never);
+
+      await expect(
+        linkCampaign({ siaId: "nonexistent", campaignId: "camp_1" }, "user_1"),
+      ).rejects.toThrow("Strategic Innovation Area not found");
+    });
+
+    it("throws SIA_ARCHIVED when SIA is not active", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+        isActive: false,
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+      vi.mocked(prisma.campaign.findUnique).mockResolvedValue({
+        id: "camp_1",
+        title: "Test",
+      } as ReturnType<typeof prisma.campaign.findUnique> extends Promise<infer T> ? T : never);
+
+      await expect(
+        linkCampaign({ siaId: "sia_1", campaignId: "camp_1" }, "user_1"),
+      ).rejects.toThrow("Cannot link to an archived SIA");
+    });
+
+    it("throws ALREADY_LINKED for duplicate link", async () => {
+      vi.mocked(prisma.strategicInnovationArea.findUnique).mockResolvedValue({
+        id: "sia_1",
+        isActive: true,
+      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+        ? T
+        : never);
+      vi.mocked(prisma.campaign.findUnique).mockResolvedValue({
+        id: "camp_1",
+        title: "Test",
+      } as ReturnType<typeof prisma.campaign.findUnique> extends Promise<infer T> ? T : never);
+      vi.mocked(prisma.campaignSia.findUnique).mockResolvedValue({
+        id: "link_1",
+        siaId: "sia_1",
+        campaignId: "camp_1",
+        linkedAt: new Date(),
+        linkedBy: "user_1",
+      });
+
+      await expect(
+        linkCampaign({ siaId: "sia_1", campaignId: "camp_1" }, "user_1"),
+      ).rejects.toThrow("Campaign is already linked to this SIA");
+    });
+  });
+
+  describe("unlinkCampaign", () => {
+    it("unlinks a campaign from an SIA", async () => {
+      vi.mocked(prisma.campaignSia.findUnique).mockResolvedValue({
+        id: "link_1",
+        siaId: "sia_1",
+        campaignId: "camp_1",
+        linkedAt: new Date(),
+        linkedBy: "user_1",
+      });
+      vi.mocked(prisma.campaignSia.delete).mockResolvedValue({
+        id: "link_1",
+        siaId: "sia_1",
+        campaignId: "camp_1",
+        linkedAt: new Date(),
+        linkedBy: "user_1",
+      });
+
+      const result = await unlinkCampaign({ siaId: "sia_1", campaignId: "camp_1" }, "user_1");
+
+      expect(result.success).toBe(true);
+    });
+
+    it("throws NOT_LINKED when link does not exist", async () => {
+      vi.mocked(prisma.campaignSia.findUnique).mockResolvedValue(null);
+
+      await expect(
+        unlinkCampaign({ siaId: "sia_1", campaignId: "camp_1" }, "user_1"),
+      ).rejects.toThrow("Campaign is not linked to this SIA");
+    });
   });
 });

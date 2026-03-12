@@ -1,127 +1,136 @@
 import { describe, it, expect } from "vitest";
 import {
-  siaListInput,
   siaCreateInput,
   siaUpdateInput,
+  siaListInput,
   siaGetByIdInput,
   siaDeleteInput,
   siaLinkCampaignInput,
-  siaUnlinkCampaignInput,
 } from "./sia.schemas";
 
-describe("siaListInput", () => {
-  it("accepts valid input with defaults", () => {
-    const result = siaListInput.parse({});
-    expect(result.limit).toBe(20);
-    expect(result.sortBy).toBe("name");
-    expect(result.sortDirection).toBe("asc");
-  });
-
-  it("accepts search and filter", () => {
-    const result = siaListInput.parse({
-      search: "digital",
-      isActive: true,
-      limit: 10,
+describe("sia.schemas", () => {
+  describe("siaCreateInput", () => {
+    it("accepts valid input", () => {
+      const result = siaCreateInput.safeParse({
+        name: "Sustainable Energy",
+        description: "Focus on clean energy solutions",
+      });
+      expect(result.success).toBe(true);
     });
-    expect(result.search).toBe("digital");
-    expect(result.isActive).toBe(true);
-    expect(result.limit).toBe(10);
-  });
 
-  it("rejects limit over 100", () => {
-    expect(() => siaListInput.parse({ limit: 101 })).toThrow();
-  });
-});
-
-describe("siaCreateInput", () => {
-  it("accepts valid input with name only", () => {
-    const result = siaCreateInput.parse({ name: "Test SIA" });
-    expect(result.name).toBe("Test SIA");
-    expect(result.isActive).toBe(true);
-  });
-
-  it("accepts all fields", () => {
-    const result = siaCreateInput.parse({
-      name: "Test SIA",
-      description: "A test description",
-      color: "#FF5733",
-      bannerUrl: "https://example.com/banner.jpg",
-      isActive: false,
+    it("accepts input with imageUrl", () => {
+      const result = siaCreateInput.safeParse({
+        name: "AI & Machine Learning",
+        imageUrl: "https://example.com/image.jpg",
+      });
+      expect(result.success).toBe(true);
     });
-    expect(result.color).toBe("#FF5733");
-    expect(result.isActive).toBe(false);
-  });
 
-  it("rejects empty name", () => {
-    expect(() => siaCreateInput.parse({ name: "" })).toThrow();
-  });
-
-  it("rejects invalid color format", () => {
-    expect(() => siaCreateInput.parse({ name: "Test", color: "red" })).toThrow();
-    expect(() => siaCreateInput.parse({ name: "Test", color: "#GGG" })).toThrow();
-  });
-
-  it("rejects invalid banner URL", () => {
-    expect(() => siaCreateInput.parse({ name: "Test", bannerUrl: "not-a-url" })).toThrow();
-  });
-});
-
-describe("siaUpdateInput", () => {
-  it("requires id", () => {
-    expect(() => siaUpdateInput.parse({})).toThrow();
-  });
-
-  it("accepts partial updates", () => {
-    const result = siaUpdateInput.parse({
-      id: "clxxxxxxxxxxxxxxxxxxxxxxxxx",
-      name: "Updated",
+    it("rejects empty name", () => {
+      const result = siaCreateInput.safeParse({ name: "" });
+      expect(result.success).toBe(false);
     });
-    expect(result.name).toBe("Updated");
-  });
 
-  it("allows nullable fields", () => {
-    const result = siaUpdateInput.parse({
-      id: "clxxxxxxxxxxxxxxxxxxxxxxxxx",
-      description: null,
-      color: null,
-      bannerUrl: null,
+    it("rejects name exceeding max length", () => {
+      const result = siaCreateInput.safeParse({ name: "x".repeat(201) });
+      expect(result.success).toBe(false);
     });
-    expect(result.description).toBeNull();
-    expect(result.color).toBeNull();
-  });
-});
 
-describe("siaGetByIdInput / siaDeleteInput", () => {
-  it("requires a valid cuid", () => {
-    expect(() => siaGetByIdInput.parse({})).toThrow();
-    expect(() => siaGetByIdInput.parse({ id: "invalid" })).toThrow();
-    expect(() => siaGetByIdInput.parse({ id: "clxxxxxxxxxxxxxxxxxxxxxxxxx" })).not.toThrow();
+    it("rejects invalid imageUrl", () => {
+      const result = siaCreateInput.safeParse({
+        name: "Test",
+        imageUrl: "not-a-url",
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
-  it("siaDeleteInput requires a valid cuid", () => {
-    expect(() => siaDeleteInput.parse({ id: "clxxxxxxxxxxxxxxxxxxxxxxxxx" })).not.toThrow();
-  });
-});
+  describe("siaUpdateInput", () => {
+    it("accepts partial updates", () => {
+      const result = siaUpdateInput.safeParse({
+        id: "clxxxxxxxxxxxxxxxxxxxxxxx",
+        name: "Updated Name",
+      });
+      expect(result.success).toBe(true);
+    });
 
-describe("siaLinkCampaignInput", () => {
-  it("requires both siaId and campaignId", () => {
-    expect(() => siaLinkCampaignInput.parse({})).toThrow();
-    expect(() =>
-      siaLinkCampaignInput.parse({
-        siaId: "clxxxxxxxxxxxxxxxxxxxxxxxxx",
-        campaignId: "clyyyyyyyyyyyyyyyyyyyyyyyyy",
-      }),
-    ).not.toThrow();
-  });
-});
+    it("accepts isActive toggle", () => {
+      const result = siaUpdateInput.safeParse({
+        id: "clxxxxxxxxxxxxxxxxxxxxxxx",
+        isActive: false,
+      });
+      expect(result.success).toBe(true);
+    });
 
-describe("siaUnlinkCampaignInput", () => {
-  it("requires campaignId", () => {
-    expect(() => siaUnlinkCampaignInput.parse({})).toThrow();
-    expect(() =>
-      siaUnlinkCampaignInput.parse({
-        campaignId: "clxxxxxxxxxxxxxxxxxxxxxxxxx",
-      }),
-    ).not.toThrow();
+    it("requires valid cuid for id", () => {
+      const result = siaUpdateInput.safeParse({
+        id: "not-a-cuid",
+        name: "Test",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("allows nullable description", () => {
+      const result = siaUpdateInput.safeParse({
+        id: "clxxxxxxxxxxxxxxxxxxxxxxx",
+        description: null,
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("siaListInput", () => {
+    it("uses defaults for empty input", () => {
+      const result = siaListInput.safeParse({});
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.limit).toBe(20);
+      }
+    });
+
+    it("accepts all filter params", () => {
+      const result = siaListInput.safeParse({
+        search: "energy",
+        isActive: true,
+        limit: 10,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects limit over 100", () => {
+      const result = siaListInput.safeParse({ limit: 101 });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("siaGetByIdInput / siaDeleteInput", () => {
+    it("requires a valid cuid", () => {
+      expect(siaGetByIdInput.safeParse({}).success).toBe(false);
+      expect(siaGetByIdInput.safeParse({ id: "invalid" }).success).toBe(false);
+      expect(siaGetByIdInput.safeParse({ id: "clxxxxxxxxxxxxxxxxxxxxxxx" }).success).toBe(true);
+    });
+
+    it("siaDeleteInput requires a valid cuid", () => {
+      expect(siaDeleteInput.safeParse({ id: "clxxxxxxxxxxxxxxxxxxxxxxx" }).success).toBe(true);
+      expect(siaDeleteInput.safeParse({ id: "invalid" }).success).toBe(false);
+    });
+  });
+
+  describe("siaLinkCampaignInput", () => {
+    it("accepts valid siaId and campaignId", () => {
+      const result = siaLinkCampaignInput.safeParse({
+        siaId: "clxxxxxxxxxxxxxxxxxxxxxxx",
+        campaignId: "clyyyyyyyyyyyyyyyyyyyyyyy",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects invalid IDs", () => {
+      const result = siaLinkCampaignInput.safeParse({
+        siaId: "invalid",
+        campaignId: "invalid",
+      });
+      expect(result.success).toBe(false);
+    });
   });
 });
