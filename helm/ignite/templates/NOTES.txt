@@ -1,0 +1,44 @@
+Ignite has been deployed successfully!
+
+{{- if .Values.ingress.enabled }}
+
+Access the application at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+
+{{- else }}
+
+To access the application, run:
+
+  kubectl port-forward svc/{{ include "ignite.fullname" . }}-app {{ .Values.app.service.port }}:{{ .Values.app.service.port }}
+
+Then open http://localhost:{{ .Values.app.service.port }}
+
+{{- end }}
+
+{{- if .Values.postgresql.enabled }}
+
+PostgreSQL is deployed as a StatefulSet.
+To connect directly:
+
+  kubectl port-forward svc/{{ include "ignite.fullname" . }}-postgresql 5432:5432
+
+{{- end }}
+
+{{- if .Values.redis.enabled }}
+
+Redis is deployed as a StatefulSet.
+To connect directly:
+
+  kubectl port-forward svc/{{ include "ignite.fullname" . }}-redis 6379:6379
+
+{{- end }}
+
+{{- if .Values.minio.enabled }}
+
+MinIO is deployed as a StatefulSet.
+API:     kubectl port-forward svc/{{ include "ignite.fullname" . }}-minio 9000:9000
+Console: kubectl port-forward svc/{{ include "ignite.fullname" . }}-minio 9001:9001
+
+{{- end }}

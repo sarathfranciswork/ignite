@@ -1,0 +1,214 @@
+# =============================================================================
+# Ignite Helm Chart — Default Values
+# =============================================================================
+
+# -- Global settings ----------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ignite
+  tag: "" # Defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# -- App Deployment (Next.js) -------------------------------------------------
+app:
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podAnnotations: {}
+  podLabels: {}
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  # -- Health probes pointing to /api/health
+  probes:
+    liveness:
+      path: /api/health
+      initialDelaySeconds: 15
+      periodSeconds: 30
+      timeoutSeconds: 3
+      failureThreshold: 3
+    readiness:
+      path: /api/health
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+# -- Worker Deployment (BullMQ) -----------------------------------------------
+worker:
+  enabled: true
+  replicaCount: 1
+
+  command: ["node", "dist/worker.js"]
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  podAnnotations: {}
+  podLabels: {}
+
+# -- Ingress -------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: ignite.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: ignite-tls
+    #   hosts:
+    #     - ignite.example.com
+
+# -- Database Migrations (init container) --------------------------------------
+migrations:
+  enabled: true
+
+# -- Application Environment Variables ----------------------------------------
+env:
+  NODE_ENV: production
+  NEXT_TELEMETRY_DISABLED: "1"
+  AI_ENABLED: "false"
+
+# -- Secrets (values provided via --set or external secret manager) -----------
+# These are stored in a Kubernetes Secret. Override at install time.
+secrets:
+  DATABASE_URL: ""
+  REDIS_URL: ""
+  NEXTAUTH_SECRET: ""
+  NEXTAUTH_URL: ""
+  S3_ENDPOINT: ""
+  S3_REGION: "us-east-1"
+  S3_BUCKET: "ignite-files"
+  S3_ACCESS_KEY_ID: ""
+  S3_SECRET_ACCESS_KEY: ""
+  SMTP_HOST: ""
+  SMTP_PORT: "587"
+  SMTP_USER: ""
+  SMTP_PASS: ""
+
+# -- Existing secret (skip creating the Secret resource) ----------------------
+# If set, the chart will NOT create a Secret and will instead reference this one.
+existingSecret: ""
+
+# -- PostgreSQL (built-in StatefulSet) ----------------------------------------
+postgresql:
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: pg15
+    pullPolicy: IfNotPresent
+  auth:
+    username: ignite
+    password: ignite
+    database: ignite
+  storage:
+    size: 10Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -- Redis (built-in StatefulSet) ---------------------------------------------
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  storage:
+    size: 2Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -- MinIO (optional, built-in StatefulSet) -----------------------------------
+minio:
+  enabled: false
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  storage:
+    size: 20Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
