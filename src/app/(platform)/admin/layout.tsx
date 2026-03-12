@@ -17,6 +17,8 @@ import {
   Globe,
   LogIn,
   KeyRound,
+  Webhook,
+  Key,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,11 @@ const systemAdminNav: AdminNavItem[] = [
   { label: "System Health", href: "/admin/health", icon: Activity },
   { label: "Settings", href: "/admin/settings", icon: Settings },
   { label: "SCIM", href: "/admin/scim", icon: KeyRound },
+];
+
+const integrationNav: AdminNavItem[] = [
+  { label: "Webhooks", href: "/admin/webhooks", icon: Webhook },
+  { label: "API Keys", href: "/admin/api-keys", icon: Key },
 ];
 
 const innovationConfigNav: AdminNavItem[] = [
@@ -95,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           <NavSection title="System Administration" items={systemAdminNav} />
+          <NavSection title="Integrations" items={integrationNav} />
           <NavSection title="Innovation Configuration" items={innovationConfigNav} />
         </div>
       </aside>

@@ -204,6 +204,14 @@ export interface EventMap {
   "communication.messageCreated": EventPayload;
   "communication.messageSent": EventPayload;
   "communication.messageDeleted": EventPayload;
+  "webhook.created": EventPayload;
+  "webhook.updated": EventPayload;
+  "webhook.deleted": EventPayload;
+  "webhook.paused": EventPayload;
+  "webhook.activated": EventPayload;
+  "apiKey.created": EventPayload;
+  "apiKey.revoked": EventPayload;
+  "apiKey.deleted": EventPayload;
 }
 
 export type EventName = keyof EventMap;
