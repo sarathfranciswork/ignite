@@ -121,11 +121,15 @@ jobs:
             echo "$route_output"
           }
 
-          # ── Guard: Remove conflicting labels before assigning ──
+          # ── Guard: Remove the OTHER agent's label (not the one we're about to add) ──
           clean_agent_labels() {
             local issue_num="$1"
-            gh issue edit "$issue_num" --remove-label "claude-code" 2>/dev/null || true
-            gh issue edit "$issue_num" --remove-label "qwen-code" 2>/dev/null || true
+            local target_label="$2"
+            if [ "$target_label" = "qwen-code" ]; then
+              gh issue edit "$issue_num" --remove-label "claude-code" 2>/dev/null || true
+            elif [ "$target_label" = "claude-code" ]; then
+              gh issue edit "$issue_num" --remove-label "qwen-code" 2>/dev/null || true
+            fi
           }
 
           # ── Step 1: Trigger next story in same epic (if any) ──
@@ -142,8 +146,8 @@ jobs:
 
             echo "Next in epic: Story $NEXT_STORY_ID (#$NEXT_ISSUE) - $NEXT_TITLE [Agent: $AGENT, $REASON]"
 
-            # Clean any stale labels, then assign the correct one
-            clean_agent_labels "$NEXT_ISSUE"
+            # Remove conflicting label, then assign the correct one
+            clean_agent_labels "$NEXT_ISSUE" "$AGENT_LABEL"
             gh issue edit "$NEXT_ISSUE" --add-label "$AGENT_LABEL" 2>/dev/null || true
             gh workflow run "$AGENT_WORKFLOW" --ref main -f issue_number="$NEXT_ISSUE" 2>/dev/null || true
 
@@ -256,7 +260,7 @@ jobs:
 
               echo "Epic $EPIC_ID ($EPIC_NAME_NEW) is now READY. Triggering first story: $FIRST_STORY_ID (#$FIRST_STORY) [Agent: $EPIC_AGENT, $REASON]"
 
-              clean_agent_labels "$FIRST_STORY"
+              clean_agent_labels "$FIRST_STORY" "$EPIC_LABEL"
               gh issue edit "$FIRST_STORY" --add-label "$EPIC_LABEL" 2>/dev/null || true
               gh workflow run "$EPIC_WORKFLOW" --ref main -f issue_number="$FIRST_STORY" 2>/dev/null || true
 
