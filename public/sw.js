@@ -1,45 +1,92 @@
 /// <reference lib="webworker" />
 
-const SW_VERSION = "1.0.0";
-const CACHE_NAME = `ignite-cache-v${SW_VERSION}`;
+const SW_VERSION = "1.1.0";
+const STATIC_CACHE = `ignite-static-v${SW_VERSION}`;
+const PAGE_CACHE = `ignite-pages-v${SW_VERSION}`;
 
 const OFFLINE_URL = "/offline";
 
-const PRECACHE_URLS = ["/offline"];
+const PRECACHE_URLS = ["/offline", "/manifest.json", "/favicon.ico"];
 
-// Install: precache offline page
+// Install: precache essential assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
-      .open(CACHE_NAME)
+      .open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE_URLS))
       .then(() => self.skipWaiting()),
   );
 });
 
-// Activate: clean old caches
+// Activate: clean old caches from previous versions
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith("ignite-") && k !== STATIC_CACHE && k !== PAGE_CACHE)
+            .map((k) => caches.delete(k)),
+        ),
       )
       .then(() => self.clients.claim()),
   );
 });
 
-// Fetch: network-first with offline fallback for navigation requests
+// Fetch: strategy depends on request type
 self.addEventListener("fetch", (event) => {
-  if (event.request.mode !== "navigate") return;
+  const { request } = event;
+  const url = new URL(request.url);
 
-  event.respondWith(
-    fetch(event.request).catch(() =>
-      caches
-        .match(OFFLINE_URL)
-        .then((cached) => cached || new Response("Offline", { status: 503 })),
-    ),
-  );
+  // Only handle same-origin requests
+  if (url.origin !== self.location.origin) return;
+
+  // Skip API calls — never cache tRPC or auth endpoints
+  if (url.pathname.startsWith("/api/")) return;
+
+  // Static assets (_next/static): cache-first for immutable hashed files
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        });
+      }),
+    );
+    return;
+  }
+
+  // HTML navigation: network-first with page cache fallback for offline reading
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(PAGE_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches
+            .match(request)
+            .then(
+              (cached) =>
+                cached ||
+                caches
+                  .match(OFFLINE_URL)
+                  .then((offlinePage) => offlinePage || new Response("Offline", { status: 503 })),
+            ),
+        ),
+    );
+    return;
+  }
 });
 
 // Push: show notification from server payload
@@ -63,6 +110,7 @@ self.addEventListener("push", (event) => {
       entityType: data.entityType,
       entityId: data.entityId,
     },
+    vibrate: [100, 50, 100],
     actions: data.actions || [],
   };
 

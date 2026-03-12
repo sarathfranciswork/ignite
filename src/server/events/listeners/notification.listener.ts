@@ -2,6 +2,7 @@ import { eventBus } from "@/server/events/event-bus";
 import { logger } from "@/server/lib/logger";
 import { prisma } from "@/server/lib/prisma";
 import { enqueueEmail } from "@/server/jobs/email-queue";
+import { sendPushNotification } from "@/server/services/push.service";
 import type { NotificationType } from "@prisma/client";
 
 const childLogger = logger.child({ service: "notification-listener" });
@@ -17,6 +18,16 @@ interface NotificationTarget {
   body: string;
   entityType: string;
   entityId: string;
+}
+
+function buildEntityUrl(entityType: string, entityId: string): string {
+  const routeMap: Record<string, string> = {
+    idea: "/ideas/",
+    campaign: "/campaigns/",
+    comment: "/ideas/",
+  };
+  const base = routeMap[entityType] ?? "/";
+  return `${base}${entityId}`;
 }
 
 async function createNotifications(targets: NotificationTarget[]) {
@@ -50,6 +61,25 @@ async function createNotifications(targets: NotificationTarget[]) {
         body: notification.body,
         entityType: notification.entityType,
         entityId: notification.entityId,
+      });
+    }
+
+    // Dispatch push notifications (fire-and-forget — sends to all active push subscriptions)
+    for (const notification of created) {
+      const entityUrl = buildEntityUrl(notification.entityType, notification.entityId);
+      void sendPushNotification({
+        userId: notification.userId,
+        title: notification.title,
+        body: notification.body,
+        url: entityUrl,
+        tag: notification.type,
+        entityType: notification.entityType,
+        entityId: notification.entityId,
+      }).catch((pushError) => {
+        childLogger.error(
+          { userId: notification.userId, error: pushError },
+          "Failed to send push notification",
+        );
       });
     }
   } catch (error) {
