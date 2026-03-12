@@ -2,6 +2,14 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
 import {
+  getSystemOverview,
+  getSystemStats,
+  getTerminology,
+  updateTerminology,
+  resetTerminology,
+  terminologyUpdateInput,
+} from "@/server/services/admin-system.service";
+import {
   orgUnitCreateInput,
   orgUnitUpdateInput,
   orgUnitDeleteInput,
@@ -361,4 +369,35 @@ export const adminRouter = createTRPCRouter({
         handleGroupError(error);
       }
     }),
+
+  // ── System Administration Procedures ───────────────────────────
+
+  systemOverview: protectedProcedure
+    .use(requirePermission(Action.ADMIN_VIEW_METRICS))
+    .query(async () => {
+      return getSystemOverview();
+    }),
+
+  systemStats: protectedProcedure
+    .use(requirePermission(Action.ADMIN_VIEW_METRICS))
+    .query(async () => {
+      return getSystemStats();
+    }),
+
+  // ── Terminology Procedures ─────────────────────────────────────
+
+  terminologyGet: protectedProcedure.use(requirePermission(Action.ADMIN_ACCESS)).query(() => {
+    return getTerminology();
+  }),
+
+  terminologyUpdate: protectedProcedure
+    .use(requirePermission(Action.ADMIN_ACCESS))
+    .input(terminologyUpdateInput)
+    .mutation(({ input }) => {
+      return updateTerminology(input);
+    }),
+
+  terminologyReset: protectedProcedure.use(requirePermission(Action.ADMIN_ACCESS)).mutation(() => {
+    return resetTerminology();
+  }),
 });

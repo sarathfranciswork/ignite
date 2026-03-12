@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
   { label: "Campaigns", href: "/campaigns", icon: Megaphone, section: "ideation" },
   { label: "Explore", href: "/explore", icon: Compass, section: "ideation" },
   { label: "Partners", href: "/partners", icon: Building2, section: "partners" },
-  { label: "Admin", href: "/admin/users", icon: Shield, section: "admin" },
+  { label: "Admin", href: "/admin", icon: Shield, section: "admin" },
 ];
 
 interface SidebarProps {
