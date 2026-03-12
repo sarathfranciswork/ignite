@@ -35,6 +35,8 @@ import {
   ideaBulkArchiveInput,
   ideaBulkExportInput,
   ideaMergeHistoryInput,
+} from "@/server/services/idea.schemas";
+import {
   splitIdea,
   mergeIdeas,
   getMergeHistory,

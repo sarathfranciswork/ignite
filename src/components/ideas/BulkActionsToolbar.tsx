@@ -202,9 +202,7 @@ export function BulkActionsToolbar({
             )}
             {bucketsQuery.data && (
               <div className="max-h-60 space-y-1 overflow-y-auto">
-                {(
-                  bucketsQuery.data as { items: Array<{ id: string; name: string; color: string }> }
-                ).items.map((bucket) => (
+                {bucketsQuery.data.items.map((bucket) => (
                   <button
                     key={bucket.id}
                     type="button"
@@ -219,7 +217,7 @@ export function BulkActionsToolbar({
                     {bucket.name}
                   </button>
                 ))}
-                {(bucketsQuery.data as { items: Array<{ id: string }> }).items.length === 0 && (
+                {bucketsQuery.data.items.length === 0 && (
                   <p className="py-4 text-center text-sm text-gray-500">
                     No buckets available. Create a bucket first.
                   </p>

@@ -1,7 +1,9 @@
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
+import { canArchiveIdea, IDEA_STATUS_LABELS } from "@/server/lib/state-machines/idea-transitions";
 import { IdeaServiceError } from "./idea.service";
+import type { IdeaStatus } from "@prisma/client";
 import type {
   IdeaSplitInput,
   IdeaMergeInput,
@@ -10,22 +12,6 @@ import type {
   IdeaBulkExportInput,
 } from "./idea.schemas";
 
-export {
-  ideaSplitInput,
-  ideaMergeInput,
-  ideaBulkAssignBucketInput,
-  ideaBulkArchiveInput,
-  ideaBulkExportInput,
-  ideaMergeHistoryInput,
-} from "./idea.schemas";
-
-export type {
-  IdeaSplitInput,
-  IdeaMergeInput,
-  IdeaBulkAssignBucketInput,
-  IdeaBulkArchiveInput,
-  IdeaBulkExportInput,
-} from "./idea.schemas";
 
 const childLogger = logger.child({ service: "idea-split-merge" });
 
@@ -98,7 +84,14 @@ export async function splitIdea(input: IdeaSplitInput, actor: string) {
       newIdeas.push(created);
     }
 
-    // Archive the original idea
+    // Archive the original idea via state machine guard
+    if (!canArchiveIdea(original.status as IdeaStatus)) {
+      throw new IdeaServiceError(
+        `Cannot archive idea in ${IDEA_STATUS_LABELS[original.status as IdeaStatus]} status`,
+        "INVALID_STATUS",
+      );
+    }
+
     const archived = await tx.idea.update({
       where: { id: original.id },
       data: {
@@ -236,8 +229,15 @@ export async function mergeIdeas(input: IdeaMergeInput, actor: string) {
       },
     });
 
-    // Archive source ideas with mergedIntoId reference
+    // Archive source ideas with mergedIntoId reference (via state machine guard)
     for (const source of sourceIdeas) {
+      if (!canArchiveIdea(source.status as IdeaStatus)) {
+        throw new IdeaServiceError(
+          `Cannot archive source idea "${source.title}" in ${IDEA_STATUS_LABELS[source.status as IdeaStatus]} status`,
+          "INVALID_STATUS",
+        );
+      }
+
       await tx.idea.update({
         where: { id: source.id },
         data: {
@@ -367,8 +367,8 @@ export async function bulkArchiveIdeas(input: IdeaBulkArchiveInput, actor: strin
     throw new IdeaServiceError("One or more ideas not found", "IDEA_NOT_FOUND");
   }
 
-  // Filter out already-archived ideas
-  const archivable = ideas.filter((i) => i.status !== "ARCHIVED");
+  // Filter to only ideas that can be archived per state machine rules
+  const archivable = ideas.filter((i) => canArchiveIdea(i.status as IdeaStatus));
 
   if (archivable.length === 0) {
     return { archivedCount: 0 };
