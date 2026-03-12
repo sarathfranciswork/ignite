@@ -135,17 +135,19 @@ export async function getEvaluationSessionById(id: string) {
       userId: e.userId,
       assignedAt: e.assignedAt.toISOString(),
     })),
-    ideas: session.ideas.map((i) => ({
-      id: i.id,
-      ideaId: i.ideaId,
-      sortOrder: i.sortOrder,
-      idea: {
-        id: i.idea.id,
-        title: i.idea.title,
-        teaser: i.idea.teaser,
-        status: i.idea.status,
-      },
-    })),
+    ideas: session.ideas
+      .filter((i) => i.idea !== null)
+      .map((i) => ({
+        id: i.id,
+        ideaId: i.ideaId!,
+        sortOrder: i.sortOrder,
+        idea: {
+          id: i.idea!.id,
+          title: i.idea!.title,
+          teaser: i.idea!.teaser,
+          status: i.idea!.status,
+        },
+      })),
     responseCount: session._count.responses,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
@@ -581,6 +583,10 @@ export async function addIdeasToSession(input: EvaluationAddIdeasInput, actor: s
     );
   }
 
+  if (!session.campaignId) {
+    throw new EvaluationServiceError("Session has no campaign linked", "SESSION_NOT_FOUND");
+  }
+
   const ideas = await prisma.idea.findMany({
     where: { id: { in: input.ideaIds }, campaignId: session.campaignId },
     select: { id: true },
@@ -923,10 +929,10 @@ export async function getEvaluationResults(input: EvaluationResultsInput) {
         : 0;
 
     return {
-      ideaId: sessionIdea.ideaId,
-      ideaTitle: sessionIdea.idea.title,
-      ideaTeaser: sessionIdea.idea.teaser,
-      ideaStatus: sessionIdea.idea.status,
+      ideaId: sessionIdea.ideaId!,
+      ideaTitle: sessionIdea.idea!.title,
+      ideaTeaser: sessionIdea.idea!.teaser,
+      ideaStatus: sessionIdea.idea!.status,
       weightedScore: Math.round(weightedScore * 100) / 100,
       criteriaScores,
     };
@@ -1096,8 +1102,8 @@ export async function getMyPendingEvaluations(input: EvaluationMyPendingInput, u
         type: s.type,
         status: s.status,
         dueDate: s.dueDate?.toISOString() ?? null,
-        campaignId: s.campaign.id,
-        campaignTitle: s.campaign.title,
+        campaignId: s.campaign?.id ?? "",
+        campaignTitle: s.campaign?.title ?? "",
         criteriaCount: s._count.criteria,
         ideaCount: s._count.ideas,
         evaluatorCount: s._count.evaluators,

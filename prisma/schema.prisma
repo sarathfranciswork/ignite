@@ -411,16 +411,17 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy          User                     @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  sia                StrategicInnovationArea? @relation("CampaignSia", fields: [siaId], references: [id], onDelete: SetNull)
-  members            CampaignMember[]
-  kpiSnapshots       CampaignKpiSnapshot[]
-  ideas              Idea[]
-  activityEvents     ActivityEvent[]
-  buckets            Bucket[]
-  evaluationSessions EvaluationSession[]
-  siaLinks           CampaignSiaLink[]
-  messages           CampaignMessage[]
+  createdBy             User                     @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  sia                   StrategicInnovationArea? @relation("CampaignSia", fields: [siaId], references: [id], onDelete: SetNull)
+  members               CampaignMember[]
+  kpiSnapshots          CampaignKpiSnapshot[]
+  ideas                 Idea[]
+  activityEvents        ActivityEvent[]
+  buckets               Bucket[]
+  evaluationSessions    EvaluationSession[]
+  siaLinks              CampaignSiaLink[]
+  messages              CampaignMessage[]
+  submissionDefinitions SubmissionDefinition[]
 
   @@index([status])
   @@index([submissionType])
@@ -1448,8 +1449,18 @@ enum EvaluationSessionStatus {
 enum EvaluationSessionType {
   SCORECARD
   PAIRWISE
+  AD_HOC
+  ONE_TEAM
 
   @@map("evaluation_session_type")
+}
+
+enum EvaluationMode {
+  STANDARD
+  AD_HOC
+  ONE_TEAM
+
+  @@map("evaluation_mode")
 }
 
 enum CriterionFieldType {
@@ -1462,14 +1473,22 @@ enum CriterionFieldType {
 
 model EvaluationSession {
   id          String                  @id @default(cuid())
-  campaignId  String                  @map("campaign_id")
+  campaignId  String?                 @map("campaign_id")
   title       String
   description String?                 @db.Text
   type        EvaluationSessionType
+  mode        EvaluationMode          @default(STANDARD)
   status      EvaluationSessionStatus @default(DRAFT)
   dueDate     DateTime?               @map("due_date")
   isTemplate  Boolean                 @default(false) @map("is_template")
   templateId  String?                 @map("template_id")
+
+  // One-Team collaborative fields
+  isCollaborative    Boolean   @default(false) @map("is_collaborative")
+  facilitatorId      String?   @map("facilitator_id")
+  consensusRequired  Boolean   @default(false) @map("consensus_required")
+  liveSessionStarted DateTime? @map("live_session_started")
+  liveSessionEnded   DateTime? @map("live_session_ended")
 
   // Shortlist management
   shortlistLocked     Boolean   @default(false) @map("shortlist_locked")
@@ -1483,16 +1502,18 @@ model EvaluationSession {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  campaign            Campaign                     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign            Campaign?                    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   criteria            EvaluationCriterion[]
   evaluators          EvaluationSessionEvaluator[]
   ideas               EvaluationSessionIdea[]
   responses           EvaluationResponse[]
   pairwiseComparisons PairwiseComparison[]
   shortlistItems      EvaluationShortlistItem[]
+  consensusNotes      ConsensusNote[]
 
   @@index([campaignId])
   @@index([status])
+  @@index([mode])
   @@index([createdById])
   @@index([campaignId, status])
   @@map("evaluation_sessions")
@@ -1549,13 +1570,17 @@ model EvaluationSessionEvaluator {
 model EvaluationSessionIdea {
   id        String   @id @default(cuid())
   sessionId String   @map("session_id")
-  ideaId    String   @map("idea_id")
+  ideaId    String?  @map("idea_id")
   sortOrder Int      @default(0) @map("sort_order")
   addedAt   DateTime @default(now()) @map("added_at")
 
+  // Ad-hoc item fields (used when ideaId is null)
+  adHocTitle       String? @map("ad_hoc_title")
+  adHocDescription String? @map("ad_hoc_description") @db.Text
+
   // Relations
   session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  idea    Idea              @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  idea    Idea?             @relation(fields: [ideaId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, ideaId])
   @@index([sessionId])
@@ -2399,4 +2424,148 @@ model ConceptDecision {
 
   @@index([conceptId])
   @@map("concept_decisions")
+}
+
+// ── Consensus Notes (One-Team Evaluation) ───────────────────
+
+model ConsensusNote {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  ideaId    String   @map("idea_id")
+  authorId  String   @map("author_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, ideaId])
+  @@map("consensus_notes")
+}
+
+// ── Submission Definitions (Generic Submissions) ────────────
+
+enum SubmissionDefinitionStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+
+  @@map("submission_definition_status")
+}
+
+enum SubmissionFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  SELECT
+  MULTI_SELECT
+  DATE
+  CHECKBOX
+  FILE
+  RICH_TEXT
+  URL
+
+  @@map("submission_field_type")
+}
+
+model SubmissionDefinition {
+  id          String                     @id @default(cuid())
+  name        String
+  description String?                    @db.Text
+  status      SubmissionDefinitionStatus @default(DRAFT)
+  slug        String                     @unique
+  campaignId  String?                    @map("campaign_id")
+  isGlobal    Boolean                    @default(false) @map("is_global")
+  createdById String                     @map("created_by_id")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
+
+  campaign    Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  fields      SubmissionField[]
+  submissions GenericSubmission[]
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([createdById])
+  @@map("submission_definitions")
+}
+
+model SubmissionField {
+  id           String              @id @default(cuid())
+  definitionId String              @map("definition_id")
+  label        String
+  fieldKey     String              @map("field_key")
+  fieldType    SubmissionFieldType @map("field_type")
+  isRequired   Boolean             @default(false) @map("is_required")
+  sortOrder    Int                 @default(0) @map("sort_order")
+  placeholder  String?
+  helpText     String?             @map("help_text") @db.Text
+  options      Json?
+  validation   Json?
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  definition SubmissionDefinition   @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  values     SubmissionFieldValue[]
+
+  @@unique([definitionId, fieldKey])
+  @@index([definitionId])
+  @@index([definitionId, sortOrder])
+  @@map("submission_fields")
+}
+
+enum GenericSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+
+  @@map("generic_submission_status")
+}
+
+model GenericSubmission {
+  id            String                  @id @default(cuid())
+  definitionId  String                  @map("definition_id")
+  title         String
+  status        GenericSubmissionStatus @default(DRAFT)
+  submittedById String                  @map("submitted_by_id")
+  reviewedById  String?                 @map("reviewed_by_id")
+  reviewNote    String?                 @map("review_note") @db.Text
+  submittedAt   DateTime?               @map("submitted_at")
+  reviewedAt    DateTime?               @map("reviewed_at")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+
+  definition  SubmissionDefinition   @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  fieldValues SubmissionFieldValue[]
+
+  @@index([definitionId])
+  @@index([submittedById])
+  @@index([status])
+  @@index([definitionId, status])
+  @@map("generic_submissions")
+}
+
+model SubmissionFieldValue {
+  id           String    @id @default(cuid())
+  submissionId String    @map("submission_id")
+  fieldId      String    @map("field_id")
+  textValue    String?   @map("text_value") @db.Text
+  numberValue  Float?    @map("number_value")
+  boolValue    Boolean?  @map("bool_value")
+  dateValue    DateTime? @map("date_value")
+  jsonValue    Json?     @map("json_value")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  submission GenericSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  field      SubmissionField   @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, fieldId])
+  @@index([submissionId])
+  @@index([fieldId])
+  @@map("submission_field_values")
 }
