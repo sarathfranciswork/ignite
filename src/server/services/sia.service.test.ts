@@ -255,7 +255,9 @@ describe("sia.service", () => {
         id: "sia_1",
         name: "Sustainable Energy",
         _count: { campaignLinks: 2 },
-      } as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<infer T>
+      } as unknown as ReturnType<typeof prisma.strategicInnovationArea.findUnique> extends Promise<
+        infer T
+      >
         ? T
         : never);
       vi.mocked(prisma.campaignSia.deleteMany).mockResolvedValue({ count: 2 });
