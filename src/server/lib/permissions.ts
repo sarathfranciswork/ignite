@@ -112,6 +112,7 @@ export const Action = {
   AI_VIEW_STATUS: "ai.viewStatus",
   AI_FIND_SIMILAR: "ai.findSimilar",
   AI_ENRICH_IDEA: "ai.enrichIdea",
+  AI_SUMMARIZE: "ai.summarize",
 
   // Push notifications
   PUSH_SUBSCRIBE: "push.subscribe",
@@ -211,6 +212,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.AI_VIEW_STATUS,
     Action.AI_FIND_SIMILAR,
     Action.AI_ENRICH_IDEA,
+    Action.AI_SUMMARIZE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -246,6 +248,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.AI_VIEW_STATUS,
     Action.AI_FIND_SIMILAR,
     Action.AI_ENRICH_IDEA,
+    Action.AI_SUMMARIZE,
   ],
 } as const;
 

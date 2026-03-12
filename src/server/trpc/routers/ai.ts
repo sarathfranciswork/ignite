@@ -8,6 +8,17 @@ import {
   recordCopilotEvent,
   getEnrichmentStatus,
 } from "@/server/services/enrichment.service";
+import {
+  campaignSummaryInput,
+  evaluationSummaryInput,
+  notificationDigestInput,
+} from "@/server/services/summarization.schemas";
+import {
+  summarizeCampaign,
+  summarizeEvaluationSession,
+  summarizeNotificationDigest,
+  getSummarizationStatus,
+} from "@/server/services/summarization.service";
 
 export const aiRouter = createTRPCRouter({
   status: protectedProcedure.use(requirePermission(Action.AI_VIEW_STATUS)).query(() => {
@@ -38,5 +49,30 @@ export const aiRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       recordCopilotEvent(input, ctx.session.user.id);
       return { success: true };
+    }),
+
+  summarizationStatus: protectedProcedure.use(requirePermission(Action.AI_SUMMARIZE)).query(() => {
+    return getSummarizationStatus();
+  }),
+
+  summarizeCampaign: protectedProcedure
+    .use(requirePermission(Action.AI_SUMMARIZE))
+    .input(campaignSummaryInput)
+    .query(async ({ input }) => {
+      return summarizeCampaign(input.campaignId);
+    }),
+
+  summarizeEvaluation: protectedProcedure
+    .use(requirePermission(Action.AI_SUMMARIZE))
+    .input(evaluationSummaryInput)
+    .query(async ({ input }) => {
+      return summarizeEvaluationSession(input.sessionId);
+    }),
+
+  summarizeNotificationDigest: protectedProcedure
+    .use(requirePermission(Action.AI_SUMMARIZE))
+    .input(notificationDigestInput)
+    .query(async ({ ctx, input }) => {
+      return summarizeNotificationDigest(ctx.session.user.id, input.limit);
     }),
 });

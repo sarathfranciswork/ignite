@@ -131,6 +131,9 @@ export interface EventMap {
   "bucket.ideaUnassigned": EventPayload;
   "copilot.suggestionAccepted": EventPayload;
   "copilot.suggestionDismissed": EventPayload;
+  "summary.campaignGenerated": EventPayload;
+  "summary.evaluationGenerated": EventPayload;
+  "summary.notificationDigestGenerated": EventPayload;
   "whiteLabel.updated": EventPayload;
   "push.subscribed": EventPayload;
   "push.unsubscribed": EventPayload;
