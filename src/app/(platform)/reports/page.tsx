@@ -1,12 +1,15 @@
-import { ComingSoon } from "@/components/shared/ComingSoon";
-import { BarChart3 } from "lucide-react";
+import { ReportsView } from "@/components/reports/ReportsView";
 
 export default function Page() {
   return (
-    <ComingSoon
-      title="Reports & Analytics"
-      description="Campaign KPIs, idea funnels, engagement metrics, and custom reports with Excel export. Coming with Story 13.1."
-      icon={BarChart3}
-    />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Portfolio analysis, campaign KPIs, idea funnels, and platform-wide metrics.
+        </p>
+      </div>
+      <ReportsView />
+    </div>
   );
 }
