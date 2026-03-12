@@ -13,6 +13,7 @@ import {
   TableProperties,
   FolderOpen,
   Compass,
+  Mail,
 } from "lucide-react";
 import { CampaignHeader } from "@/components/campaigns/CampaignHeader";
 import { CampaignLifecycleBar } from "@/components/campaigns/CampaignLifecycleBar";
@@ -25,6 +26,7 @@ import { CampaignIdeasTab } from "@/components/ideas/CampaignIdeasTab";
 import { IdeaBoard } from "@/components/ideas/IdeaBoard";
 import { BucketManager } from "@/components/buckets/BucketManager";
 import { EvaluationSessionList } from "@/components/evaluation/EvaluationSessionList";
+import { CommunicationHub } from "@/components/communications/CommunicationHub";
 import { trpc } from "@/lib/trpc";
 
 const BASE_TABS = [
@@ -35,6 +37,7 @@ const BASE_TABS = [
   { id: "be-inspired", label: "Be Inspired", icon: Compass },
   { id: "evaluation", label: "Evaluation", icon: BarChart3 },
   { id: "cockpit", label: "Cockpit", icon: MessageSquare },
+  { id: "communications", label: "Communications", icon: Mail },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -178,6 +181,8 @@ export default function CampaignDetailPage() {
         {activeTab === "evaluation" && <EvaluationSessionList campaignId={campaign.id} />}
 
         {activeTab === "cockpit" && <CampaignCockpit campaignId={campaign.id} />}
+
+        {activeTab === "communications" && <CommunicationHub campaignId={campaign.id} />}
 
         {activeTab === "settings" && (
           <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">

@@ -75,6 +75,12 @@ export const Action = {
   NOTIFICATION_READ_OWN: "notification.read.own",
   NOTIFICATION_SEND_BULK: "notification.sendBulk",
 
+  // Communication Hub
+  COMMUNICATION_CREATE: "communication.create",
+  COMMUNICATION_READ: "communication.read",
+  COMMUNICATION_SEND: "communication.send",
+  COMMUNICATION_DELETE: "communication.delete",
+
   // Admin
   ADMIN_ACCESS: "admin.access",
   ADMIN_MANAGE_USERS: "admin.manageUsers",
@@ -234,6 +240,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.EVALUATION_MANAGE_EVALUATORS,
     Action.EVALUATION_MANAGE_IDEAS,
     Action.NOTIFICATION_READ_OWN,
+    Action.COMMUNICATION_CREATE,
+    Action.COMMUNICATION_READ,
+    Action.COMMUNICATION_SEND,
+    Action.COMMUNICATION_DELETE,
     Action.PUSH_SUBSCRIBE,
     Action.PUSH_READ_OWN,
     Action.ORGANIZATION_CREATE,
@@ -317,6 +327,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.IDEA_FOLLOW,
     Action.EVALUATION_PARTICIPATE,
     Action.NOTIFICATION_READ_OWN,
+    Action.COMMUNICATION_READ,
     Action.PUSH_SUBSCRIBE,
     Action.PUSH_READ_OWN,
     Action.BUCKET_READ,
@@ -395,6 +406,10 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.BUCKET_UPDATE,
     Action.BUCKET_DELETE,
     Action.BUCKET_ASSIGN_IDEAS,
+    Action.COMMUNICATION_CREATE,
+    Action.COMMUNICATION_READ,
+    Action.COMMUNICATION_SEND,
+    Action.COMMUNICATION_DELETE,
   ],
   CAMPAIGN_COACH: [
     Action.CAMPAIGN_READ,

@@ -185,6 +185,9 @@ export interface EventMap {
   "sia.deleted": EventPayload;
   "sia.campaignLinked": EventPayload;
   "sia.campaignUnlinked": EventPayload;
+  "communication.messageCreated": EventPayload;
+  "communication.messageSent": EventPayload;
+  "communication.messageDeleted": EventPayload;
 }
 
 export type EventName = keyof EventMap;
