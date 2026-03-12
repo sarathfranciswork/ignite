@@ -39,6 +39,18 @@ import {
   getCampaignKpis,
   getCampaignKpiTimeSeries,
 } from "@/server/services/kpi.service";
+import {
+  beInspiredInput,
+  campaignSiaLinkInput,
+  campaignSiaUnlinkInput,
+} from "@/server/services/be-inspired.schemas";
+import {
+  getBeInspiredContent,
+  linkCampaignToSias,
+  unlinkCampaignFromSia as unlinkCampaignSia,
+  getCampaignSias,
+  BeInspiredServiceError,
+} from "@/server/services/be-inspired.service";
 import { z } from "zod";
 
 function handleCampaignError(error: unknown): never {
@@ -50,6 +62,24 @@ function handleCampaignError(error: unknown): never {
       INVALID_TRANSITION: "BAD_REQUEST",
       GUARD_FAILED: "BAD_REQUEST",
       NO_PREVIOUS_STATUS: "BAD_REQUEST",
+    };
+
+    throw new TRPCError({
+      code: codeMap[error.code] ?? "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
+  throw error;
+}
+
+function handleBeInspiredError(error: unknown): never {
+  if (error instanceof TRPCError) throw error;
+
+  if (error instanceof BeInspiredServiceError) {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST"> = {
+      CAMPAIGN_NOT_FOUND: "NOT_FOUND",
+      SIA_NOT_FOUND: "NOT_FOUND",
     };
 
     throw new TRPCError({
@@ -247,6 +277,64 @@ export const campaignRouter = createTRPCRouter({
         return await approveSponsorShortlist(input, ctx.session.user.id);
       } catch (error) {
         handleCampaignError(error);
+      }
+    }),
+
+  getBeInspired: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(Action.CAMPAIGN_READ, (input) => input.campaignId),
+    )
+    .input(beInspiredInput)
+    .query(async ({ input }) => {
+      try {
+        return await getBeInspiredContent(input);
+      } catch (error) {
+        handleBeInspiredError(error);
+      }
+    }),
+
+  getLinkedSias: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(Action.CAMPAIGN_READ, (input) => input.campaignId),
+    )
+    .input(z.object({ campaignId: z.string().cuid() }))
+    .query(async ({ input }) => {
+      try {
+        return await getCampaignSias(input.campaignId);
+      } catch (error) {
+        handleBeInspiredError(error);
+      }
+    }),
+
+  linkSias: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.CAMPAIGN_UPDATE,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(campaignSiaLinkInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await linkCampaignToSias(input, ctx.session.user.id);
+      } catch (error) {
+        handleBeInspiredError(error);
+      }
+    }),
+
+  unlinkSia: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(
+        Action.CAMPAIGN_UPDATE,
+        (input) => input.campaignId,
+      ),
+    )
+    .input(campaignSiaUnlinkInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await unlinkCampaignSia(input, ctx.session.user.id);
+      } catch (error) {
+        handleBeInspiredError(error);
       }
     }),
 });

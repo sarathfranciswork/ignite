@@ -126,9 +126,11 @@ const mockCampaign = {
   customFields: null,
   settings: null,
   createdById: "user-1",
+  siaId: null,
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
   createdBy: mockCreatedBy,
+  siaLinks: [],
 };
 
 beforeEach(() => {
