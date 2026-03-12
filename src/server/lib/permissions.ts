@@ -234,6 +234,9 @@ export const Action = {
   GENERIC_SUBMISSION_UPDATE_OWN: "genericSubmission.update.own",
   GENERIC_SUBMISSION_REVIEW: "genericSubmission.review",
 
+  // Reports & analytics
+  REPORT_READ: "report.read",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -404,6 +407,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.GENERIC_SUBMISSION_READ,
     Action.GENERIC_SUBMISSION_UPDATE_OWN,
     Action.GENERIC_SUBMISSION_REVIEW,
+    Action.REPORT_READ,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -458,6 +462,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.GENERIC_SUBMISSION_CREATE,
     Action.GENERIC_SUBMISSION_READ,
     Action.GENERIC_SUBMISSION_UPDATE_OWN,
+    Action.REPORT_READ,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,

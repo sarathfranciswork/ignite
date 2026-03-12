@@ -23,6 +23,7 @@ import { portfolioRouter } from "./portfolio";
 import { processDefinitionRouter } from "./process-definition";
 import { projectRouter } from "./project";
 import { pushRouter } from "./push";
+import { reportRouter } from "./report";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
 import { submissionRouter } from "./submission";
@@ -62,6 +63,7 @@ export const appRouter = createTRPCRouter({
   processDefinition: processDefinitionRouter,
   project: projectRouter,
   push: pushRouter,
+  report: reportRouter,
   search: searchRouter,
   scoutingBoard: scoutingBoardRouter,
   scoutingMission: scoutingMissionRouter,
