@@ -148,6 +148,12 @@ export const Action = {
   TECHNOLOGY_UPDATE: "technology.update",
   TECHNOLOGY_DELETE: "technology.delete",
 
+  // Community Insights
+  INSIGHT_CREATE: "insight.create",
+  INSIGHT_READ: "insight.read",
+  INSIGHT_UPDATE: "insight.update",
+  INSIGHT_DELETE: "insight.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -257,6 +263,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.TECHNOLOGY_READ,
     Action.TECHNOLOGY_UPDATE,
     Action.TECHNOLOGY_DELETE,
+    Action.INSIGHT_CREATE,
+    Action.INSIGHT_READ,
+    Action.INSIGHT_UPDATE,
+    Action.INSIGHT_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -297,6 +307,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SIA_READ,
     Action.TREND_READ,
     Action.TECHNOLOGY_READ,
+    Action.INSIGHT_CREATE,
+    Action.INSIGHT_READ,
   ],
 } as const;
 
