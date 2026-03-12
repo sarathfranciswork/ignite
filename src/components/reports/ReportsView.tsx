@@ -4,15 +4,19 @@ import { useState } from "react";
 import { PlatformSummaryTab } from "./PlatformSummaryTab";
 import { PortfolioAnalysisTab } from "./PortfolioAnalysisTab";
 import { PortfolioAnalyzerTab } from "./PortfolioAnalyzerTab";
+import { CampaignComparisonTab } from "./CampaignComparisonTab";
+import { SuccessFactorTab } from "./SuccessFactorTab";
 import { cn } from "@/lib/utils";
-import { BarChart3, FolderKanban, GitBranch } from "lucide-react";
+import { BarChart3, FolderKanban, GitBranch, ArrowLeftRight, Sparkles } from "lucide-react";
 
-type TabId = "platform" | "portfolio" | "analyzer";
+type TabId = "platform" | "portfolio" | "analyzer" | "comparison" | "successFactors";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
   { id: "platform", label: "Platform Summary", icon: BarChart3 },
   { id: "portfolio", label: "Portfolio Analysis", icon: FolderKanban },
   { id: "analyzer", label: "Deep Analytics", icon: GitBranch },
+  { id: "comparison", label: "Campaign Comparison", icon: ArrowLeftRight },
+  { id: "successFactors", label: "Success Factors", icon: Sparkles },
 ];
 
 export function ReportsView() {
@@ -20,7 +24,7 @@ export function ReportsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+      <div className="flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -44,6 +48,8 @@ export function ReportsView() {
       {activeTab === "platform" && <PlatformSummaryTab />}
       {activeTab === "portfolio" && <PortfolioAnalysisTab />}
       {activeTab === "analyzer" && <PortfolioAnalyzerTab />}
+      {activeTab === "comparison" && <CampaignComparisonTab />}
+      {activeTab === "successFactors" && <SuccessFactorTab />}
     </div>
   );
 }
