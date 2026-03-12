@@ -4,10 +4,12 @@ import {
   getPairwisePairs,
   getNextPair,
   submitPairwiseComparison,
+} from "./pairwise.service";
+import {
   getMyComparison,
   getPairwiseProgress,
   getPairwiseResults,
-} from "./pairwise.service";
+} from "./pairwise-ranking.service";
 import { EvaluationServiceError } from "./evaluation.schemas";
 
 vi.mock("@/server/lib/prisma", () => ({

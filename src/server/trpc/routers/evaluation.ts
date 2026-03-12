@@ -56,10 +56,12 @@ import {
   getPairwisePairs,
   getNextPair,
   submitPairwiseComparison,
+} from "@/server/services/pairwise.service";
+import {
   getMyComparison,
   getPairwiseProgress,
   getPairwiseResults,
-} from "@/server/services/pairwise.service";
+} from "@/server/services/pairwise-ranking.service";
 
 function handleEvaluationError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -339,6 +341,7 @@ export const evaluationRouter = createTRPCRouter({
     }),
 
   pairwiseNextPair: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_PARTICIPATE))
     .input(pairwiseGetNextPairInput)
     .query(async ({ ctx, input }) => {
       try {
@@ -360,6 +363,7 @@ export const evaluationRouter = createTRPCRouter({
     }),
 
   pairwiseMyComparison: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_PARTICIPATE))
     .input(pairwiseGetMyComparisonInput)
     .query(async ({ ctx, input }) => {
       try {
