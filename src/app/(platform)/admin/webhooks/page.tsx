@@ -198,6 +198,48 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
   );
 }
 
+function SecretDialog({
+  secret,
+  onClose,
+}: {
+  secret: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(secret);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <h3 className="mb-2 text-lg font-semibold text-gray-900">New Webhook Secret</h3>
+        <p className="mb-4 text-sm text-gray-500">
+          Copy this secret now. It will not be shown again.
+        </p>
+        <div className="mb-4 flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2">
+          <code className="flex-1 break-all text-sm text-gray-800">{secret}</code>
+          <button
+            onClick={handleCopy}
+            className="shrink-0 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-gray-200"
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function WebhookRow({
   webhook,
 }: {
@@ -211,6 +253,7 @@ function WebhookRow({
   };
 }) {
   const [expanded, setExpanded] = React.useState(false);
+  const [regeneratedSecret, setRegeneratedSecret] = React.useState<string | null>(null);
   const utils = trpc.useUtils();
 
   const updateMutation = trpc.webhook.update.useMutation({
@@ -243,12 +286,19 @@ function WebhookRow({
 
   const regenerateMutation = trpc.webhook.regenerateSecret.useMutation({
     onSuccess: (result) => {
-      toast.success("Secret regenerated. New secret: " + result.secret);
+      setRegeneratedSecret(result.secret);
     },
     onError: (err) => toast.error(err.message),
   });
 
   return (
+    <>
+    {regeneratedSecret && (
+      <SecretDialog
+        secret={regeneratedSecret}
+        onClose={() => setRegeneratedSecret(null)}
+      />
+    )}
     <div className="rounded-lg border border-gray-200 bg-white">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
@@ -327,6 +377,7 @@ function WebhookRow({
         </div>
       )}
     </div>
+    </>
   );
 }
 

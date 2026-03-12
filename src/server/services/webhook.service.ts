@@ -1,4 +1,7 @@
 import crypto from "crypto";
+import { URL } from "url";
+import dns from "dns/promises";
+import net from "net";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
@@ -51,6 +54,66 @@ export class WebhookServiceError extends Error {
 
 function generateSecret(): string {
   return `whsec_${crypto.randomBytes(32).toString("hex")}`;
+}
+
+function isPrivateIP(ip: string): boolean {
+  if (net.isIPv4(ip)) {
+    const parts = ip.split(".").map(Number);
+    // 127.0.0.0/8
+    if (parts[0] === 127) return true;
+    // 10.0.0.0/8
+    if (parts[0] === 10) return true;
+    // 172.16.0.0/12
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    // 192.168.0.0/16
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    // 169.254.0.0/16 (link-local / cloud metadata)
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    // 0.0.0.0
+    if (parts[0] === 0) return true;
+  }
+  if (net.isIPv6(ip)) {
+    const normalized = ip.toLowerCase();
+    if (normalized === "::1" || normalized === "::") return true;
+    if (normalized.startsWith("fe80:")) return true;
+    if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  }
+  return false;
+}
+
+async function validateWebhookUrl(url: string): Promise<void> {
+  const parsed = new URL(url);
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new WebhookServiceError("INVALID_URL", "Webhook URL must use http or https");
+  }
+
+  const hostname = parsed.hostname;
+
+  // Reject if hostname is an IP literal
+  if (net.isIP(hostname)) {
+    if (isPrivateIP(hostname)) {
+      throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
+    }
+    return;
+  }
+
+  // Reject localhost
+  if (hostname === "localhost" || hostname.endsWith(".local")) {
+    throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
+  }
+
+  // Resolve DNS and check all addresses
+  const addresses = await dns.resolve(hostname).catch(() => [] as string[]);
+  if (addresses.length === 0) {
+    throw new WebhookServiceError("INVALID_URL", "Could not resolve webhook URL hostname");
+  }
+
+  for (const addr of addresses) {
+    if (isPrivateIP(addr)) {
+      throw new WebhookServiceError("INVALID_URL", "Webhook URL must not target private/internal networks");
+    }
+  }
 }
 
 function computeSignature(payload: string, secret: string): string {
@@ -363,6 +426,8 @@ async function deliverWebhookPayload(
   eventName: string,
   payload: Prisma.InputJsonValue,
 ): Promise<{ id: string; status: string; httpStatusCode: number | null }> {
+  await validateWebhookUrl(url);
+
   const payloadStr = JSON.stringify(payload);
   const signature = computeSignature(payloadStr, secret);
 
