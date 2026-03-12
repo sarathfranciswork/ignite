@@ -182,7 +182,7 @@ export interface EventMap {
   "processDefinition.duplicated": EventPayload;
   "project.created": EventPayload;
   "project.updated": EventPayload;
-  "project.statusChanged": EventPayload;
+  "project.deleted": EventPayload;
   "project.teamMemberAdded": EventPayload;
   "project.teamMemberRemoved": EventPayload;
   "externalUser.invited": EventPayload;

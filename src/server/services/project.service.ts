@@ -278,7 +278,7 @@ export async function updateProject(input: ProjectUpdateInput, userId: string) {
   return getProjectById(input.id);
 }
 
-export async function deleteProject(id: string, _userId: string) {
+export async function deleteProject(id: string, userId: string) {
   const existing = await prisma.project.findUnique({ where: { id } });
 
   if (!existing) {
@@ -286,6 +286,13 @@ export async function deleteProject(id: string, _userId: string) {
   }
 
   await prisma.project.delete({ where: { id } });
+
+  eventBus.emit("project.deleted", {
+    entity: "Project",
+    entityId: id,
+    actor: userId,
+    timestamp: new Date().toISOString(),
+  });
 
   childLogger.info({ projectId: id }, "Project deleted");
 
