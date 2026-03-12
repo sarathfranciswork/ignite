@@ -91,6 +91,9 @@ model User {
   sentCampaignMessages       CampaignMessage[]           @relation("CampaignMessageSentBy")
   createdWebhooks            Webhook[]                   @relation("WebhookCreatedBy")
   createdApiKeys             ApiKey[]                    @relation("ApiKeyCreatedBy")
+  ownedConcepts              Concept[]                   @relation("ConceptOwner")
+  createdConcepts            Concept[]                   @relation("ConceptCreatedBy")
+  conceptTeamMemberships     ConceptTeamMember[]         @relation("ConceptTeamMember")
 
   @@map("users")
 }
@@ -627,6 +630,7 @@ model Idea {
   pairwiseAsIdeaA        PairwiseComparison[]      @relation("PairwiseIdeaA")
   pairwiseAsIdeaB        PairwiseComparison[]      @relation("PairwiseIdeaB")
   sourceForProjects      Project[]                 @relation("ProjectSourceIdea")
+  sourceForConcepts      Concept[]                 @relation("ConceptSourceIdea")
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1964,6 +1968,7 @@ model Project {
   isConfidential      Boolean       @default(false) @map("is_confidential")
   createdById         String        @map("created_by_id")
   sourceIdeaId        String?       @map("source_idea_id")
+  sourceConceptId     String?       @unique @map("source_concept_id")
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
@@ -1971,6 +1976,7 @@ model Project {
   currentPhase      ProcessPhase?           @relation("ProjectCurrentPhase", fields: [currentPhaseId], references: [id], onDelete: SetNull)
   createdBy         User                    @relation("ProjectCreatedBy", fields: [createdById], references: [id])
   sourceIdea        Idea?                   @relation("ProjectSourceIdea", fields: [sourceIdeaId], references: [id], onDelete: SetNull)
+  sourceConcept     Concept?                @relation("ProjectSourceConcept", fields: [sourceConceptId], references: [id], onDelete: SetNull)
   teamMembers       ProjectTeamMember[]
   phaseInstances    ProjectPhaseInstance[]
   taskAssignments   ProjectTaskAssignment[]
@@ -1978,6 +1984,7 @@ model Project {
   @@index([processDefinitionId])
   @@index([createdById])
   @@index([sourceIdeaId])
+  @@index([sourceConceptId])
   @@index([status])
   @@map("projects")
 }
@@ -2299,4 +2306,97 @@ model ApiKey {
   @@index([createdById])
   @@index([isActive])
   @@map("api_keys")
+}
+
+// ── Concepts (Lightweight Phase-Gate) ───────────────────────
+
+enum ConceptStatus {
+  ELABORATION
+  EVALUATION
+  APPROVED
+  REJECTED
+
+  @@map("concept_status")
+}
+
+enum ConceptDecisionType {
+  APPROVE
+  REJECT
+  REVISE
+
+  @@map("concept_decision_type")
+}
+
+enum ConceptTeamRole {
+  OWNER
+  CONTRIBUTOR
+  REVIEWER
+
+  @@map("concept_team_role")
+}
+
+model Concept {
+  id                   String        @id @default(cuid())
+  title                String
+  description          String?       @db.Text
+  status               ConceptStatus @default(ELABORATION)
+  ownerId              String        @map("owner_id")
+  sourceIdeaId         String?       @map("source_idea_id")
+  problemStatement     String?       @map("problem_statement") @db.Text
+  proposedSolution     String?       @map("proposed_solution") @db.Text
+  valueProposition     String?       @map("value_proposition") @db.Text
+  swotStrengths        String?       @map("swot_strengths") @db.Text
+  swotWeaknesses       String?       @map("swot_weaknesses") @db.Text
+  swotOpportunities    String?       @map("swot_opportunities") @db.Text
+  swotThreats          String?       @map("swot_threats") @db.Text
+  targetMarket         String?       @map("target_market") @db.Text
+  resourceRequirements String?       @map("resource_requirements") @db.Text
+  expectedRoi          String?       @map("expected_roi") @db.Text
+  riskAssessment       String?       @map("risk_assessment") @db.Text
+  createdById          String        @map("created_by_id")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  owner            User                @relation("ConceptOwner", fields: [ownerId], references: [id])
+  createdBy        User                @relation("ConceptCreatedBy", fields: [createdById], references: [id])
+  sourceIdea       Idea?               @relation("ConceptSourceIdea", fields: [sourceIdeaId], references: [id], onDelete: SetNull)
+  convertedProject Project?            @relation("ProjectSourceConcept")
+  teamMembers      ConceptTeamMember[]
+  decisions        ConceptDecision[]
+
+  @@index([ownerId])
+  @@index([createdById])
+  @@index([sourceIdeaId])
+  @@index([status])
+  @@map("concepts")
+}
+
+model ConceptTeamMember {
+  id        String          @id @default(cuid())
+  conceptId String          @map("concept_id")
+  userId    String          @map("user_id")
+  role      ConceptTeamRole
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  user    User    @relation("ConceptTeamMember", fields: [userId], references: [id])
+
+  @@unique([conceptId, userId])
+  @@index([conceptId])
+  @@index([userId])
+  @@map("concept_team_members")
+}
+
+model ConceptDecision {
+  id        String              @id @default(cuid())
+  conceptId String              @map("concept_id")
+  decision  ConceptDecisionType
+  feedback  String?             @db.Text
+  decidedBy String              @map("decided_by")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  @@index([conceptId])
+  @@map("concept_decisions")
 }
