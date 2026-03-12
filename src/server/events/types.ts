@@ -151,6 +151,13 @@ export interface EventMap {
   "trend.deleted": EventPayload;
   "trend.siaLinked": EventPayload;
   "trend.siaUnlinked": EventPayload;
+  "technology.created": EventPayload;
+  "technology.updated": EventPayload;
+  "technology.archived": EventPayload;
+  "technology.unarchived": EventPayload;
+  "technology.deleted": EventPayload;
+  "technology.siaLinked": EventPayload;
+  "technology.siaUnlinked": EventPayload;
   "sia.created": EventPayload;
   "sia.updated": EventPayload;
   "sia.archived": EventPayload;
