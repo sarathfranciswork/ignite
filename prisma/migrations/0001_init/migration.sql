@@ -1,8 +1,11 @@
 -- CreateEnum
-CREATE TYPE "global_role" AS ENUM ('PLATFORM_ADMIN', 'INNOVATION_MANAGER', 'MEMBER');
+CREATE TYPE "global_role" AS ENUM ('PLATFORM_ADMIN', 'INNOVATION_MANAGER', 'MEMBER', 'EXTERNAL');
 
 -- CreateEnum
 CREATE TYPE "notification_frequency" AS ENUM ('IMMEDIATE', 'DAILY', 'WEEKLY');
+
+-- CreateEnum
+CREATE TYPE "external_invitation_status" AS ENUM ('PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED');
 
 -- CreateEnum
 CREATE TYPE "resource_role_type" AS ENUM ('CAMPAIGN_MANAGER', 'CAMPAIGN_COACH', 'CAMPAIGN_CONTRIBUTOR', 'CAMPAIGN_MODERATOR', 'CAMPAIGN_EVALUATOR', 'CAMPAIGN_SEEDER', 'CAMPAIGN_SPONSOR', 'CHANNEL_MANAGER', 'CHANNEL_CONTRIBUTOR');
@@ -121,6 +124,8 @@ CREATE TABLE "users" (
     "notification_frequency" "notification_frequency" NOT NULL DEFAULT 'IMMEDIATE',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
+    "external_campaign_ids" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "scim_external_id" TEXT,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -158,6 +163,21 @@ CREATE TABLE "verification_tokens" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expires" TIMESTAMP(3) NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "external_invitations" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "inviter_user_id" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "status" "external_invitation_status" NOT NULL DEFAULT 'PENDING',
+    "campaign_ids" TEXT[],
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "external_invitations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -289,6 +309,15 @@ CREATE TABLE "campaigns" (
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "campaigns_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "campaign_sia_links" (
+    "id" TEXT NOT NULL,
+    "campaign_id" TEXT NOT NULL,
+    "sia_id" TEXT NOT NULL,
+
+    CONSTRAINT "campaign_sia_links_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1063,8 +1092,25 @@ CREATE TABLE "portfolio_items" (
     CONSTRAINT "portfolio_items_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "scim_tokens" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "token_hash" TEXT NOT NULL,
+    "created_by_id" TEXT NOT NULL,
+    "last_used_at" TIMESTAMP(3),
+    "expires_at" TIMESTAMP(3),
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "scim_tokens_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_scim_external_id_key" ON "users"("scim_external_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "accounts_provider_provider_account_id_key" ON "accounts"("provider", "provider_account_id");
@@ -1077,6 +1123,18 @@ CREATE UNIQUE INDEX "verification_tokens_token_key" ON "verification_tokens"("to
 
 -- CreateIndex
 CREATE UNIQUE INDEX "verification_tokens_identifier_token_key" ON "verification_tokens"("identifier", "token");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "external_invitations_token_key" ON "external_invitations"("token");
+
+-- CreateIndex
+CREATE INDEX "external_invitations_email_idx" ON "external_invitations"("email");
+
+-- CreateIndex
+CREATE INDEX "external_invitations_token_idx" ON "external_invitations"("token");
+
+-- CreateIndex
+CREATE INDEX "external_invitations_status_idx" ON "external_invitations"("status");
 
 -- CreateIndex
 CREATE INDEX "resource_roles_user_id_idx" ON "resource_roles"("user_id");
@@ -1131,6 +1189,9 @@ CREATE INDEX "campaigns_created_by_id_idx" ON "campaigns"("created_by_id");
 
 -- CreateIndex
 CREATE INDEX "campaigns_sia_id_idx" ON "campaigns"("sia_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "campaign_sia_links_campaign_id_sia_id_key" ON "campaign_sia_links"("campaign_id", "sia_id");
 
 -- CreateIndex
 CREATE INDEX "campaign_members_campaign_id_idx" ON "campaign_members"("campaign_id");
@@ -1573,11 +1634,20 @@ CREATE INDEX "portfolio_items_entity_type_entity_id_idx" ON "portfolio_items"("e
 -- CreateIndex
 CREATE UNIQUE INDEX "portfolio_items_portfolio_id_entity_type_entity_id_key" ON "portfolio_items"("portfolio_id", "entity_type", "entity_id");
 
+-- CreateIndex
+CREATE INDEX "scim_tokens_token_hash_idx" ON "scim_tokens"("token_hash");
+
+-- CreateIndex
+CREATE INDEX "scim_tokens_created_by_id_idx" ON "scim_tokens"("created_by_id");
+
 -- AddForeignKey
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "external_invitations" ADD CONSTRAINT "external_invitations_inviter_user_id_fkey" FOREIGN KEY ("inviter_user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "org_units" ADD CONSTRAINT "org_units_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "org_units"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1605,6 +1675,12 @@ ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_created_by_id_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "campaigns" ADD CONSTRAINT "campaigns_sia_id_fkey" FOREIGN KEY ("sia_id") REFERENCES "strategic_innovation_areas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "campaign_sia_links" ADD CONSTRAINT "campaign_sia_links_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "campaign_sia_links" ADD CONSTRAINT "campaign_sia_links_sia_id_fkey" FOREIGN KEY ("sia_id") REFERENCES "strategic_innovation_areas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "campaign_members" ADD CONSTRAINT "campaign_members_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1866,4 +1942,7 @@ ALTER TABLE "innovation_portfolios" ADD CONSTRAINT "innovation_portfolios_create
 
 -- AddForeignKey
 ALTER TABLE "portfolio_items" ADD CONSTRAINT "portfolio_items_portfolio_id_fkey" FOREIGN KEY ("portfolio_id") REFERENCES "innovation_portfolios"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "scim_tokens" ADD CONSTRAINT "scim_tokens_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
