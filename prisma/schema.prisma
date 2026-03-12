@@ -406,12 +406,24 @@ model Campaign {
   activityEvents     ActivityEvent[]
   buckets            Bucket[]
   evaluationSessions EvaluationSession[]
+  siaLinks           CampaignSiaLink[]
 
   @@index([status])
   @@index([submissionType])
   @@index([createdById])
   @@index([siaId])
   @@map("campaigns")
+}
+
+model CampaignSiaLink {
+  id         String                  @id @default(cuid())
+  campaignId String                  @map("campaign_id")
+  siaId      String                  @map("sia_id")
+  campaign   Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sia        StrategicInnovationArea @relation("CampaignSiaLinks", fields: [siaId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, siaId])
+  @@map("campaign_sia_links")
 }
 
 model CampaignMember {
@@ -1634,10 +1646,11 @@ model StrategicInnovationArea {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdBy    User           @relation("SiaCreatedBy", fields: [createdById], references: [id])
-  campaigns    Campaign[]     @relation("CampaignSia")
-  trends       TrendSiaLink[]
-  technologies TechSiaLink[]
+  createdBy     User              @relation("SiaCreatedBy", fields: [createdById], references: [id])
+  campaigns     Campaign[]        @relation("CampaignSia")
+  campaignLinks CampaignSiaLink[] @relation("CampaignSiaLinks")
+  trends        TrendSiaLink[]
+  technologies  TechSiaLink[]
 
   @@index([isActive])
   @@index([createdById])

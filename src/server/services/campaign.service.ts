@@ -111,6 +111,18 @@ export async function getCampaignById(id: string) {
       createdBy: {
         select: { id: true, name: true, email: true, image: true },
       },
+      siaLinks: {
+        include: {
+          sia: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+              isActive: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -120,6 +132,7 @@ export async function getCampaignById(id: string) {
 
   return {
     ...campaign,
+    linkedSias: campaign.siaLinks.map((link) => link.sia),
     submissionCloseDate: campaign.submissionCloseDate?.toISOString() ?? null,
     votingCloseDate: campaign.votingCloseDate?.toISOString() ?? null,
     plannedCloseDate: campaign.plannedCloseDate?.toISOString() ?? null,

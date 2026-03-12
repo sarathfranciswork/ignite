@@ -12,29 +12,33 @@ import {
   Eye,
   TableProperties,
   FolderOpen,
+  Compass,
 } from "lucide-react";
 import { CampaignHeader } from "@/components/campaigns/CampaignHeader";
 import { CampaignLifecycleBar } from "@/components/campaigns/CampaignLifecycleBar";
 import { CampaignPhaseControls } from "@/components/campaigns/CampaignPhaseControls";
 import { CampaignCockpit } from "@/components/campaigns/CampaignCockpit";
 import { CopyCampaignButton } from "@/components/campaigns/CopyCampaignButton";
+import { BeInspiredTab } from "@/components/campaigns/BeInspiredTab";
+import { CampaignSiaManager } from "@/components/campaigns/CampaignSiaManager";
 import { CampaignIdeasTab } from "@/components/ideas/CampaignIdeasTab";
 import { IdeaBoard } from "@/components/ideas/IdeaBoard";
 import { BucketManager } from "@/components/buckets/BucketManager";
 import { EvaluationSessionList } from "@/components/evaluation/EvaluationSessionList";
 import { trpc } from "@/lib/trpc";
 
-const TABS = [
+const BASE_TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "board", label: "Board", icon: TableProperties },
   { id: "buckets", label: "Buckets", icon: FolderOpen },
+  { id: "be-inspired", label: "Be Inspired", icon: Compass },
   { id: "evaluation", label: "Evaluation", icon: BarChart3 },
   { id: "cockpit", label: "Cockpit", icon: MessageSquare },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = (typeof BASE_TABS)[number]["id"];
 
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
@@ -67,6 +71,9 @@ export default function CampaignDetailPage() {
   if (!campaignQuery.data) return null;
 
   const campaign = campaignQuery.data;
+  const hasLinkedSias = (campaign.linkedSias ?? []).length > 0;
+
+  const tabs = BASE_TABS.filter((tab) => tab.id !== "be-inspired" || hasLinkedSias);
 
   return (
     <div className="space-y-6">
@@ -74,7 +81,7 @@ export default function CampaignDetailPage() {
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-6" aria-label="Campaign tabs">
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
@@ -150,11 +157,15 @@ export default function CampaignDetailPage() {
               <StatCard label="Created" value={new Date(campaign.createdAt).toLocaleDateString()} />
             </div>
 
+            <CampaignSiaManager campaignId={campaign.id} />
+
             <div className="flex gap-3">
               <CopyCampaignButton campaignId={campaign.id} campaignTitle={campaign.title} />
             </div>
           </div>
         )}
+
+        {activeTab === "be-inspired" && <BeInspiredTab campaignId={campaign.id} />}
 
         {activeTab === "ideas" && (
           <CampaignIdeasTab campaignId={campaign.id} campaignStatus={campaign.status} />
