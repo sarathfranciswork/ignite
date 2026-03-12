@@ -6,6 +6,9 @@ export const campaignCreateInput = z.object({
   title: z.string().min(1, "Title is required").max(200),
   description: z.string().max(10000).optional(),
   teaser: z.string().max(500).optional(),
+  submissionType: z
+    .enum(["CALL_FOR_IDEAS", "CALL_FOR_PROPOSALS", "CALL_FOR_GENERIC", "PARTNERSHIP_PROPOSALS"])
+    .optional(),
   submissionCloseDate: z.string().optional(),
   votingCloseDate: z.string().optional(),
   plannedCloseDate: z.string().optional(),
@@ -18,6 +21,9 @@ export const campaignUpdateInput = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(10000).optional(),
   teaser: z.string().max(500).optional(),
+  submissionType: z
+    .enum(["CALL_FOR_IDEAS", "CALL_FOR_PROPOSALS", "CALL_FOR_GENERIC", "PARTNERSHIP_PROPOSALS"])
+    .optional(),
   bannerUrl: z.string().url().max(2048).optional().nullable(),
   videoUrl: z.string().url().max(2048).optional().nullable(),
   submissionCloseDate: z.string().optional().nullable(),

@@ -101,6 +101,14 @@ export const Action = {
   SCOUTING_BOARD_DELETE: "scoutingBoard.delete",
   SCOUTING_BOARD_SHARE: "scoutingBoard.share",
 
+  // Scouting mission management
+  SCOUTING_MISSION_CREATE: "scoutingMission.create",
+  SCOUTING_MISSION_READ: "scoutingMission.read",
+  SCOUTING_MISSION_UPDATE: "scoutingMission.update",
+  SCOUTING_MISSION_DELETE: "scoutingMission.delete",
+  SCOUTING_MISSION_TRANSITION: "scoutingMission.transition",
+  SCOUTING_MISSION_MANAGE_SCOUTS: "scoutingMission.manageScouts",
+
   // Bucket management
   BUCKET_CREATE: "bucket.create",
   BUCKET_READ: "bucket.read",
@@ -194,6 +202,12 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SCOUTING_BOARD_UPDATE,
     Action.SCOUTING_BOARD_DELETE,
     Action.SCOUTING_BOARD_SHARE,
+    Action.SCOUTING_MISSION_CREATE,
+    Action.SCOUTING_MISSION_READ,
+    Action.SCOUTING_MISSION_UPDATE,
+    Action.SCOUTING_MISSION_DELETE,
+    Action.SCOUTING_MISSION_TRANSITION,
+    Action.SCOUTING_MISSION_MANAGE_SCOUTS,
     Action.USE_CASE_CREATE,
     Action.USE_CASE_READ,
     Action.USE_CASE_UPDATE,
@@ -241,6 +255,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SCOUTING_BOARD_UPDATE,
     Action.SCOUTING_BOARD_DELETE,
     Action.SCOUTING_BOARD_SHARE,
+    Action.SCOUTING_MISSION_READ,
     Action.USE_CASE_READ,
     Action.SEARCH_GLOBAL,
     Action.SEARCH_SAVE,

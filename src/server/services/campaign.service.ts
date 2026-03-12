@@ -144,6 +144,16 @@ export async function createCampaign(input: CampaignCreateInput, createdById: st
         : undefined,
       votingCloseDate: input.votingCloseDate ? new Date(input.votingCloseDate) : undefined,
       plannedCloseDate: input.plannedCloseDate ? new Date(input.plannedCloseDate) : undefined,
+      submissionType: input.submissionType ?? "CALL_FOR_IDEAS",
+      // Partnership proposals: simplified workflow (no discussion/voting)
+      ...(input.submissionType === "PARTNERSHIP_PROPOSALS"
+        ? {
+            hasDiscussionPhase: false,
+            hasVoting: false,
+            hasSeedingPhase: false,
+            hasCommunityGraduation: false,
+          }
+        : {}),
       status: "DRAFT",
       setupType: "SIMPLE",
       createdById,
@@ -198,6 +208,7 @@ export async function updateCampaign(input: CampaignUpdateInput, updatedById: st
   if (updateData.title !== undefined) data.title = updateData.title;
   if (updateData.description !== undefined) data.description = updateData.description;
   if (updateData.teaser !== undefined) data.teaser = updateData.teaser;
+  if (updateData.submissionType !== undefined) data.submissionType = updateData.submissionType;
   if (updateData.bannerUrl !== undefined) data.bannerUrl = updateData.bannerUrl;
   if (updateData.videoUrl !== undefined) data.videoUrl = updateData.videoUrl;
   if (updateData.submissionCloseDate !== undefined) {
