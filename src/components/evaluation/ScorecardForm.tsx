@@ -49,8 +49,9 @@ export function ScorecardForm({
   const debounceTimers = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   React.useEffect(() => {
+    const timers = debounceTimers.current;
     return () => {
-      for (const timer of debounceTimers.current.values()) {
+      for (const timer of timers.values()) {
         clearTimeout(timer);
       }
     };
