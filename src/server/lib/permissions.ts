@@ -191,6 +191,18 @@ export const Action = {
   PROJECT_DELETE: "project.delete",
   PROJECT_MANAGE_TEAM: "project.manageTeam",
 
+  // Webhook management
+  WEBHOOK_CREATE: "webhook.create",
+  WEBHOOK_READ: "webhook.read",
+  WEBHOOK_UPDATE: "webhook.update",
+  WEBHOOK_DELETE: "webhook.delete",
+
+  // API key management
+  API_KEY_CREATE: "apiKey.create",
+  API_KEY_READ: "apiKey.read",
+  API_KEY_REVOKE: "apiKey.revoke",
+  API_KEY_DELETE: "apiKey.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -330,6 +342,14 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.EXTERNAL_INVITATION_REVOKE,
     Action.EXTERNAL_INVITATION_REVOKE_ACCESS,
     Action.EXTERNAL_INVITATION_MANAGE,
+    Action.WEBHOOK_CREATE,
+    Action.WEBHOOK_READ,
+    Action.WEBHOOK_UPDATE,
+    Action.WEBHOOK_DELETE,
+    Action.API_KEY_CREATE,
+    Action.API_KEY_READ,
+    Action.API_KEY_REVOKE,
+    Action.API_KEY_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,

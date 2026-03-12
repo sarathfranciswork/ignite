@@ -2,6 +2,7 @@ import { createTRPCRouter } from "../trpc";
 import { activityRouter } from "./activity";
 import { adminRouter } from "./admin";
 import { aiRouter } from "./ai";
+import { apiKeyRouter } from "./api-key";
 import { authRouter } from "./auth";
 import { bucketRouter } from "./bucket";
 import { campaignRouter } from "./campaign";
@@ -30,12 +31,14 @@ import { technologyRouter } from "./technology";
 import { trendRouter } from "./trend";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
+import { webhookRouter } from "./webhook";
 import { whiteLabelRouter } from "./white-label";
 
 export const appRouter = createTRPCRouter({
   activity: activityRouter,
   admin: adminRouter,
   ai: aiRouter,
+  apiKey: apiKeyRouter,
   auth: authRouter,
   bucket: bucketRouter,
   campaign: campaignRouter,
@@ -64,6 +67,7 @@ export const appRouter = createTRPCRouter({
   sso: ssoRouter,
   useCase: useCaseRouter,
   user: userRouter,
+  webhook: webhookRouter,
   whiteLabel: whiteLabelRouter,
 });
 
