@@ -69,7 +69,7 @@ export const Action = {
 
 export type ActionType = (typeof Action)[keyof typeof Action];
 
-type GlobalRoleName = "PLATFORM_ADMIN" | "INNOVATION_MANAGER" | "MEMBER";
+type GlobalRoleName = "PLATFORM_ADMIN" | "INNOVATION_MANAGER" | "MEMBER" | "EXTERNAL";
 
 const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType[]> = {
   PLATFORM_ADMIN: [], // bypass — never checked
@@ -105,6 +105,16 @@ const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType[]> = {
     Action.EVALUATION_PARTICIPATE,
     Action.NOTIFICATION_READ_OWN,
     Action.ORGANIZATION_READ,
+  ],
+  EXTERNAL: [
+    Action.USER_READ_OWN,
+    Action.USER_UPDATE_OWN,
+    Action.CAMPAIGN_READ,
+    Action.IDEA_CREATE,
+    Action.IDEA_READ,
+    Action.IDEA_UPDATE_OWN,
+    Action.IDEA_DELETE_OWN,
+    Action.NOTIFICATION_READ_OWN,
   ],
 } as const;
 

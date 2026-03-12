@@ -171,6 +171,8 @@ export interface EventMap {
   "portfolio.itemAdded": EventPayload;
   "portfolio.itemRemoved": EventPayload;
   "portfolio.itemsReordered": EventPayload;
+  "externalUser.invited": EventPayload;
+  "externalUser.accepted": EventPayload;
   "sia.created": EventPayload;
   "sia.updated": EventPayload;
   "sia.archived": EventPayload;

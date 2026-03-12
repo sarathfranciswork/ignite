@@ -122,6 +122,12 @@ export const Action = {
   AI_ENRICH_IDEA: "ai.enrichIdea",
   AI_SUMMARIZE: "ai.summarize",
 
+  // External invitations
+  EXTERNAL_INVITATION_CREATE: "externalInvitation.create",
+  EXTERNAL_INVITATION_LIST: "externalInvitation.list",
+  EXTERNAL_INVITATION_REVOKE: "externalInvitation.revoke",
+  EXTERNAL_INVITATION_REVOKE_ACCESS: "externalInvitation.revokeAccess",
+
   // Push notifications
   PUSH_SUBSCRIBE: "push.subscribe",
   PUSH_READ_OWN: "push.read.own",
@@ -172,7 +178,7 @@ export const Action = {
 
 export type ActionType = (typeof Action)[keyof typeof Action];
 
-type GlobalRoleName = "PLATFORM_ADMIN" | "INNOVATION_MANAGER" | "MEMBER";
+type GlobalRoleName = "PLATFORM_ADMIN" | "INNOVATION_MANAGER" | "MEMBER" | "EXTERNAL";
 type ResourceRoleName =
   | "CAMPAIGN_MANAGER"
   | "CAMPAIGN_COACH"
@@ -277,6 +283,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PORTFOLIO_READ,
     Action.PORTFOLIO_UPDATE,
     Action.PORTFOLIO_DELETE,
+    Action.EXTERNAL_INVITATION_CREATE,
+    Action.EXTERNAL_INVITATION_LIST,
+    Action.EXTERNAL_INVITATION_REVOKE,
+    Action.EXTERNAL_INVITATION_REVOKE_ACCESS,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -320,6 +330,20 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.INSIGHT_CREATE,
     Action.INSIGHT_READ,
     Action.PORTFOLIO_READ,
+  ],
+  EXTERNAL: [
+    Action.USER_READ_OWN,
+    Action.USER_UPDATE_OWN,
+    Action.CAMPAIGN_READ,
+    Action.IDEA_CREATE,
+    Action.IDEA_READ,
+    Action.IDEA_UPDATE_OWN,
+    Action.IDEA_DELETE_OWN,
+    Action.COMMENT_CREATE,
+    Action.COMMENT_READ,
+    Action.COMMENT_UPDATE_OWN,
+    Action.COMMENT_DELETE_OWN,
+    Action.NOTIFICATION_READ_OWN,
   ],
 } as const;
 
