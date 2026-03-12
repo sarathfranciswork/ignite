@@ -15,10 +15,14 @@ const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 1025;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM ?? "noreply@ignite.local";
+const SMTP_FROM = process.env.SMTP_FROM ?? "Ignite <noreply@ignite.local>";
 
-function isSmtpConfigured(): boolean {
+export function isEmailEnabled(): boolean {
   return !!SMTP_HOST;
+}
+
+export function getSenderAddress(): string {
+  return SMTP_FROM;
 }
 
 let transporter: Transporter | null = null;
@@ -26,7 +30,7 @@ let transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (transporter) return transporter;
 
-  if (!isSmtpConfigured()) {
+  if (!isEmailEnabled()) {
     childLogger.warn("SMTP not configured — emails will be logged but not sent");
     transporter = nodemailer.createTransport({
       jsonTransport: true,
@@ -56,7 +60,7 @@ export async function sendEmail(message: EmailMessage): Promise<boolean> {
       ...(message.text ? { text: message.text } : {}),
     });
 
-    if (!isSmtpConfigured()) {
+    if (!isEmailEnabled()) {
       childLogger.info(
         { to: message.to, subject: message.subject },
         "Email logged (SMTP not configured)",
