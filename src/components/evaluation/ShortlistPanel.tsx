@@ -1,207 +1,250 @@
 "use client";
 
 import * as React from "react";
-import { Lock, Trash2, ArrowRight, Loader2 } from "lucide-react";
+import { Lock, Plus, Trash2, ArrowRight, ListChecks } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-
-interface ShortlistItem {
-  id: string;
-  ideaId: string;
-  ideaTitle: string;
-  ideaTeaser: string | null;
-  ideaStatus: string;
-  addedById: string;
-  addedAt: string;
-  forwardedTo: string | null;
-  forwardedAt: string | null;
-}
 
 interface ShortlistPanelProps {
   sessionId: string;
-  isLocked: boolean;
-  items: ShortlistItem[];
-  onRefresh: () => void;
+  selectedIdeaIds: Set<string>;
+  onClearSelection: () => void;
 }
 
-type ForwardTarget = "SELECTED_IMPLEMENTATION" | "CONCEPT" | "ARCHIVED";
-
-const FORWARD_LABELS: Record<ForwardTarget, string> = {
-  SELECTED_IMPLEMENTATION: "Implementation",
+const DESTINATION_LABELS: Record<string, string> = {
+  IMPLEMENTATION: "Implementation",
   CONCEPT: "Concept",
-  ARCHIVED: "Archive",
+  ARCHIVE: "Archive",
 };
 
-export function ShortlistPanel({ sessionId, isLocked, items, onRefresh }: ShortlistPanelProps) {
-  const [forwardTarget, setForwardTarget] =
-    React.useState<ForwardTarget>("SELECTED_IMPLEMENTATION");
+const DESTINATION_COLORS: Record<string, string> = {
+  IMPLEMENTATION: "bg-emerald-100 text-emerald-700",
+  CONCEPT: "bg-blue-100 text-blue-700",
+  ARCHIVE: "bg-gray-100 text-gray-600",
+};
 
+export function ShortlistPanel({
+  sessionId,
+  selectedIdeaIds,
+  onClearSelection,
+}: ShortlistPanelProps) {
   const utils = trpc.useUtils();
 
-  const lockMutation = trpc.evaluation.shortlistLock.useMutation({
+  const shortlistQuery = trpc.evaluation.shortlistGet.useQuery({ sessionId });
+
+  const addIdeasMutation = trpc.evaluation.shortlistAddIdeas.useMutation({
     onSuccess: () => {
-      onRefresh();
-      void utils.evaluation.shortlistGet.invalidate({ sessionId });
-      void utils.evaluation.enhancedResults.invalidate({ sessionId });
+      utils.evaluation.shortlistGet.invalidate({ sessionId });
+      onClearSelection();
     },
   });
 
-  const removeMutation = trpc.evaluation.shortlistRemove.useMutation({
+  const removeIdeaMutation = trpc.evaluation.shortlistRemoveIdea.useMutation({
     onSuccess: () => {
-      onRefresh();
-      void utils.evaluation.enhancedResults.invalidate({ sessionId });
+      utils.evaluation.shortlistGet.invalidate({ sessionId });
+    },
+  });
+
+  const lockMutation = trpc.evaluation.shortlistLock.useMutation({
+    onSuccess: () => {
+      utils.evaluation.shortlistGet.invalidate({ sessionId });
     },
   });
 
   const forwardMutation = trpc.evaluation.shortlistForward.useMutation({
     onSuccess: () => {
-      onRefresh();
-      void utils.evaluation.enhancedResults.invalidate({ sessionId });
+      utils.evaluation.shortlistGet.invalidate({ sessionId });
     },
   });
 
-  const forwardAllMutation = trpc.evaluation.shortlistForwardAll.useMutation({
-    onSuccess: () => {
-      onRefresh();
-      void utils.evaluation.enhancedResults.invalidate({ sessionId });
-    },
-  });
+  const handleAddSelected = React.useCallback(() => {
+    if (selectedIdeaIds.size === 0) return;
+    addIdeasMutation.mutate({
+      sessionId,
+      ideaIds: Array.from(selectedIdeaIds),
+    });
+  }, [sessionId, selectedIdeaIds, addIdeasMutation]);
 
-  const unforwardedItems = items.filter((item) => !item.forwardedTo);
-  const forwardedItems = items.filter((item) => item.forwardedTo);
+  const handleRemove = React.useCallback(
+    (ideaId: string) => {
+      removeIdeaMutation.mutate({ sessionId, ideaId });
+    },
+    [sessionId, removeIdeaMutation],
+  );
+
+  const handleLock = React.useCallback(() => {
+    if (!window.confirm("Lock this shortlist? This prevents further modifications.")) return;
+    lockMutation.mutate({ sessionId });
+  }, [sessionId, lockMutation]);
+
+  const handleForward = React.useCallback(
+    (ideaId: string, destination: "IMPLEMENTATION" | "CONCEPT" | "ARCHIVE") => {
+      forwardMutation.mutate({ sessionId, ideaId, destination });
+    },
+    [sessionId, forwardMutation],
+  );
+
+  if (shortlistQuery.isLoading) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="h-4 w-32 animate-pulse rounded bg-gray-100" />
+      </div>
+    );
+  }
+
+  const shortlist = shortlistQuery.data;
+  const isLocked = shortlist?.isLocked ?? false;
+  const entries = shortlist?.entries ?? [];
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white">
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <h3 className="font-semibold text-gray-900">
-          Shortlist ({items.length} idea{items.length !== 1 ? "s" : ""})
-        </h3>
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isLocked ? (
-            <span className="flex items-center gap-1 text-sm text-amber-600">
-              <Lock className="h-4 w-4" />
+          <ListChecks className="h-4 w-4 text-gray-500" />
+          <h3 className="text-sm font-semibold text-gray-900">Shortlist</h3>
+          {isLocked && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              <Lock className="h-3 w-3" />
               Locked
             </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => lockMutation.mutate({ sessionId })}
-              disabled={lockMutation.isPending || items.length === 0}
-              className="flex items-center gap-1 rounded-md bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {lockMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Lock className="h-4 w-4" />
-              )}
-              Lock Shortlist
-            </button>
           )}
         </div>
+        <span className="text-xs text-gray-400">
+          {entries.length} idea{entries.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {items.length === 0 ? (
-        <div className="px-4 py-6 text-center text-sm text-gray-500">
-          No ideas shortlisted yet. Use the star icons in the results table to add ideas.
+      {selectedIdeaIds.size > 0 && !isLocked && (
+        <div className="mt-3">
+          <Button
+            size="sm"
+            onClick={handleAddSelected}
+            disabled={addIdeasMutation.isPending}
+            className="w-full"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Add {selectedIdeaIds.size} Selected to Shortlist
+          </Button>
         </div>
-      ) : (
-        <div>
-          {/* Unforwarded items */}
-          {unforwardedItems.length > 0 && (
-            <ul className="divide-y divide-gray-100">
-              {unforwardedItems.map((item) => (
-                <li key={item.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-gray-900">{item.ideaTitle}</p>
-                    {item.ideaTeaser && (
-                      <p className="truncate text-xs text-gray-500">{item.ideaTeaser}</p>
-                    )}
-                  </div>
-                  <div className="ml-3 flex items-center gap-2">
-                    {isLocked && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          forwardMutation.mutate({
-                            sessionId,
-                            ideaId: item.ideaId,
-                            target: forwardTarget,
-                          })
-                        }
-                        disabled={forwardMutation.isPending}
-                        className="flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-200 disabled:opacity-50"
-                        title={`Forward to ${FORWARD_LABELS[forwardTarget]}`}
-                      >
-                        <ArrowRight className="h-3 w-3" />
-                        {FORWARD_LABELS[forwardTarget]}
-                      </button>
-                    )}
-                    {!isLocked && (
-                      <button
-                        type="button"
-                        onClick={() => removeMutation.mutate({ sessionId, ideaId: item.ideaId })}
-                        disabled={removeMutation.isPending}
-                        className="rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-                        title="Remove from shortlist"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+      )}
 
-          {/* Forwarded items */}
-          {forwardedItems.length > 0 && (
-            <div className="border-t border-gray-200 bg-gray-50">
-              <p className="px-4 py-2 text-xs font-medium text-gray-500">Forwarded</p>
-              <ul className="divide-y divide-gray-100">
-                {forwardedItems.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between px-4 py-2">
-                    <p className="truncate text-sm text-gray-600">{item.ideaTitle}</p>
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                      {FORWARD_LABELS[item.forwardedTo as ForwardTarget] ?? item.forwardedTo}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Bulk actions when locked */}
-          {isLocked && unforwardedItems.length > 0 && (
-            <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
-              <div className="flex items-center gap-3">
-                <label htmlFor="forward-target" className="text-sm text-gray-600">
-                  Forward all to:
-                </label>
-                <select
-                  id="forward-target"
-                  value={forwardTarget}
-                  onChange={(e) => setForwardTarget(e.target.value as ForwardTarget)}
-                  className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                >
-                  <option value="SELECTED_IMPLEMENTATION">Implementation</option>
-                  <option value="CONCEPT">Concept</option>
-                  <option value="ARCHIVED">Archive</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => forwardAllMutation.mutate({ sessionId, target: forwardTarget })}
-                  disabled={forwardAllMutation.isPending}
-                  className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {forwardAllMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" />
+      {entries.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {entries.map((entry) => (
+            <li key={entry.ideaId} className="rounded-lg border border-gray-100 px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{entry.ideaTitle}</p>
+                  {entry.ideaTeaser && (
+                    <p className="truncate text-xs text-gray-400">{entry.ideaTeaser}</p>
                   )}
-                  Forward All ({unforwardedItems.length})
-                </button>
+                  {entry.forwardedTo && (
+                    <span
+                      className={cn(
+                        "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                        DESTINATION_COLORS[entry.forwardedTo] ?? "bg-gray-100 text-gray-600",
+                      )}
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                      {DESTINATION_LABELS[entry.forwardedTo] ?? entry.forwardedTo}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {!entry.forwardedTo && (
+                    <ForwardDropdown
+                      onForward={(dest) => handleForward(entry.ideaId, dest)}
+                      disabled={forwardMutation.isPending}
+                    />
+                  )}
+                  {!isLocked && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(entry.ideaId)}
+                      disabled={removeIdeaMutation.isPending}
+                      className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                      aria-label="Remove from shortlist"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-center text-xs text-gray-400">
+          Select ideas from the results table and add them to the shortlist.
+        </p>
+      )}
+
+      {entries.length > 0 && !isLocked && (
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLock}
+            disabled={lockMutation.isPending}
+            className="w-full"
+          >
+            <Lock className="mr-1.5 h-3.5 w-3.5" />
+            Lock Shortlist
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ForwardDropdown({
+  onForward,
+  disabled,
+}: {
+  onForward: (dest: "IMPLEMENTATION" | "CONCEPT" | "ARCHIVE") => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const currentRef = ref.current;
+    function handleClickOutside(event: MouseEvent) {
+      if (currentRef && !currentRef.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        aria-label="Forward idea"
+      >
+        <ArrowRight className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-10 mt-1 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {(["IMPLEMENTATION", "CONCEPT", "ARCHIVE"] as const).map((dest) => (
+            <button
+              key={dest}
+              type="button"
+              onClick={() => {
+                onForward(dest);
+                setOpen(false);
+              }}
+              className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
+            >
+              {DESTINATION_LABELS[dest]}
+            </button>
+          ))}
         </div>
       )}
     </div>

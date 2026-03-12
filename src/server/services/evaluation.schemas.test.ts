@@ -13,9 +13,13 @@ import {
   evaluationSendRemindersInput,
   shortlistAddItemInput,
   shortlistRemoveItemInput,
+  shortlistGetInput,
+  shortlistAddIdeasInput,
+  shortlistRemoveIdeaInput,
   shortlistLockInput,
   shortlistForwardInput,
   shortlistForwardAllInput,
+  shortlistUpdateEntryInput,
 } from "./evaluation.schemas";
 
 describe("evaluation.schemas", () => {
@@ -373,11 +377,51 @@ describe("evaluation.schemas", () => {
     });
   });
 
+  describe("shortlistGetInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistGetInput.safeParse({ sessionId: "s1" });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects missing sessionId", () => {
+      const result = shortlistGetInput.safeParse({});
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("shortlistAddIdeasInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistAddIdeasInput.safeParse({
+        sessionId: "s1",
+        ideaIds: ["i1", "i2"],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects empty ideaIds array", () => {
+      const result = shortlistAddIdeasInput.safeParse({
+        sessionId: "s1",
+        ideaIds: [],
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("shortlistRemoveItemInput", () => {
     it("accepts valid input", () => {
       const result = shortlistRemoveItemInput.safeParse({
         sessionId: "session_1",
         ideaId: "idea_1",
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("shortlistRemoveIdeaInput", () => {
+    it("accepts valid input", () => {
+      const result = shortlistRemoveIdeaInput.safeParse({
+        sessionId: "s1",
+        ideaId: "i1",
       });
       expect(result.success).toBe(true);
     });
@@ -391,38 +435,22 @@ describe("evaluation.schemas", () => {
   });
 
   describe("shortlistForwardInput", () => {
-    it("accepts SELECTED_IMPLEMENTATION target", () => {
-      const result = shortlistForwardInput.safeParse({
-        sessionId: "session_1",
-        ideaId: "idea_1",
-        target: "SELECTED_IMPLEMENTATION",
-      });
-      expect(result.success).toBe(true);
+    it("accepts valid forward destinations", () => {
+      for (const dest of ["IMPLEMENTATION", "CONCEPT", "ARCHIVE"]) {
+        const result = shortlistForwardInput.safeParse({
+          sessionId: "s1",
+          ideaId: "i1",
+          destination: dest,
+        });
+        expect(result.success).toBe(true);
+      }
     });
 
-    it("accepts CONCEPT target", () => {
+    it("rejects invalid destination", () => {
       const result = shortlistForwardInput.safeParse({
-        sessionId: "session_1",
-        ideaId: "idea_1",
-        target: "CONCEPT",
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it("accepts ARCHIVED target", () => {
-      const result = shortlistForwardInput.safeParse({
-        sessionId: "session_1",
-        ideaId: "idea_1",
-        target: "ARCHIVED",
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it("rejects invalid target", () => {
-      const result = shortlistForwardInput.safeParse({
-        sessionId: "session_1",
-        ideaId: "idea_1",
-        target: "INVALID",
+        sessionId: "s1",
+        ideaId: "i1",
+        destination: "INVALID",
       });
       expect(result.success).toBe(false);
     });
@@ -439,6 +467,36 @@ describe("evaluation.schemas", () => {
 
     it("rejects missing target", () => {
       const result = shortlistForwardAllInput.safeParse({ sessionId: "session_1" });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("shortlistUpdateEntryInput", () => {
+    it("accepts valid input with rank and notes", () => {
+      const result = shortlistUpdateEntryInput.safeParse({
+        sessionId: "s1",
+        ideaId: "i1",
+        rank: 3,
+        notes: "Top pick",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts input with only rank", () => {
+      const result = shortlistUpdateEntryInput.safeParse({
+        sessionId: "s1",
+        ideaId: "i1",
+        rank: 0,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects negative rank", () => {
+      const result = shortlistUpdateEntryInput.safeParse({
+        sessionId: "s1",
+        ideaId: "i1",
+        rank: -1,
+      });
       expect(result.success).toBe(false);
     });
   });

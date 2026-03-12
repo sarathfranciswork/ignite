@@ -274,5 +274,3 @@ export async function submitPairwiseComparison(
 
   return { saved: input.comparisons.length };
 }
-
-

@@ -557,6 +557,7 @@ model Idea {
   shortlistItems         EvaluationShortlistItem[]
   pairwiseAsIdeaA        PairwiseComparison[]      @relation("PairwiseIdeaA")
   pairwiseAsIdeaB        PairwiseComparison[]      @relation("PairwiseIdeaB")
+  shortlistEntries       ShortlistEntry[]
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1337,6 +1338,7 @@ model EvaluationSession {
   responses           EvaluationResponse[]
   pairwiseComparisons PairwiseComparison[]
   shortlistItems      EvaluationShortlistItem[]
+  shortlist           Shortlist?
 
   @@index([campaignId])
   @@index([status])
@@ -1493,4 +1495,60 @@ model PairwiseComparison {
   @@index([sessionId])
   @@index([sessionId, evaluatorId])
   @@map("pairwise_comparisons")
+}
+
+// ── Shortlist Model ──────────────────────────────────────────
+
+model Shortlist {
+  id        String  @id @default(cuid())
+  sessionId String  @unique @map("session_id")
+  isLocked  Boolean @default(false) @map("is_locked")
+
+  // Who created/locked
+  createdById String   @map("created_by_id")
+  lockedById  String?  @map("locked_by_id")
+  lockedAt    DateTime? @map("locked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  entries ShortlistEntry[]
+
+  @@index([sessionId])
+  @@map("shortlists")
+}
+
+enum ShortlistForwardDestination {
+  IMPLEMENTATION
+  CONCEPT
+  ARCHIVE
+
+  @@map("shortlist_forward_destination")
+}
+
+model ShortlistEntry {
+  id          String  @id @default(cuid())
+  shortlistId String  @map("shortlist_id")
+  ideaId      String  @map("idea_id")
+  rank        Int     @default(0)
+  notes       String? @db.Text
+
+  // Forward destination
+  forwardedTo ShortlistForwardDestination? @map("forwarded_to")
+  forwardedAt DateTime?                    @map("forwarded_at")
+  forwardedBy String?                      @map("forwarded_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  shortlist Shortlist @relation(fields: [shortlistId], references: [id], onDelete: Cascade)
+  idea      Idea      @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@unique([shortlistId, ideaId])
+  @@index([shortlistId])
+  @@index([ideaId])
+  @@map("shortlist_entries")
 }

@@ -57,8 +57,11 @@ export interface EventMap {
   "evaluation.pairwiseComparisonSubmitted": EventPayload;
   "evaluation.shortlistItemAdded": EventPayload;
   "evaluation.shortlistItemRemoved": EventPayload;
+  "evaluation.shortlistCreated": EventPayload;
+  "evaluation.shortlistUpdated": EventPayload;
   "evaluation.shortlistLocked": EventPayload;
   "evaluation.shortlistForwarded": EventPayload;
+  "evaluation.shortlistIdeaForwarded": EventPayload;
   "notification.created": EventPayload;
   "rbac.roleAssigned": EventPayload;
   "rbac.roleRemoved": EventPayload;

@@ -34,6 +34,9 @@ import {
   shortlistGetInput,
   shortlistForwardInput,
   shortlistForwardAllInput,
+  shortlistAddIdeasInput,
+  shortlistRemoveIdeaInput,
+  shortlistUpdateEntryInput,
 } from "@/server/services/evaluation.schemas";
 import {
   listEvaluationSessions,
@@ -70,13 +73,18 @@ import {
 } from "@/server/services/pairwise-ranking.service";
 import {
   getEnhancedResults,
-  getShortlist,
   addToShortlist,
   removeFromShortlist,
-  lockShortlist,
-  forwardShortlistItem,
   forwardAllShortlistItems,
 } from "@/server/services/results.service";
+import {
+  getShortlist,
+  addIdeasToShortlist,
+  removeIdeaFromShortlist,
+  lockShortlist,
+  forwardShortlistedIdea,
+  updateShortlistEntry,
+} from "@/server/services/shortlist.service";
 
 function handleEvaluationError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -104,6 +112,9 @@ function handleEvaluationError(error: unknown): never {
       SHORTLIST_NOT_LOCKED: "BAD_REQUEST",
       NOT_IN_SHORTLIST: "NOT_FOUND",
       NOT_EVALUATOR: "FORBIDDEN",
+      SHORTLIST_NOT_FOUND: "NOT_FOUND",
+      IDEA_NOT_IN_SHORTLIST: "NOT_FOUND",
+      SHORTLIST_EMPTY: "BAD_REQUEST",
     };
 
     throw new TRPCError({
@@ -427,6 +438,8 @@ export const evaluationRouter = createTRPCRouter({
       }
     }),
 
+  // ── Shortlist Endpoints ────────────────────────────────
+
   shortlistGet: protectedProcedure
     .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
     .input(shortlistGetInput)
@@ -449,12 +462,34 @@ export const evaluationRouter = createTRPCRouter({
       }
     }),
 
+  shortlistAddIdeas: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_IDEAS))
+    .input(shortlistAddIdeasInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await addIdeasToShortlist(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
   shortlistRemove: protectedProcedure
     .use(requirePermission(Action.EVALUATION_UPDATE))
     .input(shortlistRemoveItemInput)
     .mutation(async ({ ctx, input }) => {
       try {
         return await removeFromShortlist(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistRemoveIdea: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_IDEAS))
+    .input(shortlistRemoveIdeaInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await removeIdeaFromShortlist(input, ctx.session.user.id);
       } catch (error) {
         handleEvaluationError(error);
       }
@@ -476,7 +511,7 @@ export const evaluationRouter = createTRPCRouter({
     .input(shortlistForwardInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await forwardShortlistItem(input, ctx.session.user.id);
+        return await forwardShortlistedIdea(input, ctx.session.user.id);
       } catch (error) {
         handleEvaluationError(error);
       }
@@ -488,6 +523,17 @@ export const evaluationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await forwardAllShortlistItems(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  shortlistUpdateEntry: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_MANAGE_IDEAS))
+    .input(shortlistUpdateEntryInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await updateShortlistEntry(input, ctx.session.user.id);
       } catch (error) {
         handleEvaluationError(error);
       }

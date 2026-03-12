@@ -138,8 +138,8 @@ export function EvaluationSessionList({ campaignId }: EvaluationSessionListProps
                     </Link>
                   </>
                 )}
-                {session.status === "COMPLETED" && (
-                  <Link href={`/campaigns/${campaignId}/evaluate/${session.id}`}>
+                {(session.status === "COMPLETED" || session.status === "ACTIVE") && (
+                  <Link href={`/campaigns/${campaignId}/evaluate/${session.id}/results`}>
                     <Button variant="outline" size="sm">
                       View Results
                     </Button>

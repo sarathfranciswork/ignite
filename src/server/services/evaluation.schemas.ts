@@ -197,23 +197,40 @@ export const shortlistRemoveItemInput = z.object({
   ideaId: z.string(),
 });
 
-export const shortlistLockInput = z.object({
+export const shortlistGetInput = z.object({
   sessionId: z.string(),
 });
 
-export const shortlistGetInput = z.object({
+export const shortlistAddIdeasInput = z.object({
+  sessionId: z.string(),
+  ideaIds: z.array(z.string()).min(1, "At least one idea is required"),
+});
+
+export const shortlistRemoveIdeaInput = z.object({
+  sessionId: z.string(),
+  ideaId: z.string(),
+});
+
+export const shortlistLockInput = z.object({
   sessionId: z.string(),
 });
 
 export const shortlistForwardInput = z.object({
   sessionId: z.string(),
   ideaId: z.string(),
-  target: z.enum(["SELECTED_IMPLEMENTATION", "CONCEPT", "ARCHIVED"]),
+  destination: z.enum(["IMPLEMENTATION", "CONCEPT", "ARCHIVE"]),
 });
 
 export const shortlistForwardAllInput = z.object({
   sessionId: z.string(),
   target: z.enum(["SELECTED_IMPLEMENTATION", "CONCEPT", "ARCHIVED"]),
+});
+
+export const shortlistUpdateEntryInput = z.object({
+  sessionId: z.string(),
+  ideaId: z.string(),
+  rank: z.number().int().min(0).optional(),
+  notes: z.string().max(5000).optional().nullable(),
 });
 
 // ── Error Class ──────────────────────────────────────────────
@@ -258,3 +275,6 @@ export type ShortlistLockInput = z.infer<typeof shortlistLockInput>;
 export type ShortlistGetInput = z.infer<typeof shortlistGetInput>;
 export type ShortlistForwardInput = z.infer<typeof shortlistForwardInput>;
 export type ShortlistForwardAllInput = z.infer<typeof shortlistForwardAllInput>;
+export type ShortlistAddIdeasInput = z.infer<typeof shortlistAddIdeasInput>;
+export type ShortlistRemoveIdeaInput = z.infer<typeof shortlistRemoveIdeaInput>;
+export type ShortlistUpdateEntryInput = z.infer<typeof shortlistUpdateEntryInput>;
