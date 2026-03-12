@@ -94,6 +94,11 @@ model User {
   ownedConcepts              Concept[]                   @relation("ConceptOwner")
   createdConcepts            Concept[]                   @relation("ConceptCreatedBy")
   conceptTeamMemberships     ConceptTeamMember[]         @relation("ConceptTeamMember")
+  facilitatedEvalSessions    EvaluationSession[]         @relation("EvalSessionFacilitator")
+  consensusNotes             ConsensusNote[]             @relation("ConsensusNoteAuthor")
+  createdSubmissionDefs      SubmissionDefinition[]      @relation("SubmissionDefinitionCreatedBy")
+  submittedGenericSubs       GenericSubmission[]         @relation("GenericSubmissionSubmitter")
+  reviewedGenericSubs        GenericSubmission[]         @relation("GenericSubmissionReviewer")
 
   @@map("users")
 }
@@ -1486,6 +1491,7 @@ model EvaluationSession {
   // One-Team collaborative fields
   isCollaborative    Boolean   @default(false) @map("is_collaborative")
   facilitatorId      String?   @map("facilitator_id")
+  facilitator        User?     @relation("EvalSessionFacilitator", fields: [facilitatorId], references: [id], onDelete: SetNull)
   consensusRequired  Boolean   @default(false) @map("consensus_required")
   liveSessionStarted DateTime? @map("live_session_started")
   liveSessionEnded   DateTime? @map("live_session_ended")
@@ -2438,9 +2444,11 @@ model ConsensusNote {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   session EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  author  User              @relation("ConsensusNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([sessionId, ideaId])
+  @@index([authorId])
   @@map("consensus_notes")
 }
 
@@ -2482,6 +2490,7 @@ model SubmissionDefinition {
   updatedAt   DateTime                   @updatedAt @map("updated_at")
 
   campaign    Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdBy   User                @relation("SubmissionDefinitionCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
   fields      SubmissionField[]
   submissions GenericSubmission[]
 
@@ -2540,10 +2549,13 @@ model GenericSubmission {
   updatedAt     DateTime                @updatedAt @map("updated_at")
 
   definition  SubmissionDefinition   @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  submittedBy User                   @relation("GenericSubmissionSubmitter", fields: [submittedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?                  @relation("GenericSubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   fieldValues SubmissionFieldValue[]
 
   @@index([definitionId])
   @@index([submittedById])
+  @@index([reviewedById])
   @@index([status])
   @@index([definitionId, status])
   @@map("generic_submissions")
