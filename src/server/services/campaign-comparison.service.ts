@@ -1,121 +1,126 @@
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
-import { IdeaStatus } from "@prisma/client";
-import type { CampaignComparisonInput, SuccessFactorInput } from "./campaign-comparison.schemas";
+import type {
+  CampaignComparisonInput,
+  SuccessFactorInput,
+  OrganizationAnalysisInput,
+} from "./campaign-comparison.schemas";
 
 const childLogger = logger.child({ service: "campaign-comparison" });
 
+export class CampaignComparisonServiceError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CampaignComparisonServiceError";
+  }
+}
+
 // ── Types ────────────────────────────────────────────────────
 
-export interface CampaignKpiRow {
+interface CampaignMetrics {
   campaignId: string;
   title: string;
   status: string;
+  createdAt: string;
+  launchedAt: string | null;
+  closedAt: string | null;
+  durationDays: number | null;
   memberCount: number;
   ideaCount: number;
-  participationRate: number;
-  averageVotes: number;
-  hotGraduationRate: number;
-  evaluationCompletionRate: number;
-  shortlistCount: number;
-  totalLikes: number;
-  totalComments: number;
-  totalVotes: number;
-  duration: number | null;
-  hasIdeaCoach: boolean;
-  votingCriteriaCount: number;
-  graduationThreshold: number;
-}
-
-export interface MetricHighlight {
-  metric: string;
-  min: number;
-  max: number;
-  spread: number;
-  isSignificant: boolean;
+  ideaStatusBreakdown: Record<string, number>;
+  engagement: {
+    totalLikes: number;
+    totalComments: number;
+    totalVotes: number;
+    totalViews: number;
+    uniqueVisitors: number;
+  };
+  configuration: {
+    hasSeedingPhase: boolean;
+    hasDiscussionPhase: boolean;
+    hasCommunityGraduation: boolean;
+    hasQualificationPhase: boolean;
+    hasVoting: boolean;
+    hasLikes: boolean;
+    hasIdeaCoach: boolean;
+  };
+  kpiTimeSeries: Array<{
+    date: string;
+    ideasSubmitted: number;
+    totalComments: number;
+    totalVotes: number;
+    totalLikes: number;
+  }>;
 }
 
 export interface CampaignComparisonResult {
-  campaigns: CampaignKpiRow[];
-  highlights: MetricHighlight[];
-  radarMetrics: Array<{
-    metric: string;
-    values: Array<{ campaignId: string; value: number }>;
-  }>;
+  campaigns: CampaignMetrics[];
+  comparedAt: string;
 }
 
-export interface SuccessFactorCorrelation {
-  factor: string;
-  xLabel: string;
-  yLabel: string;
-  dataPoints: Array<{
-    campaignId: string;
-    title: string;
-    x: number;
-    y: number;
-  }>;
-  correlationStrength: number;
-  direction: "positive" | "negative" | "none";
-}
-
-export interface SuccessFactorRecommendation {
-  factor: string;
-  insight: string;
-  recommendedRange: string;
+interface SuccessFactorEntry {
+  campaignId: string;
+  title: string;
+  status: string;
+  configuration: {
+    durationDays: number | null;
+    phaseCount: number;
+    hasVoting: boolean;
+    hasLikes: boolean;
+    hasSeedingPhase: boolean;
+    hasDiscussionPhase: boolean;
+    hasCommunityGraduation: boolean;
+    hasQualificationPhase: boolean;
+    hasIdeaCoach: boolean;
+  };
+  outcomes: {
+    totalIdeas: number;
+    hotIdeas: number;
+    evaluatedIdeas: number;
+    selectedIdeas: number;
+    totalLikes: number;
+    totalComments: number;
+    totalVotes: number;
+    memberCount: number;
+    ideasPerMember: number;
+  };
+  successScore: number;
 }
 
 export interface SuccessFactorResult {
-  correlations: SuccessFactorCorrelation[];
-  recommendations: SuccessFactorRecommendation[];
-  campaignCount: number;
+  entries: SuccessFactorEntry[];
+  averages: {
+    avgDurationDays: number | null;
+    avgIdeasPerMember: number;
+    avgSuccessScore: number;
+  };
+  analyzedAt: string;
 }
 
-// ── Helpers ──────────────────────────────────────────────────
-
-function calculateCorrelation(xs: number[], ys: number[]): number {
-  const n = xs.length;
-  if (n < 3) return 0;
-
-  const meanX = xs.reduce((a, b) => a + b, 0) / n;
-  const meanY = ys.reduce((a, b) => a + b, 0) / n;
-
-  let numerator = 0;
-  let denomX = 0;
-  let denomY = 0;
-
-  for (let i = 0; i < n; i++) {
-    const dx = (xs[i] ?? 0) - meanX;
-    const dy = (ys[i] ?? 0) - meanY;
-    numerator += dx * dy;
-    denomX += dx * dx;
-    denomY += dy * dy;
-  }
-
-  const denom = Math.sqrt(denomX * denomY);
-  if (denom === 0) return 0;
-
-  return numerator / denom;
+interface OrgUnitActivity {
+  orgUnitId: string;
+  orgUnitName: string;
+  memberCount: number;
+  ideasSubmitted: number;
+  commentsContributed: number;
+  votesParticipated: number;
+  likesGiven: number;
+  campaignsParticipated: number;
 }
 
-function getCorrelationDirection(r: number): "positive" | "negative" | "none" {
-  if (r > 0.3) return "positive";
-  if (r < -0.3) return "negative";
-  return "none";
-}
-
-function normalizeToPercent(value: number, max: number): number {
-  if (max === 0) return 0;
-  return Math.round((value / max) * 100);
-}
-
-function getDurationDays(campaign: {
-  launchedAt: Date | null;
-  closedAt: Date | null;
-  createdAt: Date;
-}): number | null {
-  const start = campaign.launchedAt ?? campaign.createdAt;
-  const end = campaign.closedAt ?? new Date();
-  return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+export interface OrganizationAnalysisResult {
+  orgUnits: OrgUnitActivity[];
+  totals: {
+    totalOrgUnits: number;
+    totalMembers: number;
+    totalIdeas: number;
+    totalComments: number;
+    totalVotes: number;
+  };
+  analyzedAt: string;
 }
 
 // ── Service Functions ────────────────────────────────────────
@@ -129,15 +134,16 @@ export async function compareCampaigns(
       id: true,
       title: true,
       status: true,
+      createdAt: true,
       launchedAt: true,
       closedAt: true,
-      createdAt: true,
+      hasSeedingPhase: true,
+      hasDiscussionPhase: true,
+      hasCommunityGraduation: true,
+      hasQualificationPhase: true,
+      hasVoting: true,
+      hasLikes: true,
       hasIdeaCoach: true,
-      votingCriteria: true,
-      graduationLikes: true,
-      graduationCommenters: true,
-      graduationVisitors: true,
-      graduationVoters: true,
       _count: {
         select: { members: true, ideas: true },
       },
@@ -145,23 +151,16 @@ export async function compareCampaigns(
   });
 
   if (campaigns.length < 2) {
-    throw new CampaignComparisonError(
+    throw new CampaignComparisonServiceError(
       "INSUFFICIENT_CAMPAIGNS",
       "At least 2 valid campaigns are required for comparison",
     );
   }
 
-  const kpiRows: CampaignKpiRow[] = [];
+  const campaignMetrics: CampaignMetrics[] = [];
 
   for (const campaign of campaigns) {
-    const [
-      ideaStatusGroups,
-      engagementAgg,
-      voteCount,
-      shortlistCount,
-      evalSessionCount,
-      completedEvalCount,
-    ] = await Promise.all([
+    const [ideaGroups, engagementAgg, voteCount, snapshots] = await Promise.all([
       prisma.idea.groupBy({
         by: ["status"],
         where: { campaignId: campaign.id },
@@ -174,434 +173,389 @@ export async function compareCampaigns(
       prisma.ideaVote.count({
         where: { idea: { campaignId: campaign.id } },
       }),
-      prisma.evaluationShortlistItem.count({
-        where: { session: { campaignId: campaign.id } },
-      }),
-      prisma.evaluationSession.count({
+      prisma.campaignKpiSnapshot.findMany({
         where: { campaignId: campaign.id },
-      }),
-      prisma.evaluationSession.count({
-        where: { campaignId: campaign.id, status: "COMPLETED" },
+        orderBy: { snapshotDate: "asc" },
+        select: {
+          snapshotDate: true,
+          ideasSubmitted: true,
+          totalComments: true,
+          totalVotes: true,
+          totalLikes: true,
+          totalViews: true,
+          uniqueVisitors: true,
+        },
       }),
     ]);
 
-    const statusMap = new Map(ideaStatusGroups.map((g) => [g.status, g._count.id]));
+    const ideaStatusBreakdown: Record<string, number> = {};
+    for (const group of ideaGroups) {
+      ideaStatusBreakdown[group.status] = group._count.id;
+    }
 
-    const totalIdeas = campaign._count.ideas;
-    const hotCount = statusMap.get(IdeaStatus.HOT) ?? 0;
-    const evaluatedCount = statusMap.get(IdeaStatus.EVALUATION) ?? 0;
-    const selectedCount = statusMap.get(IdeaStatus.SELECTED_IMPLEMENTATION) ?? 0;
-    const implementedCount = statusMap.get(IdeaStatus.IMPLEMENTED) ?? 0;
+    const latestSnapshot = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
 
-    const advancedPastDraft = totalIdeas - (statusMap.get(IdeaStatus.DRAFT) ?? 0);
-    const hotGraduationRate =
-      advancedPastDraft > 0
-        ? (hotCount + evaluatedCount + selectedCount + implementedCount) / advancedPastDraft
-        : 0;
+    let durationDays: number | null = null;
+    if (campaign.launchedAt) {
+      const endDate = campaign.closedAt ?? new Date();
+      durationDays = Math.round(
+        (endDate.getTime() - campaign.launchedAt.getTime()) / (1000 * 60 * 60 * 24),
+      );
+    }
 
-    const participationRate =
-      campaign._count.members > 0 ? totalIdeas / campaign._count.members : 0;
-
-    const averageVotes = totalIdeas > 0 ? voteCount / totalIdeas : 0;
-
-    const evaluationCompletionRate =
-      evalSessionCount > 0 ? completedEvalCount / evalSessionCount : 0;
-
-    const votingCriteriaArray = campaign.votingCriteria as unknown[];
-    const votingCriteriaCount = Array.isArray(votingCriteriaArray) ? votingCriteriaArray.length : 0;
-
-    const graduationThreshold =
-      campaign.graduationLikes +
-      campaign.graduationCommenters +
-      campaign.graduationVisitors +
-      campaign.graduationVoters;
-
-    kpiRows.push({
+    campaignMetrics.push({
       campaignId: campaign.id,
       title: campaign.title,
       status: campaign.status,
+      createdAt: campaign.createdAt.toISOString(),
+      launchedAt: campaign.launchedAt?.toISOString() ?? null,
+      closedAt: campaign.closedAt?.toISOString() ?? null,
+      durationDays,
       memberCount: campaign._count.members,
-      ideaCount: totalIdeas,
-      participationRate: Math.round(participationRate * 100) / 100,
-      averageVotes: Math.round(averageVotes * 100) / 100,
-      hotGraduationRate: Math.round(hotGraduationRate * 100) / 100,
-      evaluationCompletionRate: Math.round(evaluationCompletionRate * 100) / 100,
-      shortlistCount,
-      totalLikes: engagementAgg._sum.likesCount ?? 0,
-      totalComments: engagementAgg._sum.commentsCount ?? 0,
-      totalVotes: voteCount,
-      duration: getDurationDays(campaign),
-      hasIdeaCoach: campaign.hasIdeaCoach,
-      votingCriteriaCount,
-      graduationThreshold,
+      ideaCount: campaign._count.ideas,
+      ideaStatusBreakdown,
+      engagement: {
+        totalLikes: engagementAgg._sum.likesCount ?? 0,
+        totalComments: engagementAgg._sum.commentsCount ?? 0,
+        totalVotes: voteCount,
+        totalViews: latestSnapshot?.totalViews ?? 0,
+        uniqueVisitors: latestSnapshot?.uniqueVisitors ?? 0,
+      },
+      configuration: {
+        hasSeedingPhase: campaign.hasSeedingPhase,
+        hasDiscussionPhase: campaign.hasDiscussionPhase,
+        hasCommunityGraduation: campaign.hasCommunityGraduation,
+        hasQualificationPhase: campaign.hasQualificationPhase,
+        hasVoting: campaign.hasVoting,
+        hasLikes: campaign.hasLikes,
+        hasIdeaCoach: campaign.hasIdeaCoach,
+      },
+      kpiTimeSeries: snapshots.map((s) => ({
+        date: s.snapshotDate.toISOString().split("T")[0] ?? "",
+        ideasSubmitted: s.ideasSubmitted,
+        totalComments: s.totalComments,
+        totalVotes: s.totalVotes,
+        totalLikes: s.totalLikes,
+      })),
     });
   }
 
-  // Calculate highlights — metrics with >50% spread are significant
-  const metricKeys: Array<{ key: keyof CampaignKpiRow; label: string }> = [
-    { key: "participationRate", label: "Participation Rate" },
-    { key: "ideaCount", label: "Idea Count" },
-    { key: "averageVotes", label: "Average Votes" },
-    { key: "hotGraduationRate", label: "HOT! Graduation Rate" },
-    { key: "evaluationCompletionRate", label: "Evaluation Completion Rate" },
-    { key: "shortlistCount", label: "Shortlist Count" },
-    { key: "totalLikes", label: "Total Likes" },
-    { key: "totalComments", label: "Total Comments" },
-  ];
-
-  const highlights: MetricHighlight[] = metricKeys.map(({ key, label }) => {
-    const values = kpiRows.map((r) => r[key] as number);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-    const spread = avg > 0 ? (max - min) / avg : 0;
-
-    return {
-      metric: label,
-      min,
-      max,
-      spread: Math.round(spread * 100) / 100,
-      isSignificant: spread > 0.5,
-    };
-  });
-
-  // Build radar chart data — normalize all metrics to 0-100 scale
-  const radarKeys: Array<{ key: keyof CampaignKpiRow; label: string }> = [
-    { key: "participationRate", label: "Participation" },
-    { key: "hotGraduationRate", label: "HOT! Rate" },
-    { key: "evaluationCompletionRate", label: "Eval Completion" },
-    { key: "averageVotes", label: "Avg Votes" },
-    { key: "totalLikes", label: "Engagement" },
-    { key: "shortlistCount", label: "Shortlisted" },
-  ];
-
-  const radarMetrics = radarKeys.map(({ key, label }) => {
-    const values = kpiRows.map((r) => r[key] as number);
-    const max = Math.max(...values, 1);
-
-    return {
-      metric: label,
-      values: kpiRows.map((r) => ({
-        campaignId: r.campaignId,
-        value: normalizeToPercent(r[key] as number, max),
-      })),
-    };
-  });
-
   childLogger.info(
-    { campaignIds: input.campaignIds, campaignCount: campaigns.length },
-    "Campaign comparison report generated",
+    { campaignIds: input.campaignIds, count: campaignMetrics.length },
+    "Campaign comparison generated",
   );
 
-  return { campaigns: kpiRows, highlights, radarMetrics };
+  return {
+    campaigns: campaignMetrics,
+    comparedAt: new Date().toISOString(),
+  };
 }
 
 export async function getSuccessFactors(input: SuccessFactorInput): Promise<SuccessFactorResult> {
-  const dateFilter = input.dateRange?.from
-    ? {
-        createdAt: {
-          ...(input.dateRange.from ? { gte: new Date(input.dateRange.from) } : {}),
-          ...(input.dateRange.to ? { lte: new Date(input.dateRange.to) } : {}),
-        },
-      }
-    : {};
+  const dateFilter =
+    input.dateRange?.from || input.dateRange?.to
+      ? {
+          createdAt: {
+            ...(input.dateRange.from ? { gte: new Date(input.dateRange.from) } : {}),
+            ...(input.dateRange.to ? { lte: new Date(input.dateRange.to) } : {}),
+          },
+        }
+      : {};
 
-  // Get all non-draft campaigns with enough data
+  const campaignWhere: Record<string, unknown> = {
+    ...dateFilter,
+    status: { notIn: ["DRAFT"] },
+  };
+
+  if (input.campaignIds && input.campaignIds.length > 0) {
+    campaignWhere.id = { in: input.campaignIds };
+  }
+
   const campaigns = await prisma.campaign.findMany({
-    where: {
-      ...dateFilter,
-      status: { notIn: ["DRAFT"] },
-    },
+    where: campaignWhere,
     select: {
       id: true,
       title: true,
       status: true,
       launchedAt: true,
       closedAt: true,
-      createdAt: true,
+      hasSeedingPhase: true,
+      hasDiscussionPhase: true,
+      hasCommunityGraduation: true,
+      hasQualificationPhase: true,
+      hasVoting: true,
+      hasLikes: true,
       hasIdeaCoach: true,
-      votingCriteria: true,
-      graduationLikes: true,
-      graduationCommenters: true,
-      graduationVisitors: true,
-      graduationVoters: true,
       _count: {
         select: { members: true, ideas: true },
       },
     },
   });
 
-  if (campaigns.length === 0) {
-    return { correlations: [], recommendations: [], campaignCount: 0 };
+  const entries: SuccessFactorEntry[] = [];
+
+  for (const campaign of campaigns) {
+    const ideaGroups = await prisma.idea.groupBy({
+      by: ["status"],
+      where: { campaignId: campaign.id },
+      _count: { id: true },
+    });
+
+    const statusMap = new Map(ideaGroups.map((g) => [g.status, g._count.id]));
+
+    const [engagementAgg, voteCount] = await Promise.all([
+      prisma.idea.aggregate({
+        where: { campaignId: campaign.id },
+        _sum: { likesCount: true, commentsCount: true },
+      }),
+      prisma.ideaVote.count({
+        where: { idea: { campaignId: campaign.id } },
+      }),
+    ]);
+
+    let durationDays: number | null = null;
+    if (campaign.launchedAt) {
+      const endDate = campaign.closedAt ?? new Date();
+      durationDays = Math.round(
+        (endDate.getTime() - campaign.launchedAt.getTime()) / (1000 * 60 * 60 * 24),
+      );
+    }
+
+    const phaseCount = [
+      campaign.hasSeedingPhase,
+      campaign.hasDiscussionPhase,
+      campaign.hasCommunityGraduation,
+      campaign.hasQualificationPhase,
+      campaign.hasVoting,
+    ].filter(Boolean).length;
+
+    const totalIdeas = campaign._count.ideas;
+    const hotIdeas = statusMap.get("HOT") ?? 0;
+    const evaluatedIdeas = statusMap.get("EVALUATION") ?? 0;
+    const selectedIdeas = statusMap.get("SELECTED_IMPLEMENTATION") ?? 0;
+    const memberCount = campaign._count.members;
+    const ideasPerMember = memberCount > 0 ? totalIdeas / memberCount : 0;
+
+    const totalLikes = engagementAgg._sum.likesCount ?? 0;
+    const totalComments = engagementAgg._sum.commentsCount ?? 0;
+
+    // Success score: weighted composite of key outcomes normalized
+    const successScore = calculateSuccessScore({
+      totalIdeas,
+      hotIdeas,
+      selectedIdeas,
+      ideasPerMember,
+      totalComments,
+      totalLikes,
+      totalVotes: voteCount,
+    });
+
+    entries.push({
+      campaignId: campaign.id,
+      title: campaign.title,
+      status: campaign.status,
+      configuration: {
+        durationDays,
+        phaseCount,
+        hasVoting: campaign.hasVoting,
+        hasLikes: campaign.hasLikes,
+        hasSeedingPhase: campaign.hasSeedingPhase,
+        hasDiscussionPhase: campaign.hasDiscussionPhase,
+        hasCommunityGraduation: campaign.hasCommunityGraduation,
+        hasQualificationPhase: campaign.hasQualificationPhase,
+        hasIdeaCoach: campaign.hasIdeaCoach,
+      },
+      outcomes: {
+        totalIdeas,
+        hotIdeas,
+        evaluatedIdeas,
+        selectedIdeas,
+        totalLikes,
+        totalComments,
+        totalVotes: voteCount,
+        memberCount,
+        ideasPerMember: Math.round(ideasPerMember * 100) / 100,
+      },
+      successScore,
+    });
   }
 
-  // Compute metrics for each campaign
-  const enrichedCampaigns = await Promise.all(
-    campaigns.map(async (campaign) => {
-      const [ideaStatusGroups, voteCount, evalSessions] = await Promise.all([
-        prisma.idea.groupBy({
-          by: ["status"],
-          where: { campaignId: campaign.id },
-          _count: { id: true },
-        }),
-        prisma.ideaVote.count({
-          where: { idea: { campaignId: campaign.id } },
-        }),
-        prisma.evaluationSession.findMany({
-          where: { campaignId: campaign.id },
-          select: {
-            status: true,
-            _count: { select: { responses: true } },
-          },
-        }),
-      ]);
+  // Sort by success score descending
+  entries.sort((a, b) => b.successScore - a.successScore);
 
-      const statusMap = new Map(ideaStatusGroups.map((g) => [g.status, g._count.id]));
+  const durationsWithValues = entries
+    .map((e) => e.configuration.durationDays)
+    .filter((d): d is number => d !== null);
 
-      const totalIdeas = campaign._count.ideas;
-      const hotCount = statusMap.get(IdeaStatus.HOT) ?? 0;
-      const evaluatedCount = statusMap.get(IdeaStatus.EVALUATION) ?? 0;
-      const selectedCount = statusMap.get(IdeaStatus.SELECTED_IMPLEMENTATION) ?? 0;
-      const implementedCount = statusMap.get(IdeaStatus.IMPLEMENTED) ?? 0;
-      const advancedPastDraft = totalIdeas - (statusMap.get(IdeaStatus.DRAFT) ?? 0);
+  const avgDurationDays =
+    durationsWithValues.length > 0
+      ? Math.round(durationsWithValues.reduce((sum, d) => sum + d, 0) / durationsWithValues.length)
+      : null;
 
-      const participationRate =
-        campaign._count.members > 0 ? totalIdeas / campaign._count.members : 0;
+  const avgIdeasPerMember =
+    entries.length > 0
+      ? Math.round(
+          (entries.reduce((sum, e) => sum + e.outcomes.ideasPerMember, 0) / entries.length) * 100,
+        ) / 100
+      : 0;
 
-      const hotRate =
-        advancedPastDraft > 0
-          ? (hotCount + evaluatedCount + selectedCount + implementedCount) / advancedPastDraft
-          : 0;
+  const avgSuccessScore =
+    entries.length > 0
+      ? Math.round((entries.reduce((sum, e) => sum + e.successScore, 0) / entries.length) * 100) /
+        100
+      : 0;
 
-      const totalResponses = evalSessions.reduce((sum, s) => sum + s._count.responses, 0);
-      const evalQuality = evalSessions.length > 0 ? totalResponses / evalSessions.length : 0;
-
-      const votingCriteriaArray = campaign.votingCriteria as unknown[];
-      const votingCriteriaCount = Array.isArray(votingCriteriaArray)
-        ? votingCriteriaArray.length
-        : 0;
-
-      const graduationThreshold =
-        campaign.graduationLikes +
-        campaign.graduationCommenters +
-        campaign.graduationVisitors +
-        campaign.graduationVoters;
-
-      return {
-        campaignId: campaign.id,
-        title: campaign.title,
-        duration: getDurationDays(campaign) ?? 0,
-        participationRate,
-        audienceSize: campaign._count.members,
-        hotRate,
-        evalQuality,
-        votingCriteriaCount,
-        graduationThreshold,
-        hasIdeaCoach: campaign.hasIdeaCoach,
-        averageVotes: totalIdeas > 0 ? voteCount / totalIdeas : 0,
-      };
-    }),
-  );
-
-  // Build correlations
-  const correlations: SuccessFactorCorrelation[] = [];
-
-  // 1. Duration vs participation rate
-  const durationXs = enrichedCampaigns.map((c) => c.duration);
-  const partYs = enrichedCampaigns.map((c) => c.participationRate);
-  const durationPartCorr = calculateCorrelation(durationXs, partYs);
-  correlations.push({
-    factor: "duration_vs_participation",
-    xLabel: "Duration (days)",
-    yLabel: "Participation Rate",
-    dataPoints: enrichedCampaigns.map((c) => ({
-      campaignId: c.campaignId,
-      title: c.title,
-      x: c.duration,
-      y: Math.round(c.participationRate * 100) / 100,
-    })),
-    correlationStrength: Math.round(Math.abs(durationPartCorr) * 100) / 100,
-    direction: getCorrelationDirection(durationPartCorr),
-  });
-
-  // 2. Voting criteria count vs evaluation quality
-  const votCritXs = enrichedCampaigns.map((c) => c.votingCriteriaCount);
-  const evalQualYs = enrichedCampaigns.map((c) => c.evalQuality);
-  const votCritCorr = calculateCorrelation(votCritXs, evalQualYs);
-  correlations.push({
-    factor: "voting_criteria_vs_eval_quality",
-    xLabel: "Voting Criteria Count",
-    yLabel: "Evaluation Quality",
-    dataPoints: enrichedCampaigns.map((c) => ({
-      campaignId: c.campaignId,
-      title: c.title,
-      x: c.votingCriteriaCount,
-      y: Math.round(c.evalQuality * 100) / 100,
-    })),
-    correlationStrength: Math.round(Math.abs(votCritCorr) * 100) / 100,
-    direction: getCorrelationDirection(votCritCorr),
-  });
-
-  // 3. Audience size vs participation rate
-  const audXs = enrichedCampaigns.map((c) => c.audienceSize);
-  const audCorr = calculateCorrelation(audXs, partYs);
-  correlations.push({
-    factor: "audience_size_vs_participation",
-    xLabel: "Audience Size",
-    yLabel: "Participation Rate",
-    dataPoints: enrichedCampaigns.map((c) => ({
-      campaignId: c.campaignId,
-      title: c.title,
-      x: c.audienceSize,
-      y: Math.round(c.participationRate * 100) / 100,
-    })),
-    correlationStrength: Math.round(Math.abs(audCorr) * 100) / 100,
-    direction: getCorrelationDirection(audCorr),
-  });
-
-  // 4. Graduation thresholds vs HOT rate
-  const gradXs = enrichedCampaigns.map((c) => c.graduationThreshold);
-  const hotYs = enrichedCampaigns.map((c) => c.hotRate);
-  const gradCorr = calculateCorrelation(gradXs, hotYs);
-  correlations.push({
-    factor: "graduation_threshold_vs_hot_rate",
-    xLabel: "Graduation Threshold",
-    yLabel: "HOT! Rate",
-    dataPoints: enrichedCampaigns.map((c) => ({
-      campaignId: c.campaignId,
-      title: c.title,
-      x: c.graduationThreshold,
-      y: Math.round(c.hotRate * 100) / 100,
-    })),
-    correlationStrength: Math.round(Math.abs(gradCorr) * 100) / 100,
-    direction: getCorrelationDirection(gradCorr),
-  });
-
-  // 5. Coach enabled vs idea quality (participation rate as proxy)
-  const coachXs = enrichedCampaigns.map((c) => (c.hasIdeaCoach ? 1 : 0));
-  const coachCorr = calculateCorrelation(coachXs, partYs);
-  correlations.push({
-    factor: "coach_vs_participation",
-    xLabel: "Idea Coach Enabled",
-    yLabel: "Participation Rate",
-    dataPoints: enrichedCampaigns.map((c) => ({
-      campaignId: c.campaignId,
-      title: c.title,
-      x: c.hasIdeaCoach ? 1 : 0,
-      y: Math.round(c.participationRate * 100) / 100,
-    })),
-    correlationStrength: Math.round(Math.abs(coachCorr) * 100) / 100,
-    direction: getCorrelationDirection(coachCorr),
-  });
-
-  // Generate recommendations
-  const recommendations = generateRecommendations(enrichedCampaigns);
-
-  childLogger.info(
-    { campaignCount: campaigns.length, correlationCount: correlations.length },
-    "Success factor analysis generated",
-  );
+  childLogger.info({ campaignCount: entries.length }, "Success factor analysis generated");
 
   return {
-    correlations,
-    recommendations,
-    campaignCount: campaigns.length,
+    entries,
+    averages: {
+      avgDurationDays,
+      avgIdeasPerMember,
+      avgSuccessScore,
+    },
+    analyzedAt: new Date().toISOString(),
   };
 }
 
-// ── Recommendation Generator ─────────────────────────────────
+export async function getOrganizationAnalysis(
+  input: OrganizationAnalysisInput,
+): Promise<OrganizationAnalysisResult> {
+  const orgUnitWhere: Record<string, unknown> = { isActive: true };
+  if (input.orgUnitIds && input.orgUnitIds.length > 0) {
+    orgUnitWhere.id = { in: input.orgUnitIds };
+  }
 
-interface EnrichedCampaign {
-  campaignId: string;
-  title: string;
-  duration: number;
-  participationRate: number;
-  audienceSize: number;
-  hotRate: number;
-  evalQuality: number;
-  votingCriteriaCount: number;
-  graduationThreshold: number;
-  hasIdeaCoach: boolean;
-  averageVotes: number;
-}
+  const orgUnits = await prisma.orgUnit.findMany({
+    where: orgUnitWhere,
+    select: {
+      id: true,
+      name: true,
+      userAssignments: {
+        select: { userId: true },
+      },
+    },
+  });
 
-function generateRecommendations(campaigns: EnrichedCampaign[]): SuccessFactorRecommendation[] {
-  const recommendations: SuccessFactorRecommendation[] = [];
+  const dateFilter =
+    input.dateRange?.from || input.dateRange?.to
+      ? {
+          createdAt: {
+            ...(input.dateRange.from ? { gte: new Date(input.dateRange.from) } : {}),
+            ...(input.dateRange.to ? { lte: new Date(input.dateRange.to) } : {}),
+          },
+        }
+      : {};
 
-  if (campaigns.length < 2) return recommendations;
+  const orgUnitActivities: OrgUnitActivity[] = [];
 
-  // Duration analysis
-  const byParticipation = [...campaigns].sort((a, b) => b.participationRate - a.participationRate);
-  const topHalf = byParticipation.slice(0, Math.ceil(campaigns.length / 2));
-  const avgTopDuration = topHalf.reduce((s, c) => s + c.duration, 0) / topHalf.length;
-  const avgAllDuration = campaigns.reduce((s, c) => s + c.duration, 0) / campaigns.length;
+  for (const orgUnit of orgUnits) {
+    const userIds = orgUnit.userAssignments.map((a) => a.userId);
 
-  if (Math.abs(avgTopDuration - avgAllDuration) > 5) {
-    const durationRange = `${Math.round(Math.min(...topHalf.map((c) => c.duration)))}-${Math.round(Math.max(...topHalf.map((c) => c.duration)))} days`;
-    recommendations.push({
-      factor: "Campaign Duration",
-      insight: `Top-performing campaigns averaged ${Math.round(avgTopDuration)} days compared to the overall average of ${Math.round(avgAllDuration)} days.`,
-      recommendedRange: durationRange,
+    if (userIds.length === 0) {
+      orgUnitActivities.push({
+        orgUnitId: orgUnit.id,
+        orgUnitName: orgUnit.name,
+        memberCount: 0,
+        ideasSubmitted: 0,
+        commentsContributed: 0,
+        votesParticipated: 0,
+        likesGiven: 0,
+        campaignsParticipated: 0,
+      });
+      continue;
+    }
+
+    const [ideaCount, commentCount, voteCount, likeCount, campaignCount] = await Promise.all([
+      prisma.idea.count({
+        where: {
+          contributorId: { in: userIds },
+          ...dateFilter,
+        },
+      }),
+      prisma.comment.count({
+        where: {
+          authorId: { in: userIds },
+          ...dateFilter,
+        },
+      }),
+      prisma.ideaVote.count({
+        where: {
+          userId: { in: userIds },
+          ...dateFilter,
+        },
+      }),
+      prisma.ideaLike.count({
+        where: {
+          userId: { in: userIds },
+          ...dateFilter,
+        },
+      }),
+      prisma.campaignMember.count({
+        where: {
+          userId: { in: userIds },
+          ...(input.dateRange?.from || input.dateRange?.to
+            ? {
+                assignedAt: {
+                  ...(input.dateRange.from ? { gte: new Date(input.dateRange.from) } : {}),
+                  ...(input.dateRange.to ? { lte: new Date(input.dateRange.to) } : {}),
+                },
+              }
+            : {}),
+        },
+      }),
+    ]);
+
+    orgUnitActivities.push({
+      orgUnitId: orgUnit.id,
+      orgUnitName: orgUnit.name,
+      memberCount: userIds.length,
+      ideasSubmitted: ideaCount,
+      commentsContributed: commentCount,
+      votesParticipated: voteCount,
+      likesGiven: likeCount,
+      campaignsParticipated: campaignCount,
     });
   }
 
-  // Coach analysis
-  const withCoach = campaigns.filter((c) => c.hasIdeaCoach);
-  const withoutCoach = campaigns.filter((c) => !c.hasIdeaCoach);
-  if (withCoach.length > 0 && withoutCoach.length > 0) {
-    const avgCoachPart = withCoach.reduce((s, c) => s + c.participationRate, 0) / withCoach.length;
-    const avgNoCoachPart =
-      withoutCoach.reduce((s, c) => s + c.participationRate, 0) / withoutCoach.length;
+  const totals = {
+    totalOrgUnits: orgUnitActivities.length,
+    totalMembers: orgUnitActivities.reduce((sum, o) => sum + o.memberCount, 0),
+    totalIdeas: orgUnitActivities.reduce((sum, o) => sum + o.ideasSubmitted, 0),
+    totalComments: orgUnitActivities.reduce((sum, o) => sum + o.commentsContributed, 0),
+    totalVotes: orgUnitActivities.reduce((sum, o) => sum + o.votesParticipated, 0),
+  };
 
-    if (avgCoachPart > avgNoCoachPart * 1.1) {
-      const improvement = Math.round(
-        ((avgCoachPart - avgNoCoachPart) / (avgNoCoachPart || 1)) * 100,
-      );
-      recommendations.push({
-        factor: "Idea Coach",
-        insight: `Campaigns with idea coaching enabled had ${improvement}% higher participation rates.`,
-        recommendedRange: "Enabled",
-      });
-    }
-  }
+  childLogger.info({ orgUnitCount: orgUnitActivities.length }, "Organization analysis generated");
 
-  // Audience size analysis
-  const avgAudience = campaigns.reduce((s, c) => s + c.audienceSize, 0) / campaigns.length;
-  const topAudiences = topHalf.map((c) => c.audienceSize);
-  if (topAudiences.length > 0) {
-    recommendations.push({
-      factor: "Audience Size",
-      insight: `Best-performing campaigns had an average audience of ${Math.round(topHalf.reduce((s, c) => s + c.audienceSize, 0) / topHalf.length)} members vs. overall ${Math.round(avgAudience)}.`,
-      recommendedRange: `${Math.min(...topAudiences)}-${Math.max(...topAudiences)} members`,
-    });
-  }
-
-  // Graduation threshold analysis
-  const topGrad = topHalf.map((c) => c.graduationThreshold);
-  if (topGrad.length > 0) {
-    const avgTopGrad = topGrad.reduce((s, v) => s + v, 0) / topGrad.length;
-    const avgAllGrad = campaigns.reduce((s, c) => s + c.graduationThreshold, 0) / campaigns.length;
-
-    if (Math.abs(avgTopGrad - avgAllGrad) > 2) {
-      recommendations.push({
-        factor: "Graduation Threshold",
-        insight: `Top campaigns used an aggregate graduation threshold of ~${Math.round(avgTopGrad)} vs. the overall average of ~${Math.round(avgAllGrad)}.`,
-        recommendedRange: `${Math.min(...topGrad)}-${Math.max(...topGrad)} total points`,
-      });
-    }
-  }
-
-  return recommendations;
+  return {
+    orgUnits: orgUnitActivities,
+    totals,
+    analyzedAt: new Date().toISOString(),
+  };
 }
 
-// ── Errors ───────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────
 
-export class CampaignComparisonError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "CampaignComparisonError";
-  }
+function calculateSuccessScore(metrics: {
+  totalIdeas: number;
+  hotIdeas: number;
+  selectedIdeas: number;
+  ideasPerMember: number;
+  totalComments: number;
+  totalLikes: number;
+  totalVotes: number;
+}): number {
+  // Weighted score (0-100 scale)
+  // Idea generation: 25% weight
+  const ideaScore = Math.min(metrics.totalIdeas / 20, 1) * 25;
+  // Quality (hot + selected): 30% weight
+  const qualityScore = Math.min((metrics.hotIdeas + metrics.selectedIdeas) / 10, 1) * 30;
+  // Participation (ideas per member): 20% weight
+  const participationScore = Math.min(metrics.ideasPerMember / 2, 1) * 20;
+  // Engagement (comments + likes + votes): 25% weight
+  const engagementTotal = metrics.totalComments + metrics.totalLikes + metrics.totalVotes;
+  const engagementScore = Math.min(engagementTotal / 100, 1) * 25;
+
+  return Math.round((ideaScore + qualityScore + participationScore + engagementScore) * 100) / 100;
 }

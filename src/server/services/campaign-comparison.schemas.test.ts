@@ -23,15 +23,9 @@ describe("campaignComparisonInput", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects more than 4 campaign IDs", () => {
+  it("rejects more than 10 campaign IDs", () => {
     const result = campaignComparisonInput.safeParse({
-      campaignIds: [
-        "clsomevalidid1aa",
-        "clsomevalidid2bb",
-        "clsomevalidid3cc",
-        "clsomevalidid4dd",
-        "clsomevalidid5ee",
-      ],
+      campaignIds: Array.from({ length: 11 }, (_, i) => `clsomevalidid${i}aa`),
     });
     expect(result.success).toBe(false);
   });

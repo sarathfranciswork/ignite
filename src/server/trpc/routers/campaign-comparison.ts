@@ -4,17 +4,19 @@ import { Action } from "@/server/lib/permissions";
 import {
   campaignComparisonInput,
   successFactorInput,
+  organizationAnalysisInput,
 } from "@/server/services/campaign-comparison.schemas";
 import {
   compareCampaigns,
   getSuccessFactors,
-  CampaignComparisonError,
+  getOrganizationAnalysis,
+  CampaignComparisonServiceError,
 } from "@/server/services/campaign-comparison.service";
 
-function handleComparisonError(error: unknown): never {
+function handleCampaignComparisonError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
 
-  if (error instanceof CampaignComparisonError) {
+  if (error instanceof CampaignComparisonServiceError) {
     const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST"> = {
       INSUFFICIENT_CAMPAIGNS: "BAD_REQUEST",
     };
@@ -36,7 +38,7 @@ export const campaignComparisonRouter = createTRPCRouter({
       try {
         return await compareCampaigns(input);
       } catch (error) {
-        handleComparisonError(error);
+        handleCampaignComparisonError(error);
       }
     }),
 
@@ -47,7 +49,18 @@ export const campaignComparisonRouter = createTRPCRouter({
       try {
         return await getSuccessFactors(input);
       } catch (error) {
-        handleComparisonError(error);
+        handleCampaignComparisonError(error);
+      }
+    }),
+
+  organizationAnalysis: protectedProcedure
+    .use(requirePermission(Action.REPORT_READ))
+    .input(organizationAnalysisInput)
+    .query(async ({ input }) => {
+      try {
+        return await getOrganizationAnalysis(input);
+      } catch (error) {
+        handleCampaignComparisonError(error);
       }
     }),
 });
