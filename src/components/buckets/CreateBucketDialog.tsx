@@ -37,11 +37,8 @@ const IDEA_STATUSES = [
 
 const bucketFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
-  color: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/)
-    .default("#6366F1"),
-  type: z.enum(["MANUAL", "SMART"]).default("MANUAL"),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  type: z.enum(["MANUAL", "SMART"]),
   description: z.string().max(2000).optional(),
   filterStatus: z.string().optional(),
   filterMinLikes: z.string().optional(),
@@ -86,7 +83,9 @@ export function CreateBucketDialog({ campaignId, open, onOpenChange }: CreateBuc
     const filterCriteria =
       values.type === "SMART"
         ? {
-            ...(values.filterStatus ? { status: values.filterStatus } : {}),
+            ...(values.filterStatus
+              ? { status: values.filterStatus as "DRAFT" | "QUALIFICATION" | "COMMUNITY_DISCUSSION" | "HOT" | "EVALUATION" | "SELECTED_IMPLEMENTATION" | "IMPLEMENTED" | "ARCHIVED" }
+              : {}),
             ...(values.filterMinLikes ? { minLikes: parseInt(values.filterMinLikes, 10) } : {}),
             ...(values.filterMinComments
               ? { minComments: parseInt(values.filterMinComments, 10) }

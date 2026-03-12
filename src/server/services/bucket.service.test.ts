@@ -400,7 +400,7 @@ describe("bucket.service", () => {
           contributor: { id: "user_1", name: "User", email: "u@e.com", image: null },
         },
       };
-      vi.mocked(prisma.ideaBucketAssignment.findMany).mockResolvedValue([mockAssignment]);
+      vi.mocked(prisma.ideaBucketAssignment.findMany).mockResolvedValue([mockAssignment] as never);
 
       const result = await listBucketIdeas({ bucketId: "bucket_1", limit: 25 });
 
@@ -429,7 +429,7 @@ describe("bucket.service", () => {
         createdAt: new Date("2026-01-01"),
         contributor: { id: "user_1", name: "User", email: "u@e.com", image: null },
       };
-      vi.mocked(prisma.idea.findMany).mockResolvedValue([mockIdea]);
+      vi.mocked(prisma.idea.findMany).mockResolvedValue([mockIdea] as never);
 
       const result = await listBucketIdeas({ bucketId: "bucket_smart", limit: 25 });
 
