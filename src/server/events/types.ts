@@ -224,6 +224,23 @@ export interface EventMap {
   "concept.approved": EventPayload;
   "concept.rejected": EventPayload;
   "concept.convertedToProject": EventPayload;
+  "adhocEvaluation.created": EventPayload;
+  "adhocEvaluation.updated": EventPayload;
+  "adhocEvaluation.deleted": EventPayload;
+  "adhocEvaluation.activated": EventPayload;
+  "adhocEvaluation.completed": EventPayload;
+  "oneTeam.sessionStarted": EventPayload;
+  "oneTeam.sessionEnded": EventPayload;
+  "oneTeam.consensusNoteAdded": EventPayload;
+  "submissionDefinition.created": EventPayload;
+  "submissionDefinition.updated": EventPayload;
+  "submissionDefinition.deleted": EventPayload;
+  "submissionDefinition.activated": EventPayload;
+  "submissionDefinition.archived": EventPayload;
+  "genericSubmission.created": EventPayload;
+  "genericSubmission.submitted": EventPayload;
+  "genericSubmission.reviewed": EventPayload;
+  "genericSubmission.deleted": EventPayload;
 }
 
 export type EventName = keyof EventMap;

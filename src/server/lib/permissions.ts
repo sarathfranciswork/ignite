@@ -216,6 +216,24 @@ export const Action = {
   CONCEPT_SUBMIT_DECISION: "concept.submitDecision",
   CONCEPT_CONVERT_TO_PROJECT: "concept.convertToProject",
 
+  // Ad-hoc evaluation
+  ADHOC_EVALUATION_CREATE: "adhocEvaluation.create",
+  ADHOC_EVALUATION_READ: "adhocEvaluation.read",
+  ADHOC_EVALUATION_UPDATE: "adhocEvaluation.update",
+  ADHOC_EVALUATION_DELETE: "adhocEvaluation.delete",
+
+  // Submission definitions
+  SUBMISSION_DEFINITION_CREATE: "submissionDefinition.create",
+  SUBMISSION_DEFINITION_READ: "submissionDefinition.read",
+  SUBMISSION_DEFINITION_UPDATE: "submissionDefinition.update",
+  SUBMISSION_DEFINITION_DELETE: "submissionDefinition.delete",
+
+  // Generic submissions
+  GENERIC_SUBMISSION_CREATE: "genericSubmission.create",
+  GENERIC_SUBMISSION_READ: "genericSubmission.read",
+  GENERIC_SUBMISSION_UPDATE_OWN: "genericSubmission.update.own",
+  GENERIC_SUBMISSION_REVIEW: "genericSubmission.review",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -374,6 +392,18 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.API_KEY_READ,
     Action.API_KEY_REVOKE,
     Action.API_KEY_DELETE,
+    Action.ADHOC_EVALUATION_CREATE,
+    Action.ADHOC_EVALUATION_READ,
+    Action.ADHOC_EVALUATION_UPDATE,
+    Action.ADHOC_EVALUATION_DELETE,
+    Action.SUBMISSION_DEFINITION_CREATE,
+    Action.SUBMISSION_DEFINITION_READ,
+    Action.SUBMISSION_DEFINITION_UPDATE,
+    Action.SUBMISSION_DEFINITION_DELETE,
+    Action.GENERIC_SUBMISSION_CREATE,
+    Action.GENERIC_SUBMISSION_READ,
+    Action.GENERIC_SUBMISSION_UPDATE_OWN,
+    Action.GENERIC_SUBMISSION_REVIEW,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -422,6 +452,12 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.PROJECT_READ,
     Action.PROJECT_MANAGE_TASKS,
     Action.CONCEPT_READ,
+    Action.ADHOC_EVALUATION_CREATE,
+    Action.ADHOC_EVALUATION_READ,
+    Action.SUBMISSION_DEFINITION_READ,
+    Action.GENERIC_SUBMISSION_CREATE,
+    Action.GENERIC_SUBMISSION_READ,
+    Action.GENERIC_SUBMISSION_UPDATE_OWN,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,

@@ -1,5 +1,6 @@
 import { createTRPCRouter } from "../trpc";
 import { activityRouter } from "./activity";
+import { adhocEvaluationRouter } from "./adhoc-evaluation";
 import { adminRouter } from "./admin";
 import { aiRouter } from "./ai";
 import { apiKeyRouter } from "./api-key";
@@ -24,6 +25,7 @@ import { projectRouter } from "./project";
 import { pushRouter } from "./push";
 import { searchRouter } from "./search";
 import { spaceRouter } from "./space";
+import { submissionRouter } from "./submission";
 import { ssoRouter } from "./sso";
 import { scoutingBoardRouter } from "./scouting-board";
 import { scoutingMissionRouter } from "./scouting-mission";
@@ -37,6 +39,7 @@ import { whiteLabelRouter } from "./white-label";
 
 export const appRouter = createTRPCRouter({
   activity: activityRouter,
+  adhocEvaluation: adhocEvaluationRouter,
   admin: adminRouter,
   ai: aiRouter,
   apiKey: apiKeyRouter,
@@ -67,6 +70,7 @@ export const appRouter = createTRPCRouter({
   trend: trendRouter,
   space: spaceRouter,
   sso: ssoRouter,
+  submission: submissionRouter,
   useCase: useCaseRouter,
   user: userRouter,
   webhook: webhookRouter,

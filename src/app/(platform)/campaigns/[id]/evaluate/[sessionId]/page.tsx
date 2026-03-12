@@ -110,9 +110,9 @@ interface SessionData {
   }>;
   ideas: Array<{
     id: string;
-    ideaId: string;
+    ideaId: string | null;
     sortOrder: number;
-    idea: { id: string; title: string; teaser: string | null; status: string };
+    idea: { id: string; title: string; teaser: string | null; status: string } | null;
   }>;
 }
 
@@ -193,7 +193,7 @@ function PairwiseEvaluationView({ sessionId, campaignId, session }: PairwiseView
           <ul className="mt-3 space-y-2">
             {session.ideas.map((item) => (
               <li key={item.id} className="rounded-lg px-3 py-2 text-left text-sm text-gray-600">
-                {item.idea.title}
+                {item.idea?.title}
               </li>
             ))}
           </ul>
@@ -293,7 +293,12 @@ function ScorecardEvaluationView({
   currentIdeaIndex,
   onIdeaIndexChange,
 }: ScorecardViewProps) {
-  const ideas = session.ideas;
+  const ideas = session.ideas.filter((i) => i.idea !== null && i.ideaId !== null) as Array<{
+    id: string;
+    ideaId: string;
+    sortOrder: number;
+    idea: { id: string; title: string; teaser: string | null; status: string };
+  }>;
   const currentIdea = ideas[currentIdeaIndex];
 
   return (

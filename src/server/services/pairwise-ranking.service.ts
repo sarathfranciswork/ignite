@@ -122,7 +122,7 @@ export async function getPairwiseResults(input: PairwiseResultsInput) {
     where: { sessionId: input.sessionId },
   });
 
-  const ideaIds = session.ideas.map((i) => i.ideaId);
+  const ideaIds = session.ideas.map((i) => i.ideaId).filter((id): id is string => id !== null);
   const scoreCriteria = session.criteria.filter((c) => c.fieldType === "SELECTION_SCALE");
 
   // Compute per-criterion Bradley-Terry scores
@@ -144,48 +144,52 @@ export async function getPairwiseResults(input: PairwiseResultsInput) {
   // Build per-idea results
   const totalWeight = scoreCriteria.reduce((sum, c) => sum + c.weight, 0);
 
-  const ideaResults = session.ideas.map((sessionIdea) => {
-    const ideaId = sessionIdea.ideaId;
+  const ideaResults = session.ideas
+    .filter((si) => si.ideaId !== null)
+    .map((sessionIdea) => {
+      const ideaId = sessionIdea.ideaId!;
 
-    // Weighted score from per-criterion BT scores
-    let weightedScore = 0;
-    if (totalWeight > 0) {
-      for (const cr of criteriaResults) {
-        const ideaScore = cr.scores[ideaId] ?? 1.0;
-        weightedScore += (ideaScore * cr.weight) / totalWeight;
+      // Weighted score from per-criterion BT scores
+      let weightedScore = 0;
+      if (totalWeight > 0) {
+        for (const cr of criteriaResults) {
+          const ideaScore = cr.scores[ideaId] ?? 1.0;
+          weightedScore += (ideaScore * cr.weight) / totalWeight;
+        }
       }
-    }
 
-    // Win/loss record
-    const ideaComparisons = comparisons.filter((c) => c.ideaAId === ideaId || c.ideaBId === ideaId);
-    let wins = 0;
-    let losses = 0;
-    let ties = 0;
-    for (const c of ideaComparisons) {
-      if (c.score === 0) {
-        ties++;
-      } else if ((c.ideaAId === ideaId && c.score > 0) || (c.ideaBId === ideaId && c.score < 0)) {
-        wins++;
-      } else {
-        losses++;
+      // Win/loss record
+      const ideaComparisons = comparisons.filter(
+        (c) => c.ideaAId === ideaId || c.ideaBId === ideaId,
+      );
+      let wins = 0;
+      let losses = 0;
+      let ties = 0;
+      for (const c of ideaComparisons) {
+        if (c.score === 0) {
+          ties++;
+        } else if ((c.ideaAId === ideaId && c.score > 0) || (c.ideaBId === ideaId && c.score < 0)) {
+          wins++;
+        } else {
+          losses++;
+        }
       }
-    }
 
-    return {
-      ideaId,
-      ideaTitle: sessionIdea.idea.title,
-      ideaTeaser: sessionIdea.idea.teaser,
-      ideaStatus: sessionIdea.idea.status,
-      btScore: overallScores.get(ideaId) ?? 1.0,
-      weightedScore: Math.round(weightedScore * 100) / 100,
-      record: { wins, losses, ties },
-      criteriaScores: criteriaResults.map((cr) => ({
-        criterionId: cr.criterionId,
-        criterionTitle: cr.criterionTitle,
-        score: cr.scores[ideaId] ?? 1.0,
-      })),
-    };
-  });
+      return {
+        ideaId,
+        ideaTitle: sessionIdea.idea!.title,
+        ideaTeaser: sessionIdea.idea!.teaser,
+        ideaStatus: sessionIdea.idea!.status,
+        btScore: overallScores.get(ideaId) ?? 1.0,
+        weightedScore: Math.round(weightedScore * 100) / 100,
+        record: { wins, losses, ties },
+        criteriaScores: criteriaResults.map((cr) => ({
+          criterionId: cr.criterionId,
+          criterionTitle: cr.criterionTitle,
+          score: cr.scores[ideaId] ?? 1.0,
+        })),
+      };
+    });
 
   // Sort by weighted score descending
   ideaResults.sort((a, b) => b.weightedScore - a.weightedScore);
@@ -222,7 +226,7 @@ export async function getPairwiseProgress(input: PairwiseProgressInput) {
     throw new EvaluationServiceError("Evaluation session not found", "SESSION_NOT_FOUND");
   }
 
-  const ideaIds = session.ideas.map((i) => i.ideaId);
+  const ideaIds = session.ideas.map((i) => i.ideaId).filter((id): id is string => id !== null);
   const pairs = generatePairsFromIdeas(ideaIds);
   const criteriaCount = session.criteria.length;
   const expectedPerEvaluator = pairs.length * criteriaCount;

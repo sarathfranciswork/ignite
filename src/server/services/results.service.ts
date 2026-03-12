@@ -94,15 +94,15 @@ export async function getEnhancedResults(input: EvaluationResultsInput) {
         : 0;
 
     return {
-      ideaId: sessionIdea.ideaId,
-      ideaTitle: sessionIdea.idea.title,
-      ideaTeaser: sessionIdea.idea.teaser,
-      ideaStatus: sessionIdea.idea.status,
+      ideaId: sessionIdea.ideaId!,
+      ideaTitle: sessionIdea.idea!.title,
+      ideaTeaser: sessionIdea.idea!.teaser,
+      ideaStatus: sessionIdea.idea!.status,
       weightedScore: Math.round(weightedScore * 100) / 100,
       normalizedScore: Math.round(normalizedWeightedScore * 100) / 100,
       overallStdDev: Math.round(overallStdDev * 100) / 100,
       isControversial: overallStdDev >= CONTROVERSIAL_STD_DEV_THRESHOLD,
-      isShortlisted: shortlistedIdeaIds.has(sessionIdea.ideaId),
+      isShortlisted: shortlistedIdeaIds.has(sessionIdea.ideaId!),
       criteriaScores,
     };
   });

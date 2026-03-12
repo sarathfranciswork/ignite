@@ -174,7 +174,9 @@ export async function summarizeEvaluationSession(
     criteria: session.criteria,
     evaluatorCount: session.evaluators.length,
     respondedCount: respondedEvaluatorIds.size,
-    ideas: session.ideas,
+    ideas: session.ideas.filter(
+      (i): i is typeof i & { idea: { title: string } } => i.idea !== null,
+    ),
     responseCount: session.responses.length,
   });
 

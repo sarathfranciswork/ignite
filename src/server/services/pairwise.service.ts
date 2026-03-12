@@ -66,10 +66,12 @@ export async function getPairwisePairs(input: PairwiseGetPairsInput) {
     );
   }
 
-  const ideaIds = session.ideas.map((i) => i.ideaId);
+  const ideaIds = session.ideas.map((i) => i.ideaId).filter((id): id is string => id !== null);
   const pairs = generatePairsFromIdeas(ideaIds);
 
-  const ideaMap = new Map(session.ideas.map((i) => [i.ideaId, i.idea]));
+  const ideaMap = new Map(
+    session.ideas.filter((i) => i.ideaId !== null).map((i) => [i.ideaId!, i.idea]),
+  );
 
   return {
     sessionId: session.id,
@@ -120,7 +122,7 @@ export async function getNextPair(input: PairwiseGetNextPairInput, evaluatorId: 
     throw new EvaluationServiceError("You are not an evaluator for this session", "NOT_EVALUATOR");
   }
 
-  const ideaIds = session.ideas.map((i) => i.ideaId);
+  const ideaIds = session.ideas.map((i) => i.ideaId).filter((id): id is string => id !== null);
   const pairs = generatePairsFromIdeas(ideaIds);
   const criteriaCount = session.criteria.length;
 
