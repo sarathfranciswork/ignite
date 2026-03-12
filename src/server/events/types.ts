@@ -25,6 +25,11 @@ export interface EventMap {
   "idea.coachQualified": EventPayload;
   "idea.coachRejected": EventPayload;
   "idea.coachRequestedChanges": EventPayload;
+  "idea.split": EventPayload;
+  "idea.merged": EventPayload;
+  "idea.bulkArchived": EventPayload;
+  "idea.bulkBucketAssigned": EventPayload;
+  "idea.bulkExported": EventPayload;
   "idea.voted": EventPayload;
   "idea.liked": EventPayload;
   "idea.unliked": EventPayload;

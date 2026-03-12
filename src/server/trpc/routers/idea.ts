@@ -28,6 +28,20 @@ import {
   coachQualifyIdea,
   IdeaServiceError,
 } from "@/server/services/idea.service";
+import {
+  ideaSplitInput,
+  ideaMergeInput,
+  ideaBulkAssignBucketInput,
+  ideaBulkArchiveInput,
+  ideaBulkExportInput,
+  ideaMergeHistoryInput,
+  splitIdea,
+  mergeIdeas,
+  getMergeHistory,
+  bulkAssignBucket,
+  bulkArchiveIdeas,
+  bulkExportIdeas,
+} from "@/server/services/idea-split-merge.service";
 
 function handleIdeaError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -36,9 +50,12 @@ function handleIdeaError(error: unknown): never {
     const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "FORBIDDEN"> = {
       IDEA_NOT_FOUND: "NOT_FOUND",
       CAMPAIGN_NOT_FOUND: "NOT_FOUND",
+      BUCKET_NOT_FOUND: "NOT_FOUND",
       CAMPAIGN_NOT_ACCEPTING: "BAD_REQUEST",
       INVALID_STATUS: "BAD_REQUEST",
       INVALID_TRANSITION: "BAD_REQUEST",
+      INVALID_MERGE_TARGET: "BAD_REQUEST",
+      CAMPAIGN_MISMATCH: "BAD_REQUEST",
       NO_VALID_TRANSITION: "BAD_REQUEST",
       NO_PREVIOUS_STATUS: "BAD_REQUEST",
       COACH_NOT_ENABLED: "BAD_REQUEST",
@@ -174,6 +191,72 @@ export const ideaRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await coachQualifyIdea(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  split: protectedProcedure
+    .use(requirePermission(Action.IDEA_SPLIT))
+    .input(ideaSplitInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await splitIdea(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  merge: protectedProcedure
+    .use(requirePermission(Action.IDEA_MERGE))
+    .input(ideaMergeInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await mergeIdeas(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  mergeHistory: protectedProcedure
+    .use(requirePermission(Action.IDEA_READ))
+    .input(ideaMergeHistoryInput)
+    .query(async ({ input }) => {
+      try {
+        return await getMergeHistory(input.ideaId);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  bulkAssignBucket: protectedProcedure
+    .use(requirePermission(Action.IDEA_BULK_ACTION))
+    .input(ideaBulkAssignBucketInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await bulkAssignBucket(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  bulkArchive: protectedProcedure
+    .use(requirePermission(Action.IDEA_BULK_ACTION))
+    .input(ideaBulkArchiveInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await bulkArchiveIdeas(input, ctx.session.user.id);
+      } catch (error) {
+        handleIdeaError(error);
+      }
+    }),
+
+  bulkExport: protectedProcedure
+    .use(requirePermission(Action.IDEA_BULK_ACTION))
+    .input(ideaBulkExportInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await bulkExportIdeas(input, ctx.session.user.id);
       } catch (error) {
         handleIdeaError(error);
       }

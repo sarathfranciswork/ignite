@@ -353,12 +353,12 @@ model Campaign {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy       User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
-  members         CampaignMember[]
-  kpiSnapshots    CampaignKpiSnapshot[]
-  ideas           Idea[]
-  activityEvents  ActivityEvent[]
-  buckets         Bucket[]
+  createdBy      User                  @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  members        CampaignMember[]
+  kpiSnapshots   CampaignKpiSnapshot[]
+  ideas          Idea[]
+  activityEvents ActivityEvent[]
+  buckets        Bucket[]
 
   @@index([status])
   @@index([submissionType])
@@ -533,20 +533,32 @@ model Idea {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  // Split/merge lineage
+  splitFromId  String? @map("split_from_id")
+  mergedIntoId String? @map("merged_into_id")
+
   // Relations
-  coAuthors      IdeaCoAuthor[]
-  comments       Comment[]
-  likes          IdeaLike[]
-  votes          IdeaVote[]
-  followers        IdeaFollow[]
-  activityEvents   ActivityEvent[]
-  bucketAssignments IdeaBucketAssignment[]
+  coAuthors            IdeaCoAuthor[]
+  comments             Comment[]
+  likes                IdeaLike[]
+  votes                IdeaVote[]
+  followers            IdeaFollow[]
+  activityEvents       ActivityEvent[]
+  bucketAssignments    IdeaBucketAssignment[]
+  splitFrom            Idea?                  @relation("IdeaSplitLineage", fields: [splitFromId], references: [id], onDelete: SetNull)
+  splitChildren        Idea[]                 @relation("IdeaSplitLineage")
+  mergedInto           Idea?                  @relation("IdeaMergeLineage", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedSources        Idea[]                 @relation("IdeaMergeLineage")
+  mergeHistoryAsTarget IdeaMergeHistory[]     @relation("MergeTarget")
+  mergeHistoryAsSource IdeaMergeHistory[]     @relation("MergeSource")
 
   @@index([campaignId])
   @@index([contributorId])
   @@index([status])
   @@index([campaignId, status])
   @@index([searchVector], type: Gin)
+  @@index([splitFromId])
+  @@index([mergedIntoId])
   @@map("ideas")
 }
 
@@ -562,6 +574,25 @@ model IdeaCoAuthor {
   @@index([ideaId])
   @@index([userId])
   @@map("idea_co_authors")
+}
+
+// ── Idea Merge History ───────────────────────────────────
+
+model IdeaMergeHistory {
+  id           String   @id @default(cuid())
+  targetIdeaId String   @map("target_idea_id")
+  sourceIdeaId String   @map("source_idea_id")
+  mergedById   String   @map("merged_by_id")
+  sourceTitle  String   @map("source_title")
+  sourceTeaser String?  @map("source_teaser") @db.Text
+  mergedAt     DateTime @default(now()) @map("merged_at")
+
+  targetIdea Idea @relation("MergeTarget", fields: [targetIdeaId], references: [id], onDelete: Cascade)
+  sourceIdea Idea @relation("MergeSource", fields: [sourceIdeaId], references: [id], onDelete: Cascade)
+
+  @@index([targetIdeaId])
+  @@index([sourceIdeaId])
+  @@map("idea_merge_history")
 }
 
 // ── Engagement Models ─────────────────────────────────────
@@ -962,11 +993,11 @@ model ScoutingBoardCard {
 }
 
 model ScoutingBoardShare {
-  id      String                 @id @default(cuid())
-  boardId String                 @map("board_id")
-  userId  String                 @map("user_id")
-  role    ScoutingBoardShareRole @default(VIEWER)
-  sharedAt DateTime              @default(now()) @map("shared_at")
+  id       String                 @id @default(cuid())
+  boardId  String                 @map("board_id")
+  userId   String                 @map("user_id")
+  role     ScoutingBoardShareRole @default(VIEWER)
+  sharedAt DateTime               @default(now()) @map("shared_at")
 
   board ScoutingBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
   user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1112,6 +1143,11 @@ enum ActivityEventType {
   IDEA_COACH_QUALIFIED
   IDEA_COACH_REJECTED
   IDEA_COACH_REQUESTED_CHANGES
+  IDEA_SPLIT
+  IDEA_MERGED
+  IDEA_BULK_ARCHIVED
+  IDEA_BULK_BUCKET_ASSIGNED
+  IDEA_BULK_EXPORTED
 
   @@map("activity_event_type")
 }
