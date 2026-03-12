@@ -54,6 +54,7 @@ export interface EventMap {
   "evaluation.responseSubmitted": EventPayload;
   "evaluation.reminderSent": EventPayload;
   "evaluation.completed": EventPayload;
+  "evaluation.pairwiseComparisonSubmitted": EventPayload;
   "notification.created": EventPayload;
   "rbac.roleAssigned": EventPayload;
   "rbac.roleRemoved": EventPayload;

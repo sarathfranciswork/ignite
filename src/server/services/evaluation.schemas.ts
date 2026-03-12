@@ -149,6 +149,42 @@ export const evaluationListTemplatesInput = z.object({
   limit: z.number().int().min(1).max(50).default(20),
 });
 
+// ── Pairwise Evaluation ─────────────────────────────────────
+
+export const pairwiseSubmitComparisonInput = z.object({
+  sessionId: z.string(),
+  ideaAId: z.string(),
+  ideaBId: z.string(),
+  comparisons: z.array(
+    z.object({
+      criterionId: z.string(),
+      score: z.number().int().min(-5).max(5),
+    }),
+  ),
+});
+
+export const pairwiseGetNextPairInput = z.object({
+  sessionId: z.string(),
+});
+
+export const pairwiseGetPairsInput = z.object({
+  sessionId: z.string(),
+});
+
+export const pairwiseGetMyComparisonInput = z.object({
+  sessionId: z.string(),
+  ideaAId: z.string(),
+  ideaBId: z.string(),
+});
+
+export const pairwiseProgressInput = z.object({
+  sessionId: z.string(),
+});
+
+export const pairwiseResultsInput = z.object({
+  sessionId: z.string(),
+});
+
 // ── Error Class ──────────────────────────────────────────────
 
 export class EvaluationServiceError extends Error {
@@ -179,3 +215,9 @@ export type EvaluationListTemplatesInput = z.infer<typeof evaluationListTemplate
 export type EvaluationMyPendingInput = z.infer<typeof evaluationMyPendingInput>;
 export type EvaluationMyResponsesInput = z.infer<typeof evaluationMyResponsesInput>;
 export type EvaluationSendRemindersInput = z.infer<typeof evaluationSendRemindersInput>;
+export type PairwiseSubmitComparisonInput = z.infer<typeof pairwiseSubmitComparisonInput>;
+export type PairwiseGetNextPairInput = z.infer<typeof pairwiseGetNextPairInput>;
+export type PairwiseGetPairsInput = z.infer<typeof pairwiseGetPairsInput>;
+export type PairwiseGetMyComparisonInput = z.infer<typeof pairwiseGetMyComparisonInput>;
+export type PairwiseProgressInput = z.infer<typeof pairwiseProgressInput>;
+export type PairwiseResultsInput = z.infer<typeof pairwiseResultsInput>;

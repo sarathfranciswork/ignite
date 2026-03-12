@@ -22,6 +22,12 @@ import {
   evaluationMyPendingInput,
   evaluationMyResponsesInput,
   evaluationSendRemindersInput,
+  pairwiseSubmitComparisonInput,
+  pairwiseGetNextPairInput,
+  pairwiseGetPairsInput,
+  pairwiseGetMyComparisonInput,
+  pairwiseProgressInput,
+  pairwiseResultsInput,
 } from "@/server/services/evaluation.schemas";
 import {
   listEvaluationSessions,
@@ -46,6 +52,14 @@ import {
   sendReminders,
   EvaluationServiceError,
 } from "@/server/services/evaluation.service";
+import {
+  getPairwisePairs,
+  getNextPair,
+  submitPairwiseComparison,
+  getMyComparison,
+  getPairwiseProgress,
+  getPairwiseResults,
+} from "@/server/services/pairwise.service";
 
 function handleEvaluationError(error: unknown): never {
   if (error instanceof TRPCError) throw error;
@@ -67,6 +81,7 @@ function handleEvaluationError(error: unknown): never {
       NO_IDEAS: "BAD_REQUEST",
       INVALID_SCALE_CONFIG: "BAD_REQUEST",
       INVALID_SCALE_RANGE: "BAD_REQUEST",
+      SESSION_NOT_PAIRWISE: "BAD_REQUEST",
       NOT_EVALUATOR: "FORBIDDEN",
     };
 
@@ -305,6 +320,72 @@ export const evaluationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await sendReminders(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  // ── Pairwise Evaluation Endpoints ────────────────────────
+
+  pairwisePairs: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(pairwiseGetPairsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getPairwisePairs(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  pairwiseNextPair: protectedProcedure
+    .input(pairwiseGetNextPairInput)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await getNextPair(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  pairwiseSubmit: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_PARTICIPATE))
+    .input(pairwiseSubmitComparisonInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await submitPairwiseComparison(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  pairwiseMyComparison: protectedProcedure
+    .input(pairwiseGetMyComparisonInput)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await getMyComparison(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  pairwiseProgress: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(pairwiseProgressInput)
+    .query(async ({ input }) => {
+      try {
+        return await getPairwiseProgress(input);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
+
+  pairwiseResults: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_VIEW_RESULTS))
+    .input(pairwiseResultsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getPairwiseResults(input);
       } catch (error) {
         handleEvaluationError(error);
       }

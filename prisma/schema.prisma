@@ -554,6 +554,8 @@ model Idea {
   mergeHistoryAsTarget   IdeaMergeHistory[]      @relation("MergeTarget")
   mergeHistoryAsSource   IdeaMergeHistory[]      @relation("MergeSource")
   evaluationSessionIdeas EvaluationSessionIdea[]
+  pairwiseAsIdeaA        PairwiseComparison[]    @relation("PairwiseIdeaA")
+  pairwiseAsIdeaB        PairwiseComparison[]    @relation("PairwiseIdeaB")
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1322,11 +1324,12 @@ model EvaluationSession {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  campaign   Campaign                     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  criteria   EvaluationCriterion[]
-  evaluators EvaluationSessionEvaluator[]
-  ideas      EvaluationSessionIdea[]
-  responses  EvaluationResponse[]
+  campaign            Campaign                     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  criteria            EvaluationCriterion[]
+  evaluators          EvaluationSessionEvaluator[]
+  ideas               EvaluationSessionIdea[]
+  responses           EvaluationResponse[]
+  pairwiseComparisons PairwiseComparison[]
 
   @@index([campaignId])
   @@index([status])
@@ -1358,8 +1361,9 @@ model EvaluationCriterion {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  session   EvaluationSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  responses EvaluationResponse[]
+  session             EvaluationSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  responses           EvaluationResponse[]
+  pairwiseComparisons PairwiseComparison[]
 
   @@index([sessionId])
   @@index([sessionId, sortOrder])
@@ -1425,4 +1429,32 @@ model EvaluationResponse {
   @@index([sessionId, ideaId])
   @@index([sessionId, evaluatorId])
   @@map("evaluation_responses")
+}
+
+// ── Pairwise Comparison Model ──────────────────────────────────
+
+model PairwiseComparison {
+  id          String @id @default(cuid())
+  sessionId   String @map("session_id")
+  evaluatorId String @map("evaluator_id")
+  criterionId String @map("criterion_id")
+  ideaAId     String @map("idea_a_id")
+  ideaBId     String @map("idea_b_id")
+
+  // Slider score: positive = ideaA preferred, negative = ideaB preferred, 0 = tie
+  score Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  session   EvaluationSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  criterion EvaluationCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  ideaA     Idea                @relation("PairwiseIdeaA", fields: [ideaAId], references: [id])
+  ideaB     Idea                @relation("PairwiseIdeaB", fields: [ideaBId], references: [id])
+
+  @@unique([sessionId, evaluatorId, criterionId, ideaAId, ideaBId])
+  @@index([sessionId])
+  @@index([sessionId, evaluatorId])
+  @@map("pairwise_comparisons")
 }
