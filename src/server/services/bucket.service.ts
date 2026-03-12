@@ -394,5 +394,3 @@ export async function getIdeaAssignments(ideaId: string, campaignId: string) {
 
   return { bucketIds: assignments.map((a) => a.bucketId) };
 }
-
-

@@ -169,9 +169,7 @@ export const bucketRouter = createTRPCRouter({
     }),
 
   ideaAssignments: protectedProcedure
-    .use(
-      requirePermission<{ campaignId: string }>(Action.BUCKET_READ, (input) => input.campaignId),
-    )
+    .use(requirePermission<{ campaignId: string }>(Action.BUCKET_READ, (input) => input.campaignId))
     .input(bucketIdeaAssignmentsInput)
     .query(async ({ input }) => {
       try {

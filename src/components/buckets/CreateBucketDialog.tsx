@@ -84,7 +84,17 @@ export function CreateBucketDialog({ campaignId, open, onOpenChange }: CreateBuc
       values.type === "SMART"
         ? {
             ...(values.filterStatus
-              ? { status: values.filterStatus as "DRAFT" | "QUALIFICATION" | "COMMUNITY_DISCUSSION" | "HOT" | "EVALUATION" | "SELECTED_IMPLEMENTATION" | "IMPLEMENTED" | "ARCHIVED" }
+              ? {
+                  status: values.filterStatus as
+                    | "DRAFT"
+                    | "QUALIFICATION"
+                    | "COMMUNITY_DISCUSSION"
+                    | "HOT"
+                    | "EVALUATION"
+                    | "SELECTED_IMPLEMENTATION"
+                    | "IMPLEMENTED"
+                    | "ARCHIVED",
+                }
               : {}),
             ...(values.filterMinLikes ? { minLikes: parseInt(values.filterMinLikes, 10) } : {}),
             ...(values.filterMinComments
