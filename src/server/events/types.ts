@@ -180,6 +180,8 @@ export interface EventMap {
   "sia.deleted": EventPayload;
   "sia.campaignLinked": EventPayload;
   "sia.campaignUnlinked": EventPayload;
+  "externalUser.invited": EventPayload;
+  "externalUser.accepted": EventPayload;
 }
 
 export type EventName = keyof EventMap;
