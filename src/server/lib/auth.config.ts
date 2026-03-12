@@ -65,12 +65,11 @@ export const authConfig: NextAuthConfig = {
         }
       }
 
-      // External users can only access /external, /profile, and campaign detail pages
+      // External users can only access /external, /profile, /api, and campaign detail pages
       if (role === "EXTERNAL") {
-        const allowedPaths = ["/external", "/profile"];
+        const allowedPaths = ["/external", "/profile", "/api"];
         const isAllowed =
           allowedPaths.some((p) => pathname.startsWith(p)) || /^\/campaigns\/[^/]+$/.test(pathname);
-
         if (!isAllowed) {
           return Response.redirect(new URL("/external", nextUrl.origin));
         }

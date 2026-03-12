@@ -127,6 +127,7 @@ export const Action = {
   EXTERNAL_INVITATION_LIST: "externalInvitation.list",
   EXTERNAL_INVITATION_REVOKE: "externalInvitation.revoke",
   EXTERNAL_INVITATION_REVOKE_ACCESS: "externalInvitation.revokeAccess",
+  EXTERNAL_INVITATION_MANAGE: "externalInvitation.manage",
 
   // Push notifications
   PUSH_SUBSCRIBE: "push.subscribe",
@@ -287,6 +288,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.EXTERNAL_INVITATION_LIST,
     Action.EXTERNAL_INVITATION_REVOKE,
     Action.EXTERNAL_INVITATION_REVOKE_ACCESS,
+    Action.EXTERNAL_INVITATION_MANAGE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,

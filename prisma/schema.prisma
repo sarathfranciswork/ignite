@@ -80,7 +80,7 @@ model User {
   createdInsights            Insight[]                   @relation("InsightCreatedBy")
   createdPortfolios          InnovationPortfolio[]       @relation("PortfolioCreatedBy")
   externalCampaignIds        String[]                    @default([]) @map("external_campaign_ids")
-  externalInvitations        ExternalInvitation[]        @relation("ExternalInvitationInviter")
+  sentExternalInvitations    ExternalInvitation[]        @relation("ExternalInvitationInviter")
 
   @@map("users")
 }
@@ -123,6 +123,36 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// ── External Invitation Models ────────────────────────────────
+
+enum ExternalInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+
+  @@map("external_invitation_status")
+}
+
+model ExternalInvitation {
+  id            String                   @id @default(cuid())
+  email         String
+  inviterUserId String                   @map("inviter_user_id")
+  token         String                   @unique @default(cuid())
+  status        ExternalInvitationStatus @default(PENDING)
+  campaignIds   String[]                 @map("campaign_ids")
+  expiresAt     DateTime                 @map("expires_at")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+
+  inviter User @relation("ExternalInvitationInviter", fields: [inviterUserId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@map("external_invitations")
 }
 
 // ── Resource Role Models ──────────────────────────────────────
@@ -1797,34 +1827,4 @@ model PortfolioItem {
   @@index([portfolioId])
   @@index([entityType, entityId])
   @@map("portfolio_items")
-}
-
-// ── External User Invitation ──────────────────────────────────
-
-enum ExternalInvitationStatus {
-  PENDING
-  ACCEPTED
-  EXPIRED
-  REVOKED
-
-  @@map("external_invitation_status")
-}
-
-model ExternalInvitation {
-  id            String                   @id @default(cuid())
-  email         String
-  inviterUserId String                   @map("inviter_user_id")
-  token         String                   @unique @default(cuid())
-  status        ExternalInvitationStatus @default(PENDING)
-  campaignIds   String[]                 @map("campaign_ids")
-  expiresAt     DateTime                 @map("expires_at")
-  createdAt     DateTime                 @default(now()) @map("created_at")
-  updatedAt     DateTime                 @updatedAt @map("updated_at")
-
-  inviter User @relation("ExternalInvitationInviter", fields: [inviterUserId], references: [id], onDelete: Cascade)
-
-  @@index([email])
-  @@index([token])
-  @@index([status])
-  @@map("external_invitations")
 }
