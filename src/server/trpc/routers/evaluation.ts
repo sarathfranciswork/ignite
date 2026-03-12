@@ -277,15 +277,19 @@ export const evaluationRouter = createTRPCRouter({
       }
     }),
 
-  myPending: protectedProcedure.input(evaluationMyPendingInput).query(async ({ ctx, input }) => {
-    try {
-      return await getMyPendingEvaluations(input, ctx.session.user.id);
-    } catch (error) {
-      handleEvaluationError(error);
-    }
-  }),
+  myPending: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_PARTICIPATE))
+    .input(evaluationMyPendingInput)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await getMyPendingEvaluations(input, ctx.session.user.id);
+      } catch (error) {
+        handleEvaluationError(error);
+      }
+    }),
 
   myResponses: protectedProcedure
+    .use(requirePermission(Action.EVALUATION_PARTICIPATE))
     .input(evaluationMyResponsesInput)
     .query(async ({ ctx, input }) => {
       try {
