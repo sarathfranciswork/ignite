@@ -254,24 +254,25 @@ export async function updateSubmissionDefinition(
   if (input.description !== undefined) data.description = input.description;
 
   if (input.fields) {
-    await prisma.submissionField.deleteMany({
-      where: { definitionId: input.id },
-    });
-
-    await prisma.submissionField.createMany({
-      data: input.fields.map((f, index) => ({
-        definitionId: input.id,
-        label: f.label,
-        fieldKey: f.fieldKey,
-        fieldType: f.fieldType,
-        isRequired: f.isRequired,
-        sortOrder: f.sortOrder ?? index,
-        placeholder: f.placeholder,
-        helpText: f.helpText,
-        options: f.options as Prisma.InputJsonValue | undefined,
-        validation: f.validation as Prisma.InputJsonValue | undefined,
-      })),
-    });
+    await prisma.$transaction([
+      prisma.submissionField.deleteMany({
+        where: { definitionId: input.id },
+      }),
+      prisma.submissionField.createMany({
+        data: input.fields.map((f, index) => ({
+          definitionId: input.id,
+          label: f.label,
+          fieldKey: f.fieldKey,
+          fieldType: f.fieldType,
+          isRequired: f.isRequired,
+          sortOrder: f.sortOrder ?? index,
+          placeholder: f.placeholder,
+          helpText: f.helpText,
+          options: f.options as Prisma.InputJsonValue | undefined,
+          validation: f.validation as Prisma.InputJsonValue | undefined,
+        })),
+      }),
+    ]);
   }
 
   const definition = await prisma.submissionDefinition.update({
@@ -626,21 +627,22 @@ export async function updateGenericSubmission(input: GenericSubmissionUpdateInpu
   if (input.title !== undefined) data.title = input.title;
 
   if (input.fieldValues) {
-    await prisma.submissionFieldValue.deleteMany({
-      where: { submissionId: input.id },
-    });
-
-    await prisma.submissionFieldValue.createMany({
-      data: input.fieldValues.map((fv) => ({
-        submissionId: input.id,
-        fieldId: fv.fieldId,
-        textValue: fv.textValue,
-        numberValue: fv.numberValue,
-        boolValue: fv.boolValue,
-        dateValue: fv.dateValue ? new Date(fv.dateValue) : undefined,
-        jsonValue: fv.jsonValue as Prisma.InputJsonValue | undefined,
-      })),
-    });
+    await prisma.$transaction([
+      prisma.submissionFieldValue.deleteMany({
+        where: { submissionId: input.id },
+      }),
+      prisma.submissionFieldValue.createMany({
+        data: input.fieldValues.map((fv) => ({
+          submissionId: input.id,
+          fieldId: fv.fieldId,
+          textValue: fv.textValue,
+          numberValue: fv.numberValue,
+          boolValue: fv.boolValue,
+          dateValue: fv.dateValue ? new Date(fv.dateValue) : undefined,
+          jsonValue: fv.jsonValue as Prisma.InputJsonValue | undefined,
+        })),
+      }),
+    ]);
   }
 
   const submission = await prisma.genericSubmission.update({

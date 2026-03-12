@@ -283,25 +283,26 @@ export async function updateAdhocEvaluation(
   }
 
   if (input.criteria) {
-    await prisma.evaluationCriterion.deleteMany({
-      where: { sessionId: input.id },
-    });
-
-    await prisma.evaluationCriterion.createMany({
-      data: input.criteria.map((c, index) => ({
-        sessionId: input.id,
-        title: c.title,
-        description: c.description,
-        guidanceText: c.guidanceText,
-        fieldType: c.fieldType,
-        weight: c.weight,
-        sortOrder: c.sortOrder ?? index,
-        isRequired: c.isRequired,
-        scaleMin: c.scaleMin,
-        scaleMax: c.scaleMax,
-        scaleLabels: c.scaleLabels as Prisma.InputJsonValue | undefined,
-      })),
-    });
+    await prisma.$transaction([
+      prisma.evaluationCriterion.deleteMany({
+        where: { sessionId: input.id },
+      }),
+      prisma.evaluationCriterion.createMany({
+        data: input.criteria.map((c, index) => ({
+          sessionId: input.id,
+          title: c.title,
+          description: c.description,
+          guidanceText: c.guidanceText,
+          fieldType: c.fieldType,
+          weight: c.weight,
+          sortOrder: c.sortOrder ?? index,
+          isRequired: c.isRequired,
+          scaleMin: c.scaleMin,
+          scaleMax: c.scaleMax,
+          scaleLabels: c.scaleLabels as Prisma.InputJsonValue | undefined,
+        })),
+      }),
+    ]);
   }
 
   const session = await prisma.evaluationSession.update({
