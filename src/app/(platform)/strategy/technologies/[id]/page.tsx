@@ -17,6 +17,8 @@ import {
   Target,
   Lock,
   ExternalLink,
+  Megaphone,
+  Lightbulb,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,6 +34,21 @@ const MATURITY_LABELS: Record<string, string> = {
   GROWING: "Growing",
   MATURE: "Mature",
   DECLINING: "Declining",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  AI_ML: "AI/ML",
+  BLOCKCHAIN: "Blockchain",
+  CLOUD: "Cloud",
+  CYBERSECURITY: "Cybersecurity",
+  DATA_ANALYTICS: "Data & Analytics",
+  HARDWARE: "Hardware",
+  IOT: "IoT",
+  MOBILE: "Mobile",
+  NETWORKING: "Networking",
+  ROBOTICS: "Robotics",
+  SOFTWARE: "Software",
+  OTHER: "Other",
 };
 
 export default function TechnologyDetailPage() {
@@ -87,6 +104,26 @@ export default function TechnologyDetailPage() {
     },
   });
 
+  const unlinkCampaignMutation = trpc.technology.unlinkCampaign.useMutation({
+    onSuccess: () => {
+      toast.success("Campaign unlinked");
+      utils.technology.getById.invalidate({ id });
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const unlinkIdeaMutation = trpc.technology.unlinkIdea.useMutation({
+    onSuccess: () => {
+      toast.success("Idea unlinked");
+      utils.technology.getById.invalidate({ id });
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
   if (techQuery.isLoading) {
     return (
       <div className="space-y-6">
@@ -132,10 +169,13 @@ export default function TechnologyDetailPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-display text-2xl font-bold text-gray-900">{tech.title}</h1>
-              {tech.maturityLevel && (
-                <Badge className={MATURITY_COLORS[tech.maturityLevel] ?? ""}>
-                  {MATURITY_LABELS[tech.maturityLevel] ?? tech.maturityLevel}
+              {tech.maturity && (
+                <Badge className={MATURITY_COLORS[tech.maturity] ?? ""}>
+                  {MATURITY_LABELS[tech.maturity] ?? tech.maturity}
                 </Badge>
+              )}
+              {tech.category && tech.category !== "OTHER" && (
+                <Badge variant="outline">{CATEGORY_LABELS[tech.category] ?? tech.category}</Badge>
               )}
               {tech.isArchived && <Badge variant="secondary">Archived</Badge>}
               {tech.isConfidential && (
@@ -186,7 +226,7 @@ export default function TechnologyDetailPage() {
       </div>
 
       {/* Metadata */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Target className="h-8 w-8 text-indigo-500" />
@@ -196,22 +236,33 @@ export default function TechnologyDetailPage() {
             </div>
           </CardContent>
         </Card>
-        {tech.maturityLevel && (
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <Cpu className="h-8 w-8 text-primary-500" />
-              <div>
-                <p className="text-lg font-bold text-gray-900">
-                  {MATURITY_LABELS[tech.maturityLevel] ?? tech.maturityLevel}
-                </p>
-                <p className="text-sm text-gray-500">Maturity Level</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <Megaphone className="h-8 w-8 text-emerald-500" />
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{tech.campaignCount}</p>
+              <p className="text-sm text-gray-500">Campaigns</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <Lightbulb className="h-8 w-8 text-amber-500" />
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{tech.ideaCount}</p>
+              <p className="text-sm text-gray-500">Ideas</p>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <div className="text-sm text-gray-500">
+              {tech.businessRelevance != null && (
+                <p className="text-lg font-bold text-gray-900">
+                  {tech.businessRelevance}
+                  <span className="text-sm font-normal text-gray-400">/10</span>
+                </p>
+              )}
               <p>
                 Created{" "}
                 {new Date(tech.createdAt).toLocaleDateString(undefined, {
@@ -258,32 +309,113 @@ export default function TechnologyDetailPage() {
             <p className="text-sm text-gray-500">No SIAs linked to this technology yet.</p>
           ) : (
             <div className="divide-y divide-gray-100">
-              {tech.sias.map((sia) => (
-                <div key={sia.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-2">
-                    {sia.color && (
-                      <div
-                        className="h-3 w-3 rounded-full"
-                        style={{ backgroundColor: sia.color }}
-                      />
-                    )}
-                    <button
-                      onClick={() => router.push(`/strategy/sias/${sia.id}`)}
-                      className="font-medium text-gray-900 hover:text-primary-600"
+              {tech.sias.map(
+                (sia: { id: string; name: string; color: string | null; isActive: boolean }) => (
+                  <div key={sia.id} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-2">
+                      {sia.color && (
+                        <div
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: sia.color }}
+                        />
+                      )}
+                      <button
+                        onClick={() => router.push(`/strategy/sias/${sia.id}`)}
+                        className="font-medium text-gray-900 hover:text-primary-600"
+                      >
+                        {sia.name}
+                      </button>
+                      {!sia.isActive && (
+                        <Badge variant="secondary" className="text-xs">
+                          Archived
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => unlinkSiaMutation.mutate({ technologyId: id, siaId: sia.id })}
+                      disabled={unlinkSiaMutation.isPending}
+                      className="text-gray-400 hover:text-red-600"
                     >
-                      {sia.name}
-                    </button>
-                    {!sia.isActive && (
-                      <Badge variant="secondary" className="text-xs">
-                        Archived
-                      </Badge>
-                    )}
+                      Unlink
+                    </Button>
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Linked Campaigns */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5" />
+            Campaigns
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tech.campaigns.length === 0 ? (
+            <p className="text-sm text-gray-500">No campaigns linked to this technology yet.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {tech.campaigns.map((campaign: { id: string; title: string; status: string }) => (
+                <div key={campaign.id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{campaign.title}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {campaign.status}
+                    </Badge>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => unlinkSiaMutation.mutate({ techId: id, siaId: sia.id })}
-                    disabled={unlinkSiaMutation.isPending}
+                    onClick={() =>
+                      unlinkCampaignMutation.mutate({
+                        technologyId: id,
+                        campaignId: campaign.id,
+                      })
+                    }
+                    disabled={unlinkCampaignMutation.isPending}
+                    className="text-gray-400 hover:text-red-600"
+                  >
+                    Unlink
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Linked Ideas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lightbulb className="h-5 w-5" />
+            Ideas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tech.ideas.length === 0 ? (
+            <p className="text-sm text-gray-500">No ideas linked to this technology yet.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {tech.ideas.map((idea: { id: string; title: string; status: string }) => (
+                <div key={idea.id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{idea.title}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {idea.status}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => unlinkIdeaMutation.mutate({ technologyId: id, ideaId: idea.id })}
+                    disabled={unlinkIdeaMutation.isPending}
                     className="text-gray-400 hover:text-red-600"
                   >
                     Unlink
@@ -305,9 +437,23 @@ export default function TechnologyDetailPage() {
               id,
               title: data.title,
               description: data.description || null,
-              maturityLevel: data.maturityLevel,
+              category: data.category as
+                | "AI_ML"
+                | "BLOCKCHAIN"
+                | "CLOUD"
+                | "CYBERSECURITY"
+                | "DATA_ANALYTICS"
+                | "HARDWARE"
+                | "IOT"
+                | "MOBILE"
+                | "NETWORKING"
+                | "ROBOTICS"
+                | "SOFTWARE"
+                | "OTHER",
+              maturity: data.maturity as "EMERGING" | "GROWING" | "MATURE" | "DECLINING",
               sourceUrl: data.sourceUrl || null,
               isConfidential: data.isConfidential,
+              businessRelevance: data.businessRelevance,
             })
           }
           isLoading={updateMutation.isPending}

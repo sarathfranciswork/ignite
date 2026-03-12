@@ -2,17 +2,20 @@
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Target, Lock } from "lucide-react";
+import { Target, Lock, Megaphone, Lightbulb } from "lucide-react";
 
 interface TechnologyCardProps {
   technology: {
     id: string;
     title: string;
     description: string | null;
-    maturityLevel: string | null;
+    category: string;
+    maturity: string;
     isArchived: boolean;
     isConfidential: boolean;
     siaCount: number;
+    campaignCount: number;
+    ideaCount: number;
     createdAt: string;
   };
   onClick: (id: string) => void;
@@ -32,6 +35,21 @@ const MATURITY_LABELS: Record<string, string> = {
   DECLINING: "Declining",
 };
 
+const CATEGORY_LABELS: Record<string, string> = {
+  AI_ML: "AI/ML",
+  BLOCKCHAIN: "Blockchain",
+  CLOUD: "Cloud",
+  CYBERSECURITY: "Cybersecurity",
+  DATA_ANALYTICS: "Data & Analytics",
+  HARDWARE: "Hardware",
+  IOT: "IoT",
+  MOBILE: "Mobile",
+  NETWORKING: "Networking",
+  ROBOTICS: "Robotics",
+  SOFTWARE: "Software",
+  OTHER: "Other",
+};
+
 export function TechnologyCard({ technology, onClick }: TechnologyCardProps) {
   return (
     <Card
@@ -43,13 +61,18 @@ export function TechnologyCard({ technology, onClick }: TechnologyCardProps) {
           <h3 className="font-display text-lg font-semibold leading-tight">{technology.title}</h3>
           <div className="flex flex-shrink-0 items-center gap-1">
             {technology.isConfidential && <Lock className="h-3.5 w-3.5 text-amber-500" />}
-            {technology.maturityLevel && (
-              <Badge className={MATURITY_COLORS[technology.maturityLevel] ?? ""}>
-                {MATURITY_LABELS[technology.maturityLevel] ?? technology.maturityLevel}
+            {technology.maturity && (
+              <Badge className={MATURITY_COLORS[technology.maturity] ?? ""}>
+                {MATURITY_LABELS[technology.maturity] ?? technology.maturity}
               </Badge>
             )}
           </div>
         </div>
+        {technology.category && technology.category !== "OTHER" && (
+          <span className="text-xs text-gray-400">
+            {CATEGORY_LABELS[technology.category] ?? technology.category}
+          </span>
+        )}
       </CardHeader>
       <CardContent>
         {technology.description && (
@@ -65,6 +88,18 @@ export function TechnologyCard({ technology, onClick }: TechnologyCardProps) {
             <span className="flex items-center gap-1">
               <Target className="h-3.5 w-3.5" />
               {technology.siaCount} {technology.siaCount === 1 ? "SIA" : "SIAs"}
+            </span>
+          )}
+          {technology.campaignCount > 0 && (
+            <span className="flex items-center gap-1">
+              <Megaphone className="h-3.5 w-3.5" />
+              {technology.campaignCount}
+            </span>
+          )}
+          {technology.ideaCount > 0 && (
+            <span className="flex items-center gap-1">
+              <Lightbulb className="h-3.5 w-3.5" />
+              {technology.ideaCount}
             </span>
           )}
         </div>

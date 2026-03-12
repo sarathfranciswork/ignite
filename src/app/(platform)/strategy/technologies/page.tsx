@@ -28,7 +28,7 @@ export default function TechnologiesPage() {
   const technologiesQuery = trpc.technology.list.useQuery({
     limit: 50,
     search: search || undefined,
-    maturityLevel: maturityParam,
+    maturity: maturityParam,
     isArchived: isArchivedParam,
     sortBy: "title",
     sortDirection: "asc",
@@ -50,16 +50,32 @@ export default function TechnologiesPage() {
   const handleCreate = (data: {
     title: string;
     description: string;
-    maturityLevel: MaturityLevel | null;
+    category: string;
+    maturity: string;
     sourceUrl: string;
     isConfidential: boolean;
+    businessRelevance: number | null;
   }) => {
     createMutation.mutate({
       title: data.title,
       description: data.description || undefined,
-      maturityLevel: data.maturityLevel ?? undefined,
+      category: data.category as
+        | "AI_ML"
+        | "BLOCKCHAIN"
+        | "CLOUD"
+        | "CYBERSECURITY"
+        | "DATA_ANALYTICS"
+        | "HARDWARE"
+        | "IOT"
+        | "MOBILE"
+        | "NETWORKING"
+        | "ROBOTICS"
+        | "SOFTWARE"
+        | "OTHER",
+      maturity: data.maturity as MaturityLevel,
       sourceUrl: data.sourceUrl || undefined,
       isConfidential: data.isConfidential,
+      businessRelevance: data.businessRelevance ?? undefined,
     });
   };
 
@@ -182,7 +198,7 @@ export default function TechnologiesPage() {
             <TechnologyCard
               key={tech.id}
               technology={tech}
-              onClick={(id) => router.push(`/strategy/technologies/${id}`)}
+              onClick={(techId) => router.push(`/strategy/technologies/${techId}`)}
             />
           ))}
         </div>

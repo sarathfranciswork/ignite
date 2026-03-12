@@ -13,13 +13,28 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 type MaturityLevel = "EMERGING" | "GROWING" | "MATURE" | "DECLINING";
+type CategoryLevel =
+  | "AI_ML"
+  | "BLOCKCHAIN"
+  | "CLOUD"
+  | "CYBERSECURITY"
+  | "DATA_ANALYTICS"
+  | "HARDWARE"
+  | "IOT"
+  | "MOBILE"
+  | "NETWORKING"
+  | "ROBOTICS"
+  | "SOFTWARE"
+  | "OTHER";
 
 interface TechnologyFormData {
   title: string;
   description: string;
-  maturityLevel: MaturityLevel | null;
+  category: CategoryLevel;
+  maturity: MaturityLevel;
   sourceUrl: string;
   isConfidential: boolean;
+  businessRelevance: number | null;
 }
 
 interface TechnologyFormDialogProps {
@@ -30,9 +45,11 @@ interface TechnologyFormDialogProps {
   initialData?: {
     title: string;
     description: string | null;
-    maturityLevel: string | null;
+    category?: string;
+    maturity?: string;
     sourceUrl: string | null;
     isConfidential: boolean;
+    businessRelevance?: number | null;
   };
   mode: "create" | "edit";
 }
@@ -42,6 +59,21 @@ const MATURITY_LEVELS: { value: MaturityLevel; label: string; description: strin
   { value: "GROWING", label: "Growing", description: "Gaining traction and adoption" },
   { value: "MATURE", label: "Mature", description: "Widely adopted, stable" },
   { value: "DECLINING", label: "Declining", description: "Being replaced or phased out" },
+];
+
+const CATEGORIES: { value: CategoryLevel; label: string }[] = [
+  { value: "AI_ML", label: "AI/ML" },
+  { value: "BLOCKCHAIN", label: "Blockchain" },
+  { value: "CLOUD", label: "Cloud" },
+  { value: "CYBERSECURITY", label: "Cybersecurity" },
+  { value: "DATA_ANALYTICS", label: "Data & Analytics" },
+  { value: "HARDWARE", label: "Hardware" },
+  { value: "IOT", label: "IoT" },
+  { value: "MOBILE", label: "Mobile" },
+  { value: "NETWORKING", label: "Networking" },
+  { value: "ROBOTICS", label: "Robotics" },
+  { value: "SOFTWARE", label: "Software" },
+  { value: "OTHER", label: "Other" },
 ];
 
 export function TechnologyFormDialog({
@@ -54,11 +86,17 @@ export function TechnologyFormDialog({
 }: TechnologyFormDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
-  const [maturityLevel, setMaturityLevel] = useState<MaturityLevel | null>(
-    (initialData?.maturityLevel as MaturityLevel) ?? null,
+  const [category, setCategory] = useState<CategoryLevel>(
+    (initialData?.category as CategoryLevel) ?? "OTHER",
+  );
+  const [maturity, setMaturity] = useState<MaturityLevel>(
+    (initialData?.maturity as MaturityLevel) ?? "EMERGING",
   );
   const [sourceUrl, setSourceUrl] = useState(initialData?.sourceUrl ?? "");
   const [isConfidential, setIsConfidential] = useState(initialData?.isConfidential ?? false);
+  const [businessRelevance, setBusinessRelevance] = useState<string>(
+    initialData?.businessRelevance != null ? String(initialData.businessRelevance) : "",
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,9 +104,11 @@ export function TechnologyFormDialog({
     onSubmit({
       title: title.trim(),
       description: description.trim(),
-      maturityLevel,
+      category,
+      maturity,
       sourceUrl: sourceUrl.trim(),
       isConfidential,
+      businessRelevance: businessRelevance ? Number(businessRelevance) : null,
     });
   };
 
@@ -94,15 +134,33 @@ export function TechnologyFormDialog({
           </div>
 
           <div>
+            <label htmlFor="tech-category" className="mb-1 block text-sm font-medium text-gray-700">
+              Category
+            </label>
+            <select
+              id="tech-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as CategoryLevel)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Maturity Level</label>
             <div className="grid grid-cols-2 gap-2">
               {MATURITY_LEVELS.map((m) => (
                 <button
                   key={m.value}
                   type="button"
-                  onClick={() => setMaturityLevel(maturityLevel === m.value ? null : m.value)}
+                  onClick={() => setMaturity(m.value)}
                   className={`rounded-lg border px-3 py-2 text-center text-sm transition-colors ${
-                    maturityLevel === m.value
+                    maturity === m.value
                       ? "border-primary-500 bg-primary-50 text-primary-700"
                       : "border-gray-200 text-gray-600 hover:bg-gray-50"
                   }`}
@@ -138,6 +196,25 @@ export function TechnologyFormDialog({
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder="https://..."
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="tech-relevance"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Business Relevance (0-10)
+            </label>
+            <Input
+              id="tech-relevance"
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
+              value={businessRelevance}
+              onChange={(e) => setBusinessRelevance(e.target.value)}
+              placeholder="e.g. 7.5"
             />
           </div>
 

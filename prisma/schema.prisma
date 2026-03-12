@@ -371,6 +371,7 @@ model Campaign {
   activityEvents     ActivityEvent[]
   buckets            Bucket[]
   evaluationSessions EvaluationSession[]
+  technologies       TechnologyCampaignLink[]
 
   @@index([status])
   @@index([submissionType])
@@ -568,6 +569,7 @@ model Idea {
   shortlistItems         EvaluationShortlistItem[]
   pairwiseAsIdeaA        PairwiseComparison[]      @relation("PairwiseIdeaA")
   pairwiseAsIdeaB        PairwiseComparison[]      @relation("PairwiseIdeaB")
+  technologies           TechnologyIdeaLink[]
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1683,32 +1685,57 @@ model TrendInsightLink {
   @@map("trend_insight_links")
 }
 
-// ─── Technologies ──────────────────────────────────────────
+// ── Technology Database ─────────────────────────────────────
 
-enum MaturityLevel {
+enum TechnologyCategory {
+  AI_ML
+  BLOCKCHAIN
+  CLOUD
+  CYBERSECURITY
+  DATA_ANALYTICS
+  HARDWARE
+  IOT
+  MOBILE
+  NETWORKING
+  ROBOTICS
+  SOFTWARE
+  OTHER
+
+  @@map("technology_category")
+}
+
+enum TechnologyMaturity {
   EMERGING
   GROWING
   MATURE
   DECLINING
+
+  @@map("technology_maturity")
 }
 
 model Technology {
-  id             String         @id @default(cuid())
-  title          String
-  description    String?        @db.Text
-  imageUrl       String?        @map("image_url")
-  sourceUrl      String?        @map("source_url")
-  maturityLevel  MaturityLevel? @map("maturity_level")
-  isConfidential Boolean        @default(false) @map("is_confidential")
-  isArchived     Boolean        @default(false) @map("is_archived")
-  createdById    String         @map("created_by_id")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  id                   String             @id @default(cuid())
+  title                String
+  description          String?            @db.Text
+  imageUrl             String?            @map("image_url")
+  sourceUrl            String?            @map("source_url")
+  category             TechnologyCategory @default(OTHER)
+  maturity             TechnologyMaturity @default(EMERGING)
+  isConfidential       Boolean            @default(false) @map("is_confidential")
+  isArchived           Boolean            @default(false) @map("is_archived")
+  isCommunitySubmitted Boolean            @default(false) @map("is_community_submitted")
+  businessRelevance    Float?             @map("business_relevance")
+  createdById          String             @map("created_by_id")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
-  createdBy User          @relation("TechnologyCreatedBy", fields: [createdById], references: [id])
-  sias      TechSiaLink[]
+  createdBy  User                     @relation("TechnologyCreatedBy", fields: [createdById], references: [id])
+  sias       TechSiaLink[]
+  campaigns  TechnologyCampaignLink[]
+  ideas      TechnologyIdeaLink[]
 
-  @@index([maturityLevel])
+  @@index([category])
+  @@index([maturity])
   @@index([createdById])
   @@index([isArchived])
   @@map("technologies")
@@ -1723,4 +1750,26 @@ model TechSiaLink {
 
   @@unique([techId, siaId])
   @@map("tech_sia_links")
+}
+
+model TechnologyCampaignLink {
+  id           String     @id @default(cuid())
+  technologyId String     @map("technology_id")
+  campaignId   String     @map("campaign_id")
+  technology   Technology @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+  campaign     Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([technologyId, campaignId])
+  @@map("technology_campaign_links")
+}
+
+model TechnologyIdeaLink {
+  id           String     @id @default(cuid())
+  technologyId String     @map("technology_id")
+  ideaId       String     @map("idea_id")
+  technology   Technology @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+  idea         Idea       @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@unique([technologyId, ideaId])
+  @@map("technology_idea_links")
 }
