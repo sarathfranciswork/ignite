@@ -75,6 +75,7 @@ model User {
   addedShortlistItems        EvaluationShortlistItem[]   @relation("ShortlistItemAddedBy")
   createdSias                StrategicInnovationArea[]   @relation("SiaCreatedBy")
   createdTrends              Trend[]                     @relation("TrendCreatedBy")
+  createdTechnologies        Technology[]                @relation("TechnologyCreatedBy")
 
   @@map("users")
 }
@@ -1598,9 +1599,10 @@ model StrategicInnovationArea {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdBy User           @relation("SiaCreatedBy", fields: [createdById], references: [id])
-  campaigns Campaign[]     @relation("CampaignSia")
-  trends    TrendSiaLink[]
+  createdBy    User           @relation("SiaCreatedBy", fields: [createdById], references: [id])
+  campaigns    Campaign[]     @relation("CampaignSia")
+  trends       TrendSiaLink[]
+  technologies TechSiaLink[]
 
   @@index([isActive])
   @@index([createdById])
@@ -1679,4 +1681,46 @@ model TrendInsightLink {
 
   @@unique([trendId, insightId])
   @@map("trend_insight_links")
+}
+
+// ─── Technologies ──────────────────────────────────────────
+
+enum MaturityLevel {
+  EMERGING
+  GROWING
+  MATURE
+  DECLINING
+}
+
+model Technology {
+  id             String         @id @default(cuid())
+  title          String
+  description    String?        @db.Text
+  imageUrl       String?        @map("image_url")
+  sourceUrl      String?        @map("source_url")
+  maturityLevel  MaturityLevel? @map("maturity_level")
+  isConfidential Boolean        @default(false) @map("is_confidential")
+  isArchived     Boolean        @default(false) @map("is_archived")
+  createdById    String         @map("created_by_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  createdBy User          @relation("TechnologyCreatedBy", fields: [createdById], references: [id])
+  sias      TechSiaLink[]
+
+  @@index([maturityLevel])
+  @@index([createdById])
+  @@index([isArchived])
+  @@map("technologies")
+}
+
+model TechSiaLink {
+  id     String                  @id @default(cuid())
+  techId String                  @map("tech_id")
+  siaId  String                  @map("sia_id")
+  tech   Technology              @relation(fields: [techId], references: [id], onDelete: Cascade)
+  sia    StrategicInnovationArea @relation(fields: [siaId], references: [id], onDelete: Cascade)
+
+  @@unique([techId, siaId])
+  @@map("tech_sia_links")
 }

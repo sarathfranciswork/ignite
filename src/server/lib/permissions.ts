@@ -142,6 +142,12 @@ export const Action = {
   TREND_UPDATE: "trend.update",
   TREND_DELETE: "trend.delete",
 
+  // Technologies
+  TECHNOLOGY_CREATE: "technology.create",
+  TECHNOLOGY_READ: "technology.read",
+  TECHNOLOGY_UPDATE: "technology.update",
+  TECHNOLOGY_DELETE: "technology.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -247,6 +253,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.TREND_READ,
     Action.TREND_UPDATE,
     Action.TREND_DELETE,
+    Action.TECHNOLOGY_CREATE,
+    Action.TECHNOLOGY_READ,
+    Action.TECHNOLOGY_UPDATE,
+    Action.TECHNOLOGY_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -286,6 +296,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.AI_SUMMARIZE,
     Action.SIA_READ,
     Action.TREND_READ,
+    Action.TECHNOLOGY_READ,
   ],
 } as const;
 
