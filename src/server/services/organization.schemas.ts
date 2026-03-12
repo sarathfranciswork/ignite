@@ -78,6 +78,11 @@ export const organizationUpdateInput = z.object({
   managementTeam: z.record(z.string(), z.string()).optional().nullable(),
 });
 
+export const organizationSetConfidentialInput = z.object({
+  id: z.string().cuid(),
+  isConfidential: z.boolean(),
+});
+
 export const organizationGetByIdInput = z.object({
   id: z.string().cuid(),
 });
@@ -100,4 +105,5 @@ export type OrganizationListInput = z.input<typeof organizationListInput>;
 export type OrganizationCreateInput = z.infer<typeof organizationCreateInput>;
 export type OrganizationUpdateInput = z.infer<typeof organizationUpdateInput>;
 export type CheckDuplicateByUrlInput = z.infer<typeof checkDuplicateByUrlInput>;
+export type OrganizationSetConfidentialInput = z.infer<typeof organizationSetConfidentialInput>;
 export type CheckDuplicateByCrunchbaseIdInput = z.infer<typeof checkDuplicateByCrunchbaseIdInput>;

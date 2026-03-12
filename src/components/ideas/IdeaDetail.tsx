@@ -10,6 +10,7 @@ import {
   Eye,
   Tag,
   Calendar,
+  Lock,
   Loader2,
   Trash2,
   Send,
@@ -136,6 +137,12 @@ export function IdeaDetail({ ideaId }: IdeaDetailProps) {
             <div className="flex items-center gap-3">
               <h1 className="font-display text-2xl font-bold text-gray-900">{idea.title}</h1>
               <StatusBadge status={idea.status} />
+              {idea.isConfidential && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                  <Lock className="h-3 w-3" />
+                  Confidential
+                </span>
+              )}
             </div>
             {idea.teaser && <p className="mt-2 text-gray-600">{idea.teaser}</p>}
           </div>

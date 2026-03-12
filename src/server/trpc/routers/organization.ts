@@ -1,21 +1,24 @@
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
+import { checkPermission } from "@/server/services/rbac.service";
 import {
   organizationListInput,
   organizationCreateInput,
   organizationUpdateInput,
   organizationGetByIdInput,
   organizationDeleteInput,
+  organizationSetConfidentialInput,
   checkDuplicateByUrlInput,
   checkDuplicateByCrunchbaseIdInput,
 } from "@/server/services/organization.schemas";
 import {
-  listOrganizations,
-  getOrganizationById,
+  listOrganizationsWithConfidentialFilter,
+  getOrganizationByIdWithConfidentialCheck,
   createOrganization,
   updateOrganization,
   deleteOrganization,
+  setOrganizationConfidential,
   checkDuplicateOrganization,
   checkDuplicateByUrl,
   checkDuplicateByCrunchbaseId,
@@ -76,16 +79,34 @@ export const organizationRouter = createTRPCRouter({
   list: protectedProcedure
     .use(requirePermission(Action.ORGANIZATION_READ))
     .input(organizationListInput)
-    .query(async ({ input }) => {
-      return listOrganizations(input);
+    .query(async ({ ctx, input }) => {
+      try {
+        const userId = ctx.session.user.id;
+        const canReadConfidential = await checkPermission(
+          userId,
+          Action.ORGANIZATION_READ_CONFIDENTIAL,
+        );
+        return await listOrganizationsWithConfidentialFilter(input, userId, canReadConfidential);
+      } catch (error) {
+        handleOrganizationError(error);
+      }
     }),
 
   getById: protectedProcedure
     .use(requirePermission(Action.ORGANIZATION_READ))
     .input(organizationGetByIdInput)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       try {
-        return await getOrganizationById(input.id);
+        const userId = ctx.session.user.id;
+        const canReadConfidential = await checkPermission(
+          userId,
+          Action.ORGANIZATION_READ_CONFIDENTIAL,
+        );
+        return await getOrganizationByIdWithConfidentialCheck(
+          input.id,
+          userId,
+          canReadConfidential,
+        );
       } catch (error) {
         handleOrganizationError(error);
       }
@@ -119,6 +140,17 @@ export const organizationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await deleteOrganization(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleOrganizationError(error);
+      }
+    }),
+
+  setConfidential: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_SET_CONFIDENTIAL))
+    .input(organizationSetConfidentialInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await setOrganizationConfidential(input, ctx.session.user.id);
       } catch (error) {
         handleOrganizationError(error);
       }

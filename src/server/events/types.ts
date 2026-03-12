@@ -30,6 +30,7 @@ export interface EventMap {
   "idea.bulkArchived": EventPayload;
   "idea.bulkBucketAssigned": EventPayload;
   "idea.bulkExported": EventPayload;
+  "idea.confidentialityChanged": EventPayload;
   "idea.voted": EventPayload;
   "idea.liked": EventPayload;
   "idea.unliked": EventPayload;
@@ -88,6 +89,7 @@ export interface EventMap {
   "channel.archived": EventPayload;
   "organization.created": EventPayload;
   "organization.updated": EventPayload;
+  "organization.confidentialityChanged": EventPayload;
   "organization.archived": EventPayload;
   "organization.deleted": EventPayload;
   "contact.created": EventPayload;

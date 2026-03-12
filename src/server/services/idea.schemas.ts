@@ -46,6 +46,12 @@ export const ideaListInput = z.object({
     .optional(),
   tag: z.string().max(50).optional(),
   category: z.string().max(200).optional(),
+  isConfidential: z.boolean().optional(),
+});
+
+export const ideaSetConfidentialInput = z.object({
+  id: z.string(),
+  isConfidential: z.boolean(),
 });
 
 export const ideaGetByIdInput = z.object({
@@ -105,6 +111,7 @@ export type IdeaListInput = z.infer<typeof ideaListInput>;
 export type IdeaTransitionInput = z.infer<typeof ideaTransitionInput>;
 export type IdeaArchiveInput = z.infer<typeof ideaArchiveInput>;
 export type IdeaUnarchiveInput = z.infer<typeof ideaUnarchiveInput>;
+export type IdeaSetConfidentialInput = z.infer<typeof ideaSetConfidentialInput>;
 export type IdeaCoachQualifyInput = z.infer<typeof ideaCoachQualifyInput>;
 export type CoachQualificationDecision = z.infer<typeof coachQualificationDecision>;
 

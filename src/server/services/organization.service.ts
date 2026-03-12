@@ -6,6 +6,7 @@ import type {
   OrganizationListInput,
   OrganizationCreateInput,
   OrganizationUpdateInput,
+  OrganizationSetConfidentialInput,
   CheckDuplicateByUrlInput,
   CheckDuplicateByCrunchbaseIdInput,
 } from "./organization.schemas";
@@ -401,6 +402,179 @@ export async function getDistinctLocations(): Promise<string[]> {
     orderBy: { location: "asc" },
   });
   return result.map((r) => r.location).filter((l): l is string => l !== null);
+}
+
+/**
+ * List organizations with confidential access filtering.
+ * Non-privileged users can only see non-confidential orgs,
+ * plus confidential orgs where they are a manager.
+ */
+export async function listOrganizationsWithConfidentialFilter(
+  input: OrganizationListInput,
+  userId: string,
+  canReadConfidential: boolean,
+) {
+  if (canReadConfidential) {
+    return listOrganizations(input);
+  }
+
+  const where: Prisma.OrganizationWhereInput = {
+    OR: [{ isConfidential: false }, { managers: { some: { userId } } }],
+  };
+
+  if (input.relationshipStatus) {
+    where.relationshipStatus = input.relationshipStatus;
+  }
+
+  if (input.industries && input.industries.length > 0) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      {
+        OR: input.industries.map((ind) => ({
+          industry: { contains: ind, mode: "insensitive" as const },
+        })),
+      },
+    ];
+  } else if (input.industry) {
+    where.industry = { contains: input.industry, mode: "insensitive" };
+  }
+
+  if (input.location) {
+    where.location = { contains: input.location, mode: "insensitive" };
+  }
+
+  if (input.ndaStatus) {
+    where.ndaStatus = input.ndaStatus;
+  }
+
+  if (input.isConfidential !== undefined) {
+    if (input.isConfidential) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { isConfidential: true },
+        { managers: { some: { userId } } },
+      ];
+      delete where.OR;
+    } else {
+      where.isConfidential = false;
+      delete where.OR;
+    }
+  }
+
+  if (input.isArchived !== undefined) {
+    where.isArchived = input.isArchived;
+  }
+
+  if (input.search) {
+    const searchConditions: Prisma.OrganizationWhereInput[] = [
+      { name: { contains: input.search, mode: "insensitive" } },
+      { description: { contains: input.search, mode: "insensitive" } },
+      { industry: { contains: input.search, mode: "insensitive" } },
+      { location: { contains: input.search, mode: "insensitive" } },
+      { websiteUrl: { contains: input.search, mode: "insensitive" } },
+    ];
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : []), { OR: searchConditions }];
+  }
+
+  const sortBy = input.sortBy ?? "name";
+  const sortDirection = input.sortDirection ?? "asc";
+  const orderBy: Prisma.OrganizationOrderByWithRelationInput = { [sortBy]: sortDirection };
+  const limit = input.limit ?? 20;
+
+  const items = await prisma.organization.findMany({
+    where,
+    include: {
+      ...orgWithManagersInclude,
+      managers: { ...managerInclude, take: 3 },
+    },
+    take: limit + 1,
+    ...(input.cursor ? { skip: 1, cursor: { id: input.cursor } } : {}),
+    orderBy,
+  });
+
+  let nextCursor: string | undefined;
+  if (items.length > limit) {
+    const next = items.pop();
+    nextCursor = next?.id;
+  }
+
+  return {
+    items: items.map(mapOrganizationToResponse),
+    nextCursor,
+  };
+}
+
+/**
+ * Get an organization by ID with confidential access check.
+ * Confidential organizations are only accessible to:
+ * - Organization managers
+ * - Users with ORGANIZATION_READ_CONFIDENTIAL permission
+ */
+export async function getOrganizationByIdWithConfidentialCheck(
+  id: string,
+  userId: string,
+  canReadConfidential: boolean,
+) {
+  const org = await getOrganizationById(id);
+
+  if (org.isConfidential && !canReadConfidential) {
+    const isManager = org.managers.some((m) => m.user.id === userId);
+
+    if (!isManager) {
+      throw new OrganizationServiceError("Organization not found", "ORGANIZATION_NOT_FOUND");
+    }
+  }
+
+  return org;
+}
+
+/**
+ * Set confidentiality on an organization.
+ */
+export async function setOrganizationConfidential(
+  input: OrganizationSetConfidentialInput,
+  actorId: string,
+) {
+  const existing = await prisma.organization.findUnique({
+    where: { id: input.id },
+    select: { id: true, name: true, isConfidential: true },
+  });
+
+  if (!existing) {
+    throw new OrganizationServiceError("Organization not found", "ORGANIZATION_NOT_FOUND");
+  }
+
+  if (existing.isConfidential === input.isConfidential) {
+    const org = await prisma.organization.findUnique({
+      where: { id: input.id },
+      include: orgWithManagersInclude,
+    });
+    return mapOrganizationToResponse(org!);
+  }
+
+  const org = await prisma.organization.update({
+    where: { id: input.id },
+    data: { isConfidential: input.isConfidential },
+    include: orgWithManagersInclude,
+  });
+
+  childLogger.info(
+    { organizationId: input.id, isConfidential: input.isConfidential, actorId },
+    "Organization confidentiality changed",
+  );
+
+  eventBus.emit("organization.confidentialityChanged", {
+    entity: "organization",
+    entityId: input.id,
+    actor: actorId,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      name: existing.name,
+      isConfidential: input.isConfidential,
+    },
+  });
+
+  return mapOrganizationToResponse(org);
 }
 
 export class OrganizationServiceError extends Error {

@@ -18,6 +18,7 @@ import type {
   IdeaUnarchiveInput,
   IdeaCoachQualifyInput,
   IdeaBoardListInput,
+  IdeaSetConfidentialInput,
 } from "./idea.schemas";
 
 export {
@@ -33,6 +34,7 @@ export {
   ideaUnarchiveInput,
   ideaCoachQualifyInput,
   ideaBoardListInput,
+  ideaSetConfidentialInput,
 } from "./idea.schemas";
 
 export type {
@@ -44,6 +46,7 @@ export type {
   IdeaUnarchiveInput,
   IdeaCoachQualifyInput,
   IdeaBoardListInput,
+  IdeaSetConfidentialInput,
 } from "./idea.schemas";
 
 const childLogger = logger.child({ service: "idea" });
@@ -123,11 +126,107 @@ export async function listIdeas(input: IdeaListInput) {
     where.category = input.category;
   }
 
+  if (input.isConfidential !== undefined) {
+    where.isConfidential = input.isConfidential;
+  }
+
   if (input.search) {
     where.OR = [
       { title: { contains: input.search, mode: "insensitive" } },
       { teaser: { contains: input.search, mode: "insensitive" } },
     ];
+  }
+
+  const items = await prisma.idea.findMany({
+    where,
+    include: {
+      contributor: {
+        select: { id: true, name: true, email: true, image: true },
+      },
+      coAuthors: {
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+        },
+      },
+    },
+    take: input.limit + 1,
+    ...(input.cursor ? { skip: 1, cursor: { id: input.cursor } } : {}),
+    orderBy: { createdAt: "desc" },
+  });
+
+  let nextCursor: string | undefined;
+  if (items.length > input.limit) {
+    const next = items.pop();
+    nextCursor = next?.id;
+  }
+
+  return {
+    items: items.map(serializeIdea),
+    nextCursor,
+  };
+}
+
+/**
+ * List ideas visible to a specific user, filtering out confidential ideas
+ * that the user is not authorized to see.
+ * Confidential ideas are only visible to:
+ * - The idea contributor
+ * - Co-authors
+ * - Users with IDEA_READ_CONFIDENTIAL permission (managers, coaches, platform admins)
+ */
+export async function listIdeasWithConfidentialFilter(
+  input: IdeaListInput,
+  userId: string,
+  canReadConfidential: boolean,
+) {
+  if (canReadConfidential) {
+    return listIdeas(input);
+  }
+
+  const where: Prisma.IdeaWhereInput = {
+    campaignId: input.campaignId,
+    OR: [{ isConfidential: false }, { contributorId: userId }, { coAuthors: { some: { userId } } }],
+  };
+
+  if (input.status) {
+    where.status = input.status;
+  }
+
+  if (input.tag) {
+    where.tags = { has: input.tag };
+  }
+
+  if (input.category) {
+    where.category = input.category;
+  }
+
+  if (input.isConfidential !== undefined) {
+    if (input.isConfidential) {
+      where.AND = [
+        { isConfidential: true },
+        {
+          OR: [{ contributorId: userId }, { coAuthors: { some: { userId } } }],
+        },
+      ];
+      delete where.OR;
+    } else {
+      where.isConfidential = false;
+      delete where.OR;
+    }
+  }
+
+  if (input.search) {
+    const searchConditions: Prisma.IdeaWhereInput[] = [
+      { title: { contains: input.search, mode: "insensitive" } },
+      { teaser: { contains: input.search, mode: "insensitive" } },
+    ];
+    if (where.AND) {
+      (where.AND as Prisma.IdeaWhereInput[]).push({ OR: searchConditions });
+    } else {
+      where.AND = [{ OR: searchConditions }];
+    }
   }
 
   const items = await prisma.idea.findMany({
@@ -197,11 +296,18 @@ export async function getIdeaById(id: string) {
 export async function createIdea(input: IdeaCreateInput, contributorId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: input.campaignId },
-    select: { id: true, status: true, title: true },
+    select: { id: true, status: true, title: true, isConfidentialAllowed: true },
   });
 
   if (!campaign) {
     throw new IdeaServiceError("Campaign not found", "CAMPAIGN_NOT_FOUND");
+  }
+
+  if (input.isConfidential && !campaign.isConfidentialAllowed) {
+    throw new IdeaServiceError(
+      "Confidential ideas are not allowed in this campaign",
+      "CONFIDENTIAL_NOT_ALLOWED",
+    );
   }
 
   const submittableStatuses = ["SEEDING", "SUBMISSION"];
@@ -918,6 +1024,108 @@ export async function listIdeasForBoard(input: IdeaBoardListInput) {
     items: items.map(serializeIdea),
     nextCursor,
   };
+}
+
+/**
+ * Get an idea by ID with confidential access check.
+ * Confidential ideas are only accessible to:
+ * - The idea contributor or co-author
+ * - Users with IDEA_READ_CONFIDENTIAL permission
+ */
+export async function getIdeaByIdWithConfidentialCheck(
+  id: string,
+  userId: string,
+  canReadConfidential: boolean,
+) {
+  const idea = await getIdeaById(id);
+
+  if (idea.isConfidential && !canReadConfidential) {
+    const isContributor = idea.contributorId === userId;
+    const isCoAuthor = idea.coAuthors?.some((ca) => ca.id === userId) ?? false;
+
+    if (!isContributor && !isCoAuthor) {
+      throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+    }
+  }
+
+  return idea;
+}
+
+/**
+ * Set confidentiality on an idea.
+ * Validates that the campaign allows confidential ideas.
+ */
+export async function setIdeaConfidential(input: IdeaSetConfidentialInput, actor: string) {
+  const idea = await prisma.idea.findUnique({
+    where: { id: input.id },
+    select: {
+      id: true,
+      isConfidential: true,
+      campaignId: true,
+      campaign: { select: { isConfidentialAllowed: true } },
+    },
+  });
+
+  if (!idea) {
+    throw new IdeaServiceError("Idea not found", "IDEA_NOT_FOUND");
+  }
+
+  if (input.isConfidential && !idea.campaign.isConfidentialAllowed) {
+    throw new IdeaServiceError(
+      "Confidential ideas are not allowed in this campaign",
+      "CONFIDENTIAL_NOT_ALLOWED",
+    );
+  }
+
+  if (idea.isConfidential === input.isConfidential) {
+    const current = await prisma.idea.findUnique({
+      where: { id: input.id },
+      include: ideaFullInclude,
+    });
+    return serializeIdea(current!);
+  }
+
+  const updated = await prisma.idea.update({
+    where: { id: input.id },
+    data: { isConfidential: input.isConfidential },
+    include: ideaFullInclude,
+  });
+
+  eventBus.emit("idea.confidentialityChanged", {
+    entity: "idea",
+    entityId: input.id,
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: {
+      campaignId: idea.campaignId,
+      isConfidential: input.isConfidential,
+    },
+  });
+
+  childLogger.info(
+    { ideaId: input.id, isConfidential: input.isConfidential },
+    "Idea confidentiality changed",
+  );
+
+  return serializeIdea(updated);
+}
+
+/**
+ * Check if a user can access a confidential idea.
+ * Returns true if user is contributor, co-author, or has read-confidential permission.
+ */
+export async function canAccessConfidentialIdea(ideaId: string, userId: string): Promise<boolean> {
+  const idea = await prisma.idea.findUnique({
+    where: { id: ideaId },
+    select: {
+      contributorId: true,
+      coAuthors: { select: { userId: true } },
+    },
+  });
+
+  if (!idea) return false;
+
+  return idea.contributorId === userId || idea.coAuthors.some((ca) => ca.userId === userId);
 }
 
 export class IdeaServiceError extends Error {
