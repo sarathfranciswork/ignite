@@ -12,6 +12,7 @@ import {
   bucketUnassignIdeaInput,
   bucketListIdeasInput,
   bucketSidebarInput,
+  bucketIdeaAssignmentsInput,
 } from "@/server/services/bucket.schemas";
 import {
   listBuckets,
@@ -24,6 +25,7 @@ import {
   unassignIdeaFromBucket,
   listBucketIdeas,
   getBucketSidebar,
+  getIdeaAssignments,
   BucketServiceError,
 } from "@/server/services/bucket.service";
 
@@ -56,7 +58,11 @@ export const bucketRouter = createTRPCRouter({
     .use(requirePermission<{ campaignId: string }>(Action.BUCKET_READ, (input) => input.campaignId))
     .input(bucketListInput)
     .query(async ({ input }) => {
-      return listBuckets(input);
+      try {
+        return await listBuckets(input);
+      } catch (error) {
+        handleBucketError(error);
+      }
     }),
 
   getById: protectedProcedure
@@ -111,7 +117,11 @@ export const bucketRouter = createTRPCRouter({
     )
     .input(bucketReorderInput)
     .mutation(async ({ ctx, input }) => {
-      return reorderBuckets(input, ctx.session.user.id);
+      try {
+        return await reorderBuckets(input, ctx.session.user.id);
+      } catch (error) {
+        handleBucketError(error);
+      }
     }),
 
   assignIdea: protectedProcedure
@@ -151,6 +161,23 @@ export const bucketRouter = createTRPCRouter({
     .use(requirePermission<{ campaignId: string }>(Action.BUCKET_READ, (input) => input.campaignId))
     .input(bucketSidebarInput)
     .query(async ({ input }) => {
-      return getBucketSidebar(input);
+      try {
+        return await getBucketSidebar(input);
+      } catch (error) {
+        handleBucketError(error);
+      }
+    }),
+
+  ideaAssignments: protectedProcedure
+    .use(
+      requirePermission<{ campaignId: string }>(Action.BUCKET_READ, (input) => input.campaignId),
+    )
+    .input(bucketIdeaAssignmentsInput)
+    .query(async ({ input }) => {
+      try {
+        return await getIdeaAssignments(input.ideaId, input.campaignId);
+      } catch (error) {
+        handleBucketError(error);
+      }
     }),
 });

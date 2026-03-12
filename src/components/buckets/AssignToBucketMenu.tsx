@@ -20,10 +20,16 @@ export function AssignToBucketMenu({ ideaId, campaignId }: AssignToBucketMenuPro
     { enabled: isOpen },
   );
 
+  const assignmentsQuery = trpc.bucket.ideaAssignments.useQuery(
+    { ideaId, campaignId },
+    { enabled: isOpen },
+  );
+
   const assignMutation = trpc.bucket.assignIdea.useMutation({
     onSuccess: () => {
       void utils.bucket.sidebar.invalidate({ campaignId });
       void utils.bucket.listIdeas.invalidate();
+      void utils.bucket.ideaAssignments.invalidate({ ideaId, campaignId });
     },
   });
 
@@ -31,6 +37,7 @@ export function AssignToBucketMenu({ ideaId, campaignId }: AssignToBucketMenuPro
     onSuccess: () => {
       void utils.bucket.sidebar.invalidate({ campaignId });
       void utils.bucket.listIdeas.invalidate();
+      void utils.bucket.ideaAssignments.invalidate({ ideaId, campaignId });
     },
   });
 
@@ -47,6 +54,7 @@ export function AssignToBucketMenu({ ideaId, campaignId }: AssignToBucketMenuPro
   }, [isOpen]);
 
   const buckets = bucketsQuery.data?.items ?? [];
+  const assignedBucketIds = new Set(assignmentsQuery.data?.bucketIds ?? []);
 
   return (
     <div className="relative" ref={menuRef}>
@@ -72,23 +80,18 @@ export function AssignToBucketMenu({ ideaId, campaignId }: AssignToBucketMenuPro
             <p className="px-3 py-2 text-xs text-gray-400">No manual buckets</p>
           )}
           {buckets.map((bucket) => {
-            const isAssigned = false; // We check reactively on click
+            const isAssigned = assignedBucketIds.has(bucket.id);
             return (
               <button
                 key={bucket.id}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  assignMutation.mutate(
-                    { bucketId: bucket.id, ideaId },
-                    {
-                      onError: (err) => {
-                        if (err.message.includes("Unique constraint")) {
-                          unassignMutation.mutate({ bucketId: bucket.id, ideaId });
-                        }
-                      },
-                    },
-                  );
+                  if (isAssigned) {
+                    unassignMutation.mutate({ bucketId: bucket.id, ideaId });
+                  } else {
+                    assignMutation.mutate({ bucketId: bucket.id, ideaId });
+                  }
                 }}
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               >

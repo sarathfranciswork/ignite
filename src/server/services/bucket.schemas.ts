@@ -102,11 +102,28 @@ export const bucketListIdeasInput = z.object({
   limit: z.number().int().min(1).max(100).default(25),
 });
 
+export const bucketIdeaAssignmentsInput = z.object({
+  ideaId: z.string(),
+  campaignId: z.string(),
+});
+
 // ── Sidebar Schema ──────────────────────────────────────────
 
 export const bucketSidebarInput = z.object({
   campaignId: z.string(),
 });
+
+// ── Error Class ─────────────────────────────────────────────
+
+export class BucketServiceError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+  ) {
+    super(message);
+    this.name = "BucketServiceError";
+  }
+}
 
 // ── Type Exports ────────────────────────────────────────────
 
