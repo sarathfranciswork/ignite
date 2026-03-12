@@ -56,10 +56,12 @@ import {
   getPairwisePairs,
   getNextPair,
   submitPairwiseComparison,
+} from "@/server/services/pairwise.service";
+import {
   getMyComparison,
   getPairwiseProgress,
   getPairwiseResults,
-} from "@/server/services/pairwise.service";
+} from "@/server/services/pairwise-ranking.service";
 
 function handleEvaluationError(error: unknown): never {
   if (error instanceof TRPCError) throw error;

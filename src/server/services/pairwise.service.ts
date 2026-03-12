@@ -8,13 +8,6 @@ import {
   type PairwiseGetPairsInput,
 } from "./evaluation.schemas";
 
-export {
-  computeBradleyTerryScores,
-  getPairwiseResults,
-  getPairwiseProgress,
-  getMyComparison,
-} from "./pairwise-ranking.service";
-
 const childLogger = logger.child({ service: "pairwise" });
 
 // ── Pair Generation ─────────────────────────────────────────
