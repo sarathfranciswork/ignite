@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, publicProcedure, requirePermission } from "../trpc";
 import { Action } from "@/server/lib/permissions";
+import { checkRateLimit } from "@/server/lib/rate-limit";
 import {
   externalInvitationCreateInput,
   externalInvitationAcceptInput,
@@ -58,6 +59,10 @@ export const externalInvitationRouter = createTRPCRouter({
     }),
 
   accept: publicProcedure.input(externalInvitationAcceptInput).mutation(async ({ input }) => {
+    await checkRateLimit(`accept:${input.token}`, {
+      windowSeconds: 60,
+      maxAttempts: 10,
+    });
     try {
       return await acceptInvitation(input);
     } catch (error) {

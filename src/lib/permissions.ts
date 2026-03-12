@@ -51,6 +51,12 @@ export const Action = {
   NOTIFICATION_READ_OWN: "notification.read.own",
   NOTIFICATION_SEND_BULK: "notification.sendBulk",
 
+  // Comments
+  COMMENT_CREATE: "comment.create",
+  COMMENT_READ: "comment.read",
+  COMMENT_UPDATE_OWN: "comment.update.own",
+  COMMENT_DELETE_OWN: "comment.delete.own",
+
   // Admin
   ADMIN_ACCESS: "admin.access",
   ADMIN_MANAGE_USERS: "admin.manageUsers",
@@ -114,6 +120,10 @@ const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType[]> = {
     Action.IDEA_READ,
     Action.IDEA_UPDATE_OWN,
     Action.IDEA_DELETE_OWN,
+    Action.COMMENT_CREATE,
+    Action.COMMENT_READ,
+    Action.COMMENT_UPDATE_OWN,
+    Action.COMMENT_DELETE_OWN,
     Action.NOTIFICATION_READ_OWN,
   ],
 } as const;

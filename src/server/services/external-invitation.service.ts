@@ -1,4 +1,6 @@
+import { randomBytes } from "crypto";
 import { prisma } from "@/server/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
 import { addDays } from "date-fns";
@@ -48,11 +50,14 @@ export async function createInvitation(input: {
     }
   }
 
+  const token = randomBytes(32).toString("hex");
+
   const invitation = await prisma.externalInvitation.create({
     data: {
       email,
       inviterUserId,
       campaignIds,
+      token,
       expiresAt: addDays(new Date(), INVITATION_EXPIRY_DAYS),
     },
   });
@@ -103,55 +108,59 @@ export async function acceptInvitation(input: { token: string }) {
     throw new ExternalInvitationServiceError("This invitation has expired", "INVITATION_EXPIRED");
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: invitation.email },
-    select: { id: true, externalCampaignIds: true },
-  });
-
-  let userId: string;
-
-  if (existingUser) {
-    const mergedCampaignIds = Array.from(
-      new Set([...existingUser.externalCampaignIds, ...invitation.campaignIds]),
-    );
-    await prisma.user.update({
-      where: { id: existingUser.id },
-      data: {
-        globalRole: "EXTERNAL",
-        externalCampaignIds: mergedCampaignIds,
-      },
+  type TransactionClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+  const userId = await prisma.$transaction(async (tx: TransactionClient) => {
+    const existingUser = await tx.user.findUnique({
+      where: { email: invitation.email },
+      select: { id: true, externalCampaignIds: true },
     });
-    userId = existingUser.id;
-  } else {
-    const newUser = await prisma.user.create({
-      data: {
-        email: invitation.email,
-        globalRole: "EXTERNAL",
-        externalCampaignIds: invitation.campaignIds,
-      },
-    });
-    userId = newUser.id;
-  }
 
-  for (const campaignId of invitation.campaignIds) {
-    const existingMember = await prisma.campaignMember.findFirst({
-      where: { campaignId, userId },
-    });
-    if (!existingMember) {
-      await prisma.campaignMember.create({
+    let resolvedUserId: string;
+
+    if (existingUser) {
+      const mergedCampaignIds = Array.from(
+        new Set([...existingUser.externalCampaignIds, ...invitation.campaignIds]),
+      );
+      await tx.user.update({
+        where: { id: existingUser.id },
         data: {
-          campaignId,
-          userId,
-          role: "CAMPAIGN_CONTRIBUTOR",
-          assignedBy: invitation.inviterUserId,
+          externalCampaignIds: mergedCampaignIds,
         },
       });
+      resolvedUserId = existingUser.id;
+    } else {
+      const newUser = await tx.user.create({
+        data: {
+          email: invitation.email,
+          globalRole: "EXTERNAL",
+          externalCampaignIds: invitation.campaignIds,
+        },
+      });
+      resolvedUserId = newUser.id;
     }
-  }
 
-  await prisma.externalInvitation.update({
-    where: { id: invitation.id },
-    data: { status: "ACCEPTED" },
+    for (const campaignId of invitation.campaignIds) {
+      const existingMember = await tx.campaignMember.findFirst({
+        where: { campaignId, userId: resolvedUserId },
+      });
+      if (!existingMember) {
+        await tx.campaignMember.create({
+          data: {
+            campaignId,
+            userId: resolvedUserId,
+            role: "CAMPAIGN_CONTRIBUTOR",
+            assignedBy: invitation.inviterUserId,
+          },
+        });
+      }
+    }
+
+    await tx.externalInvitation.update({
+      where: { id: invitation.id },
+      data: { status: "ACCEPTED" },
+    });
+
+    return resolvedUserId;
   });
 
   eventBus.emit("externalUser.accepted", {

@@ -8,8 +8,8 @@ import {
   ExternalInvitationServiceError,
 } from "./external-invitation.service";
 
-vi.mock("@/server/lib/prisma", () => ({
-  prisma: {
+vi.mock("@/server/lib/prisma", () => {
+  const mockPrisma = {
     externalInvitation: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
@@ -30,8 +30,10 @@ vi.mock("@/server/lib/prisma", () => ({
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
-  },
-}));
+    $transaction: vi.fn((fn: (tx: typeof mockPrisma) => Promise<unknown>) => fn(mockPrisma)),
+  };
+  return { prisma: mockPrisma };
+});
 
 vi.mock("@/server/lib/logger", () => ({
   logger: {
@@ -109,6 +111,10 @@ describe("createInvitation", () => {
 
     expect(result).toEqual(mockInvitation);
     expect(invitationCreate).toHaveBeenCalledOnce();
+    const createArg = invitationCreate.mock.calls[0][0];
+    expect(createArg.data.token).toBeDefined();
+    expect(typeof createArg.data.token).toBe("string");
+    expect(createArg.data.token.length).toBe(64);
     expect(eventBus.emit).toHaveBeenCalledWith(
       "externalUser.invited",
       expect.objectContaining({
@@ -215,7 +221,6 @@ describe("acceptInvitation", () => {
     expect(userUpdate).toHaveBeenCalledWith({
       where: { id: "existinguser" },
       data: {
-        globalRole: "EXTERNAL",
         externalCampaignIds: ["camp1", "camp2"],
       },
     });

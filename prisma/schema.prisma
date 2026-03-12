@@ -1814,7 +1814,7 @@ model ExternalInvitation {
   id            String                   @id @default(cuid())
   email         String
   inviterUserId String                   @map("inviter_user_id")
-  token         String                   @unique @default(cuid())
+  token         String                   @unique
   status        ExternalInvitationStatus @default(PENDING)
   campaignIds   String[]                 @map("campaign_ids")
   expiresAt     DateTime                 @map("expires_at")
