@@ -235,7 +235,7 @@ export default function EvaluationResultsPage() {
               <p className="text-sm text-gray-500">Shortlisted</p>
               <p className="text-2xl font-bold text-yellow-600">
                 <Star className="mr-1 inline h-5 w-5 fill-yellow-400 text-yellow-400" />
-                {shortlistQuery.data?.entries?.length ?? shortlistQuery.data?.items?.length ?? 0}
+                {shortlistQuery.data?.entries?.length ?? 0}
               </p>
             </div>
             <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">

@@ -333,12 +333,12 @@ describe("forwardShortlistItem", () => {
     mockPrisma.$transaction.mockResolvedValue([]);
 
     const result = await forwardShortlistItem(
-      { sessionId: "session-1", ideaId: "idea-1", target: "SELECTED_IMPLEMENTATION" },
+      { sessionId: "session-1", ideaId: "idea-1", destination: "IMPLEMENTATION" },
       "user-1",
     );
 
     expect(result.forwarded).toBe(true);
-    expect(result.target).toBe("SELECTED_IMPLEMENTATION");
+    expect(result.destination).toBe("IMPLEMENTATION");
   });
 
   it("should reject if shortlist is not locked", async () => {
@@ -350,7 +350,7 @@ describe("forwardShortlistItem", () => {
 
     await expect(
       forwardShortlistItem(
-        { sessionId: "session-1", ideaId: "idea-1", target: "SELECTED_IMPLEMENTATION" },
+        { sessionId: "session-1", ideaId: "idea-1", destination: "IMPLEMENTATION" },
         "user-1",
       ),
     ).rejects.toThrow("Shortlist must be locked before forwarding");

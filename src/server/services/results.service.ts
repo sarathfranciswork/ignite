@@ -359,13 +359,14 @@ export async function forwardShortlistItem(input: ShortlistForwardInput, actor: 
     throw new EvaluationServiceError("Idea not in shortlist", "NOT_IN_SHORTLIST");
   }
 
-  const targetStatus = FORWARD_TARGET_MAP[input.target as ShortlistForwardTarget];
+  const targetStatus =
+    FORWARD_TARGET_MAP[input.destination as unknown as ShortlistForwardTarget] ?? "EVALUATION";
 
   await prisma.$transaction([
     prisma.evaluationShortlistItem.update({
       where: { id: item.id },
       data: {
-        forwardedTo: input.target as ShortlistForwardTarget,
+        forwardedTo: input.destination as unknown as ShortlistForwardTarget,
         forwardedAt: new Date(),
       },
     }),
@@ -386,16 +387,16 @@ export async function forwardShortlistItem(input: ShortlistForwardInput, actor: 
     metadata: {
       campaignId: session.campaignId,
       ideaId: input.ideaId,
-      target: input.target,
+      destination: input.destination,
     },
   });
 
   childLogger.info(
-    { sessionId: input.sessionId, ideaId: input.ideaId, target: input.target },
+    { sessionId: input.sessionId, ideaId: input.ideaId, destination: input.destination },
     "Shortlist idea forwarded",
   );
 
-  return { forwarded: true, target: input.target };
+  return { forwarded: true, destination: input.destination };
 }
 
 export async function forwardAllShortlistItems(input: ShortlistForwardAllInput, actor: string) {
