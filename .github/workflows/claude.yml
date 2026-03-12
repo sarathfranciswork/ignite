@@ -44,17 +44,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get issue number
+      - name: Get issue number and detect trigger type
         id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event_name }}" = "issues" ]; then
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            echo "trigger=issue" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "issue_comment" ]; then
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            # Detect if this comment is on a PR (not a plain issue)
+            if [ -n "${{ github.event.issue.pull_request.url }}" ]; then
+              echo "trigger=pr_comment" >> "$GITHUB_OUTPUT"
+              # Get PR branch name
+              PR_BRANCH=$(gh pr view "${{ github.event.issue.number }}" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+              echo "pr_branch=$PR_BRANCH" >> "$GITHUB_OUTPUT"
+            else
+              echo "trigger=issue" >> "$GITHUB_OUTPUT"
+            fi
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "number=${{ github.event.inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+            echo "trigger=issue" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request_review_comment" ] || [ "${{ github.event_name }}" = "pull_request_review" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "trigger=pr_comment" >> "$GITHUB_OUTPUT"
+            PR_BRANCH=$(gh pr view "${{ github.event.pull_request.number }}" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+            echo "pr_branch=$PR_BRANCH" >> "$GITHUB_OUTPUT"
           else
             echo "number=" >> "$GITHUB_OUTPUT"
+            echo "trigger=unknown" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check main branch CI health
@@ -146,9 +165,10 @@ jobs:
           echo "Story chain validation failed. Aborting."
           exit 0
 
-      - name: Run Claude Code
-        if: steps.validate.outputs.valid != 'false'
-        id: claude
+      # ── Claude for NEW ISSUES (full implementation) ──
+      - name: Run Claude Code (implement issue)
+        if: steps.validate.outputs.valid != 'false' && steps.issue.outputs.trigger != 'pr_comment'
+        id: claude-issue
         uses: anthropics/claude-code-action@v1
         env:
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
@@ -182,7 +202,6 @@ jobs:
             - _bmad-output/planning-artifacts/architecture.md (full architecture decisions)
 
             ## STEP 0: Acknowledge & Update Kanban
-            If this is triggered from an issue (not a PR review):
             1. Post an acknowledgment comment on the issue:
                ```
                gh issue comment <issue-number> --body "I'm picking up this issue now. I'll create a feature branch, implement, run tests, and open a PR when ready.
@@ -304,20 +323,6 @@ jobs:
               GH_TOKEN="$PROJECT_TOKEN" .github/scripts/update-kanban.sh --issue <issue-number> --status "In review"
               ```
 
-            ## IF TRIGGERED FROM A PR REVIEW (fixing review feedback)
-            If this was triggered by a PR review or comment requesting changes:
-            - Read the review comments to understand what needs to be fixed
-            - Checkout the PR branch (not main)
-            - If asked to rebase:
-              1. `git fetch origin main`
-              2. `git rebase origin/main`
-              3. Resolve conflicts using the rules above (especially package-lock.json and prisma)
-              4. `git push --force-with-lease`
-            - Otherwise, fix the issues raised in the review
-            - Run available validation checks
-            - Commit and push the fixes to the same branch
-            - Post a comment on the PR summarizing what was fixed
-
             ## CRITICAL RULES
             - NEVER recreate project scaffolding if it already exists
             - NEVER modify CLAUDE.md, settings.json, or lock files unless explicitly told to
@@ -328,3 +333,47 @@ jobs:
             - Write tests for new features when a test framework is configured
             - One logical change per commit
             - The PR body MUST contain `Closes #<issue-number>` for the chain to work
+
+      # ── Claude for PR COMMENTS (targeted fix/rebase only) ──
+      - name: Run Claude Code (PR feedback)
+        if: steps.issue.outputs.trigger == 'pr_comment'
+        id: claude-pr
+        uses: anthropics/claude-code-action@v1
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "claude[bot],github-actions[bot]"
+          additional_permissions: |
+            actions: read
+          claude_args: "--allowedTools Bash Read Write Edit Glob Grep Agent"
+          show_full_output: true
+          prompt: |
+            You are fixing feedback on an EXISTING pull request. Do NOT re-implement the feature.
+            Do ONLY what the comment asks — nothing more.
+
+            ## PR Details
+            - PR number: ${{ steps.issue.outputs.number }}
+            - Branch: ${{ steps.issue.outputs.pr_branch }}
+
+            ## Your Task
+            1. Read the latest comment on this PR to understand what's requested:
+               `gh pr view ${{ steps.issue.outputs.number }} --json comments --jq '.comments | last | .body'`
+            2. Checkout the PR branch:
+               `git checkout ${{ steps.issue.outputs.pr_branch }}`
+            3. Do EXACTLY what's asked. Common requests:
+               - **Rebase**: `git fetch origin main && git rebase origin/main`
+                 - For package-lock.json conflicts: `git checkout --theirs package-lock.json && npm install && git add package-lock.json && git rebase --continue`
+                 - For prisma/schema.prisma conflicts: keep ALL models from both sides, then `npx prisma validate && npx prisma format && git add prisma/schema.prisma && git rebase --continue`
+                 - For other conflicts: keep ALL code from both sides, `git add <file> && git rebase --continue`
+               - **Fix code**: make the specific changes requested, nothing else
+               - **Fix tests**: run `npm run typecheck && npm run lint && npm run test` and fix failures
+            4. Push the changes: `git push --force-with-lease origin ${{ steps.issue.outputs.pr_branch }}`
+            5. Post a SHORT comment on the PR summarizing what you did:
+               `gh pr comment ${{ steps.issue.outputs.number }} --body "Done: <what you did>"`
+
+            ## CRITICAL RULES
+            - Do NOT create a new branch
+            - Do NOT re-implement the feature
+            - Do NOT read architecture docs or explore the codebase unless needed for the specific fix
+            - Do ONLY what the comment asks — be fast and targeted

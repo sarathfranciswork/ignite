@@ -44,20 +44,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get issue number
+      - name: Get issue number and detect trigger type
         id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event_name }}" = "issues" ]; then
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            echo "trigger=issue" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "issue_comment" ]; then
             echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            if [ -n "${{ github.event.issue.pull_request.url }}" ]; then
+              echo "trigger=pr_comment" >> "$GITHUB_OUTPUT"
+              PR_BRANCH=$(gh pr view "${{ github.event.issue.number }}" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+              echo "pr_branch=$PR_BRANCH" >> "$GITHUB_OUTPUT"
+            else
+              echo "trigger=issue" >> "$GITHUB_OUTPUT"
+            fi
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "number=${{ github.event.inputs.issue_number }}" >> "$GITHUB_OUTPUT"
+            echo "trigger=issue" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "pull_request_review_comment" ] || [ "${{ github.event_name }}" = "pull_request_review" ]; then
             echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-            echo "is_pr=true" >> "$GITHUB_OUTPUT"
+            echo "trigger=pr_comment" >> "$GITHUB_OUTPUT"
+            PR_BRANCH=$(gh pr view "${{ github.event.pull_request.number }}" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+            echo "pr_branch=$PR_BRANCH" >> "$GITHUB_OUTPUT"
           else
             echo "number=" >> "$GITHUB_OUTPUT"
+            echo "trigger=unknown" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check main branch CI health
@@ -176,7 +190,7 @@ jobs:
           exit 1
 
       - name: Run Qwen Agent
-        if: steps.validate.outputs.valid != 'false' && steps.llm_check.outputs.available == 'true'
+        if: steps.validate.outputs.valid != 'false' && steps.llm_check.outputs.available == 'true' && steps.issue.outputs.trigger != 'pr_comment'
         id: qwen
         env:
           LLM_BASE_URL: ${{ secrets.QWEN_API_BASE }}
@@ -353,6 +367,53 @@ jobs:
           fi
 
           # ── Run the agent ──
+          python3 .github/scripts/qwen-agent.py /tmp/system_prompt.txt /tmp/user_prompt.txt
+
+      # ── Qwen for PR COMMENTS (targeted fix/rebase only) ──
+      - name: Run Qwen Agent (PR feedback)
+        if: steps.issue.outputs.trigger == 'pr_comment' && steps.llm_check.outputs.available == 'true'
+        env:
+          LLM_BASE_URL: ${{ secrets.QWEN_API_BASE }}
+          LLM_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          LLM_MODEL: "qwen3-coder-next:q4_K_M"
+          MAX_ITERATIONS: "15"
+          REPO_ROOT: ${{ github.workspace }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM="${{ steps.issue.outputs.number }}"
+          PR_BRANCH="${{ steps.issue.outputs.pr_branch }}"
+
+          git config user.name "Qwen Code"
+          git config user.email "qwen@sarathfrancis.work"
+
+          # Get latest comment
+          COMMENT=$(gh pr view "$PR_NUM" --json comments --jq '.comments | last | .body' 2>/dev/null || echo "")
+
+          cat > /tmp/system_prompt.txt << 'EOF'
+          You are fixing feedback on an EXISTING pull request. Do NOT re-implement the feature.
+          Do ONLY what the comment asks — nothing more. Be fast and targeted.
+          You have tools: bash, read_file, write_file, edit_file, list_files, search_files.
+          EOF
+
+          cat > /tmp/user_prompt.txt << PROMPT_EOF
+          Fix PR #${PR_NUM} on branch ${PR_BRANCH}.
+
+          The latest comment says:
+          ${COMMENT}
+
+          Steps:
+          1. Checkout the branch: git checkout ${PR_BRANCH}
+          2. Do EXACTLY what's asked:
+             - Rebase: git fetch origin main && git rebase origin/main
+               - package-lock.json conflicts: git checkout --theirs package-lock.json && npm install && git add package-lock.json && git rebase --continue
+               - prisma conflicts: keep ALL models from both sides
+             - Code fixes: make only the specific changes requested
+          3. Push: git push --force-with-lease origin ${PR_BRANCH}
+          4. Comment: gh pr comment ${PR_NUM} --body "Done: <what you did>"
+
+          Do NOT create a new branch. Do NOT re-implement the feature.
+          PROMPT_EOF
+
           python3 .github/scripts/qwen-agent.py /tmp/system_prompt.txt /tmp/user_prompt.txt
 
       - name: Handle failure
