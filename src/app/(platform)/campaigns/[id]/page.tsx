@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Eye,
   TableProperties,
+  FolderOpen,
 } from "lucide-react";
 import { CampaignHeader } from "@/components/campaigns/CampaignHeader";
 import { CampaignLifecycleBar } from "@/components/campaigns/CampaignLifecycleBar";
@@ -19,12 +20,14 @@ import { CampaignCockpit } from "@/components/campaigns/CampaignCockpit";
 import { CopyCampaignButton } from "@/components/campaigns/CopyCampaignButton";
 import { CampaignIdeasTab } from "@/components/ideas/CampaignIdeasTab";
 import { IdeaBoard } from "@/components/ideas/IdeaBoard";
+import { BucketManager } from "@/components/buckets/BucketManager";
 import { trpc } from "@/lib/trpc";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "ideas", label: "Ideas", icon: Lightbulb },
   { id: "board", label: "Board", icon: TableProperties },
+  { id: "buckets", label: "Buckets", icon: FolderOpen },
   { id: "evaluation", label: "Evaluation", icon: BarChart3 },
   { id: "cockpit", label: "Cockpit", icon: MessageSquare },
   { id: "settings", label: "Settings", icon: Settings },
@@ -157,6 +160,8 @@ export default function CampaignDetailPage() {
         )}
 
         {activeTab === "board" && <IdeaBoard campaignId={campaign.id} />}
+
+        {activeTab === "buckets" && <BucketManager campaignId={campaign.id} />}
 
         {activeTab === "evaluation" && (
           <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">

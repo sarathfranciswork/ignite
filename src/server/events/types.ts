@@ -104,6 +104,11 @@ export interface EventMap {
   "scoutingBoard.cardMoved": EventPayload;
   "embedding.generated": EventPayload;
   "embedding.failed": EventPayload;
+  "bucket.created": EventPayload;
+  "bucket.updated": EventPayload;
+  "bucket.deleted": EventPayload;
+  "bucket.ideaAssigned": EventPayload;
+  "bucket.ideaUnassigned": EventPayload;
 }
 
 export type EventName = keyof EventMap;

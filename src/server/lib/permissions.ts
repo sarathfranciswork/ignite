@@ -94,6 +94,13 @@ export const Action = {
   SCOUTING_BOARD_DELETE: "scoutingBoard.delete",
   SCOUTING_BOARD_SHARE: "scoutingBoard.share",
 
+  // Bucket management
+  BUCKET_CREATE: "bucket.create",
+  BUCKET_READ: "bucket.read",
+  BUCKET_UPDATE: "bucket.update",
+  BUCKET_DELETE: "bucket.delete",
+  BUCKET_ASSIGN_IDEAS: "bucket.assignIdeas",
+
   // AI features
   AI_VIEW_STATUS: "ai.viewStatus",
   AI_FIND_SIMILAR: "ai.findSimilar",
@@ -167,6 +174,11 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.USE_CASE_TRANSITION,
     Action.USE_CASE_MANAGE_TEAM,
     Action.USE_CASE_MANAGE_TASKS,
+    Action.BUCKET_CREATE,
+    Action.BUCKET_READ,
+    Action.BUCKET_UPDATE,
+    Action.BUCKET_DELETE,
+    Action.BUCKET_ASSIGN_IDEAS,
     Action.SEARCH_GLOBAL,
     Action.SEARCH_SAVE,
     Action.SEARCH_DELETE_OWN,
@@ -191,6 +203,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.IDEA_FOLLOW,
     Action.EVALUATION_PARTICIPATE,
     Action.NOTIFICATION_READ_OWN,
+    Action.BUCKET_READ,
     Action.ORGANIZATION_READ,
     Action.SCOUTING_BOARD_CREATE,
     Action.SCOUTING_BOARD_READ,
@@ -229,6 +242,11 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.COMMENT_MODERATE,
     Action.EVALUATION_CREATE,
     Action.EVALUATION_VIEW_RESULTS,
+    Action.BUCKET_CREATE,
+    Action.BUCKET_READ,
+    Action.BUCKET_UPDATE,
+    Action.BUCKET_DELETE,
+    Action.BUCKET_ASSIGN_IDEAS,
   ],
   CAMPAIGN_COACH: [
     Action.CAMPAIGN_READ,
@@ -243,6 +261,10 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.COMMENT_MODERATE,
     Action.EVALUATION_PARTICIPATE,
     Action.EVALUATION_VIEW_RESULTS,
+    Action.BUCKET_READ,
+    Action.BUCKET_CREATE,
+    Action.BUCKET_UPDATE,
+    Action.BUCKET_ASSIGN_IDEAS,
   ],
   CAMPAIGN_CONTRIBUTOR: [
     Action.CAMPAIGN_READ,
@@ -258,6 +280,7 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.COMMENT_UPDATE_OWN,
     Action.COMMENT_DELETE_OWN,
     Action.EVALUATION_PARTICIPATE,
+    Action.BUCKET_READ,
   ],
   CAMPAIGN_MODERATOR: [
     Action.CAMPAIGN_READ,
