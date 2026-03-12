@@ -48,17 +48,25 @@ export default function EvaluateSessionPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href={`/campaigns/${params.id}`}>
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back to Campaign
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href={`/campaigns/${params.id}`}>
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back to Campaign
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
+            {session.description && <p className="text-sm text-gray-500">{session.description}</p>}
+          </div>
+        </div>
+        <Link href={`/campaigns/${params.id}/evaluate/${params.sessionId}/results`}>
+          <Button variant="outline" size="sm">
+            <BarChart3 className="mr-1.5 h-4 w-4" />
+            View Results
           </Button>
         </Link>
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
-          {session.description && <p className="text-sm text-gray-500">{session.description}</p>}
-        </div>
       </div>
 
       {session.type === "PAIRWISE" ? (
