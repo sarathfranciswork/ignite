@@ -65,10 +65,10 @@ const siaFindUnique = prisma.strategicInnovationArea.findUnique as unknown as Mo
 const siaFindMany = prisma.strategicInnovationArea.findMany as unknown as Mock;
 const siaCreate = prisma.strategicInnovationArea.create as unknown as Mock;
 const siaUpdate = prisma.strategicInnovationArea.update as unknown as Mock;
-const siaDelete = prisma.strategicInnovationArea.delete as unknown as Mock;
+const _siaDelete = prisma.strategicInnovationArea.delete as unknown as Mock;
 const campaignFindUnique = prisma.campaign.findUnique as unknown as Mock;
 const campaignUpdate = prisma.campaign.update as unknown as Mock;
-const campaignUpdateMany = prisma.campaign.updateMany as unknown as Mock;
+const _campaignUpdateMany = prisma.campaign.updateMany as unknown as Mock;
 
 const mockSia = {
   id: "sia-1",
