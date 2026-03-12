@@ -3,6 +3,7 @@ import { activityRouter } from "./activity";
 import { adminRouter } from "./admin";
 import { aiRouter } from "./ai";
 import { authRouter } from "./auth";
+import { bucketRouter } from "./bucket";
 import { campaignRouter } from "./campaign";
 import { channelRouter } from "./channel";
 import { commentRouter } from "./comment";
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   admin: adminRouter,
   ai: aiRouter,
   auth: authRouter,
+  bucket: bucketRouter,
   campaign: campaignRouter,
   channel: channelRouter,
   comment: commentRouter,

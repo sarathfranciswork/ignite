@@ -358,6 +358,7 @@ model Campaign {
   kpiSnapshots    CampaignKpiSnapshot[]
   ideas           Idea[]
   activityEvents  ActivityEvent[]
+  buckets         Bucket[]
 
   @@index([status])
   @@index([submissionType])
@@ -537,8 +538,9 @@ model Idea {
   comments       Comment[]
   likes          IdeaLike[]
   votes          IdeaVote[]
-  followers      IdeaFollow[]
-  activityEvents ActivityEvent[]
+  followers        IdeaFollow[]
+  activityEvents   ActivityEvent[]
+  bucketAssignments IdeaBucketAssignment[]
 
   @@index([campaignId])
   @@index([contributorId])
@@ -1133,4 +1135,56 @@ model ActivityEvent {
   @@index([campaignId, createdAt])
   @@index([actorId])
   @@map("activity_events")
+}
+
+// ── Bucket Models ────────────────────────────────────────────
+
+enum BucketType {
+  MANUAL
+  SMART
+
+  @@map("bucket_type")
+}
+
+model Bucket {
+  id          String     @id @default(cuid())
+  campaignId  String     @map("campaign_id")
+  name        String
+  color       String     @default("#6366F1")
+  type        BucketType @default(MANUAL)
+  description String?    @db.Text
+  sortOrder   Int        @default(0) @map("sort_order")
+
+  // Smart bucket filter criteria (JSON object with filter conditions)
+  filterCriteria Json? @map("filter_criteria")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaign    Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  assignments IdeaBucketAssignment[]
+
+  @@unique([campaignId, name])
+  @@index([campaignId])
+  @@index([campaignId, sortOrder])
+  @@map("buckets")
+}
+
+model IdeaBucketAssignment {
+  id        String   @id @default(cuid())
+  bucketId  String   @map("bucket_id")
+  ideaId    String   @map("idea_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  bucket Bucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+  idea   Idea   @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@unique([bucketId, ideaId])
+  @@index([bucketId])
+  @@index([ideaId])
+  @@index([bucketId, sortOrder])
+  @@map("idea_bucket_assignments")
 }
