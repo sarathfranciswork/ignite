@@ -176,6 +176,15 @@ export interface EventMap {
   "portfolio.itemAdded": EventPayload;
   "portfolio.itemRemoved": EventPayload;
   "portfolio.itemsReordered": EventPayload;
+  "processDefinition.created": EventPayload;
+  "processDefinition.updated": EventPayload;
+  "processDefinition.deleted": EventPayload;
+  "processDefinition.duplicated": EventPayload;
+  "project.created": EventPayload;
+  "project.updated": EventPayload;
+  "project.statusChanged": EventPayload;
+  "project.teamMemberAdded": EventPayload;
+  "project.teamMemberRemoved": EventPayload;
   "externalUser.invited": EventPayload;
   "externalUser.accepted": EventPayload;
   "sia.created": EventPayload;
