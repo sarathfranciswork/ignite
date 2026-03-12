@@ -76,6 +76,7 @@ model User {
   createdSias                StrategicInnovationArea[]   @relation("SiaCreatedBy")
   createdTrends              Trend[]                     @relation("TrendCreatedBy")
   createdTechnologies        Technology[]                @relation("TechnologyCreatedBy")
+  createdInsights            Insight[]                   @relation("InsightCreatedBy")
 
   @@map("users")
 }
@@ -1658,17 +1659,43 @@ model TrendSiaLink {
   @@map("trend_sia_links")
 }
 
-model Insight {
-  id          String   @id @default(cuid())
-  title       String
-  description String?  @db.Text
-  sourceUrl   String?  @map("source_url")
-  isEditorial Boolean  @default(false) @map("is_editorial")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+enum InsightType {
+  SIGNAL
+  OBSERVATION
+  OPPORTUNITY
+  RISK
 
+  @@map("insight_type")
+}
+
+enum InsightScope {
+  GLOBAL
+  CAMPAIGN
+  TREND
+
+  @@map("insight_scope")
+}
+
+model Insight {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  type        InsightType  @default(SIGNAL)
+  scope       InsightScope @default(GLOBAL)
+  sourceUrl   String?      @map("source_url")
+  isEditorial Boolean      @default(false) @map("is_editorial")
+  isArchived  Boolean      @default(false) @map("is_archived")
+  createdById String       @map("created_by_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  createdBy  User               @relation("InsightCreatedBy", fields: [createdById], references: [id])
   trendLinks TrendInsightLink[]
 
+  @@index([type])
+  @@index([scope])
+  @@index([createdById])
+  @@index([isArchived])
   @@map("insights")
 }
 

@@ -11,6 +11,7 @@ import { commentRouter } from "./comment";
 import { engagementRouter } from "./engagement";
 import { evaluationRouter } from "./evaluation";
 import { ideaRouter } from "./idea";
+import { insightRouter } from "./insight";
 import { notificationRouter } from "./notification";
 import { organizationRouter } from "./organization";
 import { pushRouter } from "./push";
@@ -39,6 +40,7 @@ export const appRouter = createTRPCRouter({
   engagement: engagementRouter,
   evaluation: evaluationRouter,
   idea: ideaRouter,
+  insight: insightRouter,
   notification: notificationRouter,
   organization: organizationRouter,
   push: pushRouter,
