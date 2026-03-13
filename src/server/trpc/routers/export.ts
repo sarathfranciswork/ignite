@@ -6,12 +6,14 @@ import {
   exportPlatformReportInput,
   exportIdeaListInput,
   exportEvaluationResultsInput,
+  exportPartneringReportInput,
 } from "@/server/services/export.schemas";
 import {
   exportCampaignReport,
   exportPlatformReport,
   exportIdeaList,
   exportEvaluationResults,
+  exportPartneringReport,
   ExportServiceError,
 } from "@/server/services/export.service";
 
@@ -72,6 +74,17 @@ export const exportRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       try {
         return await exportEvaluationResults(input, ctx.session.user.id);
+      } catch (error) {
+        handleExportError(error);
+      }
+    }),
+
+  partneringReport: protectedProcedure
+    .use(requirePermission(Action.REPORT_EXPORT))
+    .input(exportPartneringReportInput)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await exportPartneringReport(input, ctx.session.user.id);
       } catch (error) {
         handleExportError(error);
       }

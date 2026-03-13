@@ -7,6 +7,7 @@ import type {
   ExportPlatformReportInput,
   ExportIdeaListInput,
   ExportEvaluationResultsInput,
+  ExportPartneringReportInput,
 } from "./export.schemas";
 
 const childLogger = logger.child({ service: "export" });
@@ -678,4 +679,159 @@ async function addEvaluationSheet(
 
     autoFitColumns(scoresSheet);
   }
+}
+
+// ── Partnering Report Export ─────────────────────────────────
+
+export async function exportPartneringReport(
+  input: ExportPartneringReportInput,
+  actor: string,
+): Promise<{ base64: string; filename: string }> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Ignite Platform";
+  workbook.created = new Date();
+
+  const orgWhere: Record<string, unknown> = { isArchived: false };
+  if (input.organizationIds?.length) {
+    orgWhere.id = { in: input.organizationIds };
+  }
+  if (input.relationshipStatus) {
+    orgWhere.relationshipStatus = input.relationshipStatus;
+  }
+
+  const organizations = await prisma.organization.findMany({
+    where: orgWhere,
+    select: {
+      id: true,
+      name: true,
+      industry: true,
+      location: true,
+      relationshipStatus: true,
+      ndaStatus: true,
+      contacts: { select: { id: true } },
+      managers: {
+        select: {
+          user: { select: { name: true, email: true } },
+        },
+      },
+      useCases: {
+        select: {
+          useCase: { select: { title: true, status: true, createdAt: true } },
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  // Sheet 1: Organization Overview
+  const orgSheet = workbook.addWorksheet("Organizations");
+  orgSheet.columns = [
+    { header: "Organization", key: "name", width: 30 },
+    { header: "Industry", key: "industry", width: 20 },
+    { header: "Location", key: "location", width: 20 },
+    { header: "Relationship Status", key: "relationshipStatus", width: 22 },
+    { header: "NDA Status", key: "ndaStatus", width: 14 },
+    { header: "Contacts", key: "contacts", width: 12 },
+    { header: "Managers", key: "managers", width: 30 },
+    { header: "Use Cases", key: "useCases", width: 12 },
+  ];
+  styleHeaderRow(orgSheet);
+
+  for (const org of organizations) {
+    orgSheet.addRow({
+      name: org.name,
+      industry: org.industry ?? "",
+      location: org.location ?? "",
+      relationshipStatus: formatStatus(org.relationshipStatus),
+      ndaStatus: formatStatus(org.ndaStatus),
+      contacts: org.contacts.length,
+      managers: org.managers.map((m) => m.user.name ?? m.user.email).join("; "),
+      useCases: org.useCases.length,
+    });
+  }
+
+  autoFitColumns(orgSheet);
+
+  // Sheet 2: Use Case Pipeline (optional)
+  if (input.includeUseCasePipeline) {
+    const dateFilter =
+      input.dateRange?.from || input.dateRange?.to
+        ? {
+            createdAt: {
+              ...(input.dateRange.from ? { gte: new Date(input.dateRange.from) } : {}),
+              ...(input.dateRange.to ? { lte: new Date(input.dateRange.to) } : {}),
+            },
+          }
+        : {};
+
+    const orgFilter = input.organizationIds?.length
+      ? {
+          organizations: {
+            some: { organizationId: { in: input.organizationIds } },
+          },
+        }
+      : {};
+
+    const useCases = await prisma.useCase.findMany({
+      where: { ...dateFilter, ...orgFilter },
+      select: {
+        title: true,
+        status: true,
+        problemDescription: true,
+        benefit: true,
+        createdAt: true,
+        owner: { select: { name: true, email: true } },
+        organizations: {
+          select: {
+            organization: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const pipelineSheet = workbook.addWorksheet("Use Case Pipeline");
+    pipelineSheet.columns = [
+      { header: "Title", key: "title", width: 35 },
+      { header: "Status", key: "status", width: 18 },
+      { header: "Organizations", key: "organizations", width: 30 },
+      { header: "Owner", key: "owner", width: 25 },
+      { header: "Problem Description", key: "problem", width: 40 },
+      { header: "Benefit", key: "benefit", width: 30 },
+      { header: "Created At", key: "createdAt", width: 14 },
+    ];
+    styleHeaderRow(pipelineSheet);
+
+    for (const uc of useCases) {
+      pipelineSheet.addRow({
+        title: uc.title,
+        status: formatStatus(uc.status),
+        organizations: uc.organizations.map((o) => o.organization.name).join("; "),
+        owner: uc.owner.name ?? uc.owner.email,
+        problem: uc.problemDescription ?? "",
+        benefit: uc.benefit ?? "",
+        createdAt: uc.createdAt.toISOString().split("T")[0],
+      });
+    }
+
+    autoFitColumns(pipelineSheet);
+  }
+
+  const base64 = await workbookToBase64(workbook);
+  const filename = `partnering_report_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+  eventBus.emit("report.exported", {
+    entity: "partnering",
+    entityId: "partnering",
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: { reportType: "partnering" },
+  });
+
+  childLogger.info(
+    { actor, orgCount: organizations.length },
+    "Partnering report exported to Excel",
+  );
+
+  return { base64, filename };
 }
