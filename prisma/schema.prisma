@@ -99,6 +99,8 @@ model User {
   createdSubmissionDefs      SubmissionDefinition[]      @relation("SubmissionDefinitionCreatedBy")
   submittedGenericSubs       GenericSubmission[]         @relation("GenericSubmissionSubmitter")
   reviewedGenericSubs        GenericSubmission[]         @relation("GenericSubmissionReviewer")
+  twoFactorAuth              TwoFactorAuth?
+  userSessions               UserSession[]
 
   @@map("users")
 }
@@ -2580,4 +2582,39 @@ model SubmissionFieldValue {
   @@index([submissionId])
   @@index([fieldId])
   @@map("submission_field_values")
+}
+
+// ── Two-Factor Authentication ─────────────────────────────────
+
+model TwoFactorAuth {
+  id          String    @id @default(cuid())
+  userId      String    @unique @map("user_id")
+  secret      String
+  isEnabled   Boolean   @default(false) @map("is_enabled")
+  backupCodes String[]  @default([]) @map("backup_codes")
+  verifiedAt  DateTime? @map("verified_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("two_factor_auth")
+}
+
+// ── User Session Tracking ─────────────────────────────────────
+
+model UserSession {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  deviceInfo     String?  @map("device_info")
+  ipAddress      String?  @map("ip_address")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastActivityAt])
+  @@map("user_sessions")
 }

@@ -92,16 +92,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { globalRole: true },
+          select: {
+            globalRole: true,
+            twoFactorAuth: { select: { isEnabled: true } },
+          },
         });
         if (dbUser) {
           token.globalRole = dbUser.globalRole;
+          if (dbUser.twoFactorAuth?.isEnabled) {
+            token.twoFactorPending = true;
+          }
         }
+      }
+      if (trigger === "update" && token.twoFactorPending === false) {
+        token.twoFactorPending = false;
       }
       return token;
     },
@@ -109,6 +118,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (typeof token.id === "string" && session.user) {
         session.user.id = token.id;
         session.user.globalRole = token.globalRole as GlobalRole | undefined;
+        session.user.twoFactorPending = token.twoFactorPending as boolean | undefined;
       }
       return session;
     },
