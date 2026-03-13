@@ -13,7 +13,13 @@ export interface TRPCContext {
 }
 
 export async function createTRPCContext(): Promise<TRPCContext> {
-  const session = await auth();
+  let session: Session | null = null;
+  try {
+    session = await auth();
+  } catch {
+    // Auth may fail due to misconfiguration (e.g. missing NEXTAUTH_SECRET).
+    // Return null session so public procedures can still serve requests.
+  }
   return {
     session,
     correlationId: crypto.randomUUID(),
