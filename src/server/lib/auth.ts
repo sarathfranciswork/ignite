@@ -92,7 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session: updateData }) {
       if (user) {
         token.id = user.id;
         const dbUser = await prisma.user.findUnique({
@@ -109,7 +109,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
       }
-      if (trigger === "update" && token.twoFactorPending === false) {
+      if (trigger === "update" && updateData?.twoFactorPending === false) {
         token.twoFactorPending = false;
       }
       return token;

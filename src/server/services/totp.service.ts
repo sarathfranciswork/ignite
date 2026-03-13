@@ -5,6 +5,7 @@ import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
 import bcryptjs from "bcryptjs";
 import { prisma } from "@/server/lib/prisma";
 import { logger } from "@/server/lib/logger";
+import { env } from "@/server/lib/env";
 import { eventBus } from "@/server/events/event-bus";
 
 const TOTP_ISSUER = "Ignite";
@@ -15,7 +16,7 @@ const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
 function getEncryptionKey(): Buffer {
-  const key = process.env.TOTP_ENCRYPTION_KEY;
+  const key = env.TOTP_ENCRYPTION_KEY;
   if (!key) {
     throw new TotpServiceError(
       "TOTP_ENCRYPTION_KEY environment variable is not set",
@@ -62,14 +63,14 @@ function generateBackupCodes(): string[] {
 }
 
 async function hashBackupCodes(codes: string[]): Promise<string[]> {
-  return Promise.all(codes.map((code) => bcryptjs.hash(code.replace("-", ""), BCRYPT_ROUNDS)));
+  return Promise.all(codes.map((code) => bcryptjs.hash(code.replaceAll("-", ""), BCRYPT_ROUNDS)));
 }
 
 async function verifyBackupCode(
   plainCode: string,
   hashedCodes: string[],
 ): Promise<{ match: boolean; index: number }> {
-  const normalized = plainCode.replace("-", "").toUpperCase();
+  const normalized = plainCode.replaceAll("-", "").toUpperCase();
   for (let i = 0; i < hashedCodes.length; i++) {
     const isMatch = await bcryptjs.compare(normalized, hashedCodes[i]!);
     if (isMatch) {
@@ -221,7 +222,7 @@ export async function verifyCode(input: z.infer<typeof verifyCodeInput>) {
     throw new TotpServiceError("2FA is not enabled", "NOT_ENABLED");
   }
 
-  const code = input.code.replace("-", "").trim();
+  const code = input.code.replaceAll("-", "").trim();
 
   if (/^\d{6}$/.test(code)) {
     const secretBase32 = decryptSecret(twoFactorAuth.secret);
