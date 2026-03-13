@@ -198,13 +198,7 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
   );
 }
 
-function SecretDialog({
-  secret,
-  onClose,
-}: {
-  secret: string;
-  onClose: () => void;
-}) {
+function SecretDialog({ secret, onClose }: { secret: string; onClose: () => void }) {
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
@@ -293,90 +287,91 @@ function WebhookRow({
 
   return (
     <>
-    {regeneratedSecret && (
-      <SecretDialog
-        secret={regeneratedSecret}
-        onClose={() => setRegeneratedSecret(null)}
-      />
-    )}
-    <div className="rounded-lg border border-gray-200 bg-white">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Webhook className="h-5 w-5 text-gray-400" />
-          <div>
-            <p className="font-medium text-gray-900">{webhook.name}</p>
-            <p className="text-xs text-gray-500">{webhook.url}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={webhook.status} />
-          <span className="text-xs text-gray-400">{webhook.events.length} events</span>
-          <button
-            onClick={() => testMutation.mutate({ id: webhook.id })}
-            disabled={testMutation.isPending}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            title="Send test"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-          {webhook.status === "ACTIVE" ? (
-            <button
-              onClick={() => updateMutation.mutate({ id: webhook.id, status: "PAUSED" })}
-              className="rounded p-1 text-gray-400 hover:bg-yellow-50 hover:text-yellow-600"
-              title="Pause"
-            >
-              <Pause className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              onClick={() => updateMutation.mutate({ id: webhook.id, status: "ACTIVE" })}
-              className="rounded p-1 text-gray-400 hover:bg-green-50 hover:text-green-600"
-              title="Activate"
-            >
-              <Play className="h-4 w-4" />
-            </button>
-          )}
-          <button
-            onClick={() => regenerateMutation.mutate({ id: webhook.id })}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            title="Regenerate secret"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => {
-              if (confirm("Delete this webhook?")) {
-                deleteMutation.mutate({ id: webhook.id });
-              }
-            }}
-            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100"
-          >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-      {expanded && (
-        <div className="border-t border-gray-100 px-4 py-3">
-          <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Subscribed Events</h4>
-          <div className="mb-3 flex flex-wrap gap-1">
-            {webhook.events.map((e) => (
-              <span key={e} className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                {e}
-              </span>
-            ))}
-          </div>
-          <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">Recent Deliveries</h4>
-          <WebhookDeliveries webhookId={webhook.id} />
-        </div>
+      {regeneratedSecret && (
+        <SecretDialog secret={regeneratedSecret} onClose={() => setRegeneratedSecret(null)} />
       )}
-    </div>
+      <div className="rounded-lg border border-gray-200 bg-white">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Webhook className="h-5 w-5 text-gray-400" />
+            <div>
+              <p className="font-medium text-gray-900">{webhook.name}</p>
+              <p className="text-xs text-gray-500">{webhook.url}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusBadge status={webhook.status} />
+            <span className="text-xs text-gray-400">{webhook.events.length} events</span>
+            <button
+              onClick={() => testMutation.mutate({ id: webhook.id })}
+              disabled={testMutation.isPending}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Send test"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+            {webhook.status === "ACTIVE" ? (
+              <button
+                onClick={() => updateMutation.mutate({ id: webhook.id, status: "PAUSED" })}
+                className="rounded p-1 text-gray-400 hover:bg-yellow-50 hover:text-yellow-600"
+                title="Pause"
+              >
+                <Pause className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => updateMutation.mutate({ id: webhook.id, status: "ACTIVE" })}
+                className="rounded p-1 text-gray-400 hover:bg-green-50 hover:text-green-600"
+                title="Activate"
+              >
+                <Play className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={() => regenerateMutation.mutate({ id: webhook.id })}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Regenerate secret"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => {
+                if (confirm("Delete this webhook?")) {
+                  deleteMutation.mutate({ id: webhook.id });
+                }
+              }}
+              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100"
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        {expanded && (
+          <div className="border-t border-gray-100 px-4 py-3">
+            <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">
+              Subscribed Events
+            </h4>
+            <div className="mb-3 flex flex-wrap gap-1">
+              {webhook.events.map((e) => (
+                <span key={e} className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                  {e}
+                </span>
+              ))}
+            </div>
+            <h4 className="mb-1 text-xs font-semibold uppercase text-gray-500">
+              Recent Deliveries
+            </h4>
+            <WebhookDeliveries webhookId={webhook.id} />
+          </div>
+        )}
+      </div>
     </>
   );
 }
