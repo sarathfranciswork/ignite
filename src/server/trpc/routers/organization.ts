@@ -41,6 +41,20 @@ import {
   markContactInvited,
   ContactServiceError,
 } from "@/server/services/contact.service";
+import {
+  crunchbaseSearchInput,
+  crunchbaseImportSingleInput,
+  crunchbaseImportBatchInput,
+  crunchbasePreviewInput,
+} from "@/server/services/crunchbase-import.schemas";
+import {
+  searchCrunchbase,
+  importSingle as crunchbaseImportSingle,
+  importBatch as crunchbaseImportBatch,
+  previewImport as crunchbasePreviewImport,
+  getCrunchbaseStatus,
+  CrunchbaseImportError,
+} from "@/server/services/crunchbase-import.service";
 import { z } from "zod";
 
 function handleOrganizationError(error: unknown): never {
@@ -55,6 +69,19 @@ function handleOrganizationError(error: unknown): never {
 
     throw new TRPCError({
       code: codeMap[error.code] ?? "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
+  if (error instanceof CrunchbaseImportError) {
+    const codeMap: Record<string, "NOT_FOUND" | "BAD_REQUEST" | "INTERNAL_SERVER_ERROR"> = {
+      API_KEY_MISSING: "BAD_REQUEST",
+      ORG_NOT_FOUND: "NOT_FOUND",
+      API_ERROR: "INTERNAL_SERVER_ERROR",
+    };
+
+    throw new TRPCError({
+      code: codeMap[error.code] ?? "INTERNAL_SERVER_ERROR",
       message: error.message,
     });
   }
@@ -241,6 +268,57 @@ export const organizationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await markContactInvited(input.id, ctx.session.user.id);
+      } catch (error) {
+        handleOrganizationError(error);
+      }
+    }),
+
+  // Crunchbase import procedures
+  crunchbaseStatus: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_READ))
+    .query(async () => {
+      return getCrunchbaseStatus();
+    }),
+
+  crunchbaseSearch: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_IMPORT))
+    .input(crunchbaseSearchInput)
+    .query(async ({ input }) => {
+      try {
+        return await searchCrunchbase(input);
+      } catch (error) {
+        handleOrganizationError(error);
+      }
+    }),
+
+  crunchbasePreview: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_IMPORT))
+    .input(crunchbasePreviewInput)
+    .query(async ({ input }) => {
+      try {
+        return await crunchbasePreviewImport(input);
+      } catch (error) {
+        handleOrganizationError(error);
+      }
+    }),
+
+  crunchbaseImport: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_IMPORT))
+    .input(crunchbaseImportSingleInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await crunchbaseImportSingle(input, ctx.session.user.id);
+      } catch (error) {
+        handleOrganizationError(error);
+      }
+    }),
+
+  crunchbaseImportBatch: protectedProcedure
+    .use(requirePermission(Action.ORGANIZATION_IMPORT))
+    .input(crunchbaseImportBatchInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await crunchbaseImportBatch(input, ctx.session.user.id);
       } catch (error) {
         handleOrganizationError(error);
       }
