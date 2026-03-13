@@ -51,8 +51,23 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
+      // Allow access to verify-2fa page without full auth
+      if (pathname.startsWith("/verify-2fa")) {
+        return isAuthenticated;
+      }
+
       if (!isAuthenticated) {
         return false; // NextAuth will redirect to signIn page
+      }
+
+      // Check if user needs 2FA verification — redirect to verify-2fa page
+      const token = auth as unknown as Record<string, unknown> | null;
+      const requires2fa = token && "requires2fa" in token ? token.requires2fa : false;
+      const twoFactorVerified =
+        token && "twoFactorVerified" in token ? token.twoFactorVerified : false;
+
+      if (requires2fa && !twoFactorVerified && !pathname.startsWith("/api")) {
+        return Response.redirect(new URL("/verify-2fa", nextUrl.origin));
       }
 
       const user = auth?.user;

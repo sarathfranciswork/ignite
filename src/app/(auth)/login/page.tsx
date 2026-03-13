@@ -35,6 +35,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Invalid email or password");
       } else {
+        // The middleware will redirect to /verify-2fa if 2FA is pending
         router.push("/dashboard");
         router.refresh();
       }

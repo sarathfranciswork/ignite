@@ -82,11 +82,17 @@ export async function validateCredentials(email: string, password: string) {
     return null;
   }
 
+  const twoFa = await prisma.twoFactorAuth.findUnique({
+    where: { userId: user.id },
+    select: { isEnabled: true },
+  });
+
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     image: user.image,
+    requires2fa: twoFa?.isEnabled ?? false,
   };
 }
 

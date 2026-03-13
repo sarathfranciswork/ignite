@@ -2584,7 +2584,7 @@ model SubmissionFieldValue {
   @@map("submission_field_values")
 }
 
-// ── Two-Factor Authentication ─────────────────────────────────
+// ── Two-Factor Authentication & Session Management ──────────
 
 model TwoFactorAuth {
   id          String    @id @default(cuid())
@@ -2602,6 +2602,7 @@ model TwoFactorAuth {
 }
 
 // ── User Session Tracking ─────────────────────────────────────
+
 
 model UserSession {
   id             String   @id @default(cuid())

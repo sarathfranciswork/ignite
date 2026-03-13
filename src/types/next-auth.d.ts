@@ -2,6 +2,10 @@ import "next-auth";
 import type { GlobalRole } from "@prisma/client";
 
 declare module "next-auth" {
+  interface User {
+    requires2fa?: boolean;
+  }
+
   interface Session {
     user: {
       id: string;
@@ -10,6 +14,8 @@ declare module "next-auth" {
       image?: string | null;
       globalRole?: GlobalRole;
       twoFactorPending?: boolean;
+      requires2fa?: boolean;
+      twoFactorVerified?: boolean;
     };
   }
 }
@@ -19,5 +25,7 @@ declare module "next-auth/jwt" {
     id?: string;
     globalRole?: GlobalRole;
     twoFactorPending?: boolean;
+    requires2fa?: boolean;
+    twoFactorVerified?: boolean;
   }
 }

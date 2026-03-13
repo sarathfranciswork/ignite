@@ -38,6 +38,7 @@ import { scoutingMissionRouter } from "./scouting-mission";
 import { siaRouter } from "./sia";
 import { technologyRouter } from "./technology";
 import { trendRouter } from "./trend";
+import { twoFactorRouter } from "./two-factor";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
 import { webhookRouter } from "./webhook";
@@ -80,6 +81,7 @@ export const appRouter = createTRPCRouter({
   sia: siaRouter,
   technology: technologyRouter,
   trend: trendRouter,
+  twoFactor: twoFactorRouter,
   space: spaceRouter,
   sso: ssoRouter,
   submission: submissionRouter,

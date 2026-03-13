@@ -108,6 +108,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.twoFactorPending = true;
           }
         }
+        // Check if user has 2FA enabled — mark token as pending verification
+        if ("requires2fa" in user && user.requires2fa) {
+          token.requires2fa = true;
+          token.twoFactorVerified = false;
+        }
       }
       if (trigger === "update" && token.twoFactorPending === false) {
         token.twoFactorPending = false;
@@ -119,6 +124,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id;
         session.user.globalRole = token.globalRole as GlobalRole | undefined;
         session.user.twoFactorPending = token.twoFactorPending as boolean | undefined;
+        session.user.requires2fa = token.requires2fa === true;
+        session.user.twoFactorVerified = token.twoFactorVerified === true;
       }
       return session;
     },

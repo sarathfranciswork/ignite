@@ -1,24 +1,14 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import {
-  listUserSessions,
-  createSession,
-  terminateSession,
-  terminateAllOtherSessions,
-  adminTerminateSession,
-  updateSessionActivity,
-  SessionManagementError,
-  listUserSessionsInput,
-  terminateSessionInput,
-} from "./session-management.service";
 
 vi.mock("@/server/lib/prisma", () => ({
   prisma: {
     userSession: {
       findMany: vi.fn(),
-      findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      updateMany: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
   },
 }));
@@ -41,128 +31,116 @@ vi.mock("@/server/events/event-bus", () => ({
 const { prisma } = await import("@/server/lib/prisma");
 const { eventBus } = await import("@/server/events/event-bus");
 
-const prismaMock = prisma as unknown as Record<string, Record<string, Mock>>;
-const sessionFindMany = prismaMock.userSession.findMany as Mock;
-const sessionFindFirst = prismaMock.userSession.findFirst as Mock;
-const sessionCreate = prismaMock.userSession.create as Mock;
-const sessionUpdate = prismaMock.userSession.update as Mock;
-const sessionUpdateMany = prismaMock.userSession.updateMany as Mock;
+const sessionFindMany = prisma.userSession.findMany as unknown as Mock;
+const sessionFindUnique = prisma.userSession.findUnique as unknown as Mock;
+const sessionCreate = prisma.userSession.create as unknown as Mock;
+const sessionDelete = prisma.userSession.delete as unknown as Mock;
+const sessionDeleteMany = prisma.userSession.deleteMany as unknown as Mock;
 
-const mockSession = {
-  id: "session-1",
-  userId: "user-1",
-  deviceInfo: "Chrome on macOS",
-  ipAddress: "192.168.1.1",
-  lastActivityAt: new Date("2026-01-15"),
-  isActive: true,
-  createdAt: new Date("2026-01-01"),
-};
+const {
+  listUserSessions,
+  terminateSession,
+  terminateAllOtherSessions,
+  adminTerminateSession,
+  createSession,
+  SessionManagementError,
+} = await import("./session-management.service");
 
 describe("session-management.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("input schemas", () => {
-    it("validates listUserSessionsInput", () => {
-      expect(listUserSessionsInput.safeParse({ userId: "user-1" }).success).toBe(true);
-      expect(listUserSessionsInput.safeParse({ userId: "" }).success).toBe(false);
-    });
-
-    it("validates terminateSessionInput", () => {
-      expect(terminateSessionInput.safeParse({ sessionId: "s-1", userId: "u-1" }).success).toBe(
-        true,
-      );
-      expect(terminateSessionInput.safeParse({ sessionId: "", userId: "u-1" }).success).toBe(false);
-    });
-  });
-
   describe("listUserSessions", () => {
-    it("returns active sessions for a user", async () => {
-      sessionFindMany.mockResolvedValue([mockSession]);
+    it("returns all sessions for a user", async () => {
+      const mockSessions = [
+        {
+          id: "session-1",
+          deviceInfo: "Chrome",
+          ipAddress: "192.168.1.1",
+          lastActivityAt: new Date(),
+          createdAt: new Date(),
+        },
+        {
+          id: "session-2",
+          deviceInfo: "Firefox",
+          ipAddress: "10.0.0.1",
+          lastActivityAt: new Date(),
+          createdAt: new Date(),
+        },
+      ];
+      sessionFindMany.mockResolvedValue(mockSessions);
 
       const result = await listUserSessions({ userId: "user-1" });
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        id: "session-1",
-        deviceInfo: "Chrome on macOS",
-        ipAddress: "192.168.1.1",
-      });
+      expect(result).toHaveLength(2);
       expect(sessionFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: "user-1", isActive: true },
-        }),
-      );
-    });
-
-    it("returns empty array when no sessions exist", async () => {
-      sessionFindMany.mockResolvedValue([]);
-
-      const result = await listUserSessions({ userId: "user-1" });
-      expect(result).toHaveLength(0);
-    });
-  });
-
-  describe("createSession", () => {
-    it("creates a new session", async () => {
-      sessionCreate.mockResolvedValue(mockSession);
-
-      const result = await createSession({
-        userId: "user-1",
-        deviceInfo: "Chrome on macOS",
-        ipAddress: "192.168.1.1",
-      });
-
-      expect(result.id).toBe("session-1");
-      expect(sessionCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: {
-            userId: "user-1",
-            deviceInfo: "Chrome on macOS",
-            ipAddress: "192.168.1.1",
-          },
+          where: { userId: "user-1" },
         }),
       );
     });
   });
 
   describe("terminateSession", () => {
-    it("terminates a session owned by the user", async () => {
-      sessionFindFirst.mockResolvedValue(mockSession);
-      sessionUpdate.mockResolvedValue({ ...mockSession, isActive: false });
+    it("terminates a session belonging to the user", async () => {
+      sessionFindUnique.mockResolvedValue({
+        id: "session-2",
+        userId: "user-1",
+      });
+      sessionDelete.mockResolvedValue({ id: "session-2" });
 
-      await terminateSession({ sessionId: "session-1", userId: "user-1" });
+      const result = await terminateSession({
+        sessionId: "session-2",
+        userId: "user-1",
+      });
 
-      expect(sessionUpdate).toHaveBeenCalledWith({
-        where: { id: "session-1" },
-        data: { isActive: false },
+      expect(result.success).toBe(true);
+      expect(sessionDelete).toHaveBeenCalledWith({
+        where: { id: "session-2" },
       });
       expect(eventBus.emit).toHaveBeenCalledWith(
         "session.terminated",
         expect.objectContaining({
-          entity: "userSession",
-          entityId: "session-1",
-          actor: "user-1",
+          entity: "session",
+          entityId: "session-2",
         }),
       );
     });
 
-    it("throws SESSION_NOT_FOUND for non-existent session", async () => {
-      sessionFindFirst.mockResolvedValue(null);
+    it("throws if session not found", async () => {
+      sessionFindUnique.mockResolvedValue(null);
 
       await expect(
         terminateSession({ sessionId: "nonexistent", userId: "user-1" }),
       ).rejects.toThrow(SessionManagementError);
+    });
+
+    it("throws if session belongs to another user", async () => {
+      sessionFindUnique.mockResolvedValue({
+        id: "session-2",
+        userId: "user-2",
+      });
+
       await expect(
-        terminateSession({ sessionId: "nonexistent", userId: "user-1" }),
-      ).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+        terminateSession({ sessionId: "session-2", userId: "user-1" }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("throws if trying to terminate current session", async () => {
+      await expect(
+        terminateSession({
+          sessionId: "session-1",
+          userId: "user-1",
+          currentSessionId: "session-1",
+        }),
+      ).rejects.toMatchObject({ code: "CANNOT_TERMINATE_CURRENT" });
     });
   });
 
   describe("terminateAllOtherSessions", () => {
     it("terminates all sessions except current", async () => {
-      sessionUpdateMany.mockResolvedValue({ count: 3 });
+      sessionDeleteMany.mockResolvedValue({ count: 3 });
 
       const result = await terminateAllOtherSessions({
         userId: "user-1",
@@ -170,63 +148,85 @@ describe("session-management.service", () => {
       });
 
       expect(result.terminatedCount).toBe(3);
-      expect(sessionUpdateMany).toHaveBeenCalledWith({
+      expect(sessionDeleteMany).toHaveBeenCalledWith({
         where: {
           userId: "user-1",
-          isActive: true,
-          id: { not: "session-1" },
+          NOT: { id: "session-1" },
         },
-        data: { isActive: false },
-      });
-      expect(eventBus.emit).toHaveBeenCalledWith(
-        "session.allTerminated",
-        expect.objectContaining({
-          entity: "userSession",
-          entityId: "user-1",
-          metadata: { terminatedCount: 3 },
-        }),
-      );
-    });
-  });
-
-  describe("adminTerminateSession", () => {
-    it("allows admin to terminate any session", async () => {
-      sessionFindFirst.mockResolvedValue(mockSession);
-      sessionUpdate.mockResolvedValue({ ...mockSession, isActive: false });
-
-      await adminTerminateSession({ sessionId: "session-1", adminUserId: "admin-1" });
-
-      expect(sessionUpdate).toHaveBeenCalledWith({
-        where: { id: "session-1" },
-        data: { isActive: false },
       });
       expect(eventBus.emit).toHaveBeenCalledWith(
         "session.terminated",
         expect.objectContaining({
-          actor: "admin-1",
-          metadata: expect.objectContaining({ adminAction: true }),
+          metadata: expect.objectContaining({ type: "terminateAll" }),
         }),
       );
     });
 
-    it("throws SESSION_NOT_FOUND for non-existent session", async () => {
-      sessionFindFirst.mockResolvedValue(null);
+    it("does not emit event when no sessions terminated", async () => {
+      sessionDeleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(
-        adminTerminateSession({ sessionId: "nonexistent", adminUserId: "admin-1" }),
-      ).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+      await terminateAllOtherSessions({
+        userId: "user-1",
+        currentSessionId: "session-1",
+      });
+
+      expect(eventBus.emit).not.toHaveBeenCalled();
     });
   });
 
-  describe("updateSessionActivity", () => {
-    it("updates lastActivityAt for an active session", async () => {
-      sessionUpdateMany.mockResolvedValue({ count: 1 });
+  describe("adminTerminateSession", () => {
+    it("terminates any session as admin", async () => {
+      sessionFindUnique.mockResolvedValue({
+        id: "session-2",
+        userId: "user-1",
+      });
+      sessionDelete.mockResolvedValue({ id: "session-2" });
 
-      await updateSessionActivity({ sessionId: "session-1" });
+      const result = await adminTerminateSession({ sessionId: "session-2" });
 
-      expect(sessionUpdateMany).toHaveBeenCalledWith(
+      expect(result.success).toBe(true);
+      expect(eventBus.emit).toHaveBeenCalledWith(
+        "session.terminated",
         expect.objectContaining({
-          where: { id: "session-1", isActive: true },
+          metadata: expect.objectContaining({ terminatedBy: "admin" }),
+        }),
+      );
+    });
+
+    it("throws if session not found", async () => {
+      sessionFindUnique.mockResolvedValue(null);
+
+      await expect(adminTerminateSession({ sessionId: "nonexistent" })).rejects.toMatchObject({
+        code: "SESSION_NOT_FOUND",
+      });
+    });
+  });
+
+  describe("createSession", () => {
+    it("creates a new session record", async () => {
+      const mockSession = {
+        id: "session-new",
+        deviceInfo: "Chrome",
+        ipAddress: "192.168.1.1",
+        lastActivityAt: new Date(),
+        createdAt: new Date(),
+      };
+      sessionCreate.mockResolvedValue(mockSession);
+
+      const result = await createSession({
+        userId: "user-1",
+        deviceInfo: "Chrome",
+        ipAddress: "192.168.1.1",
+      });
+
+      expect(result.id).toBe("session-new");
+      expect(sessionCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: "user-1",
+            deviceInfo: "Chrome",
+            ipAddress: "192.168.1.1",
+          }),
         }),
       );
     });

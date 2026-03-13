@@ -4,40 +4,38 @@ import { logger } from "@/server/lib/logger";
 import { eventBus } from "@/server/events/event-bus";
 
 export const listUserSessionsInput = z.object({
-  userId: z.string().min(1),
+  userId: z.string(),
+});
+
+export const terminateSessionInput = z.object({
+  sessionId: z.string(),
+  userId: z.string(),
+  currentSessionId: z.string().optional(),
+});
+
+export const terminateAllOtherSessionsInput = z.object({
+  userId: z.string(),
+  currentSessionId: z.string(),
+});
+
+export const adminTerminateSessionInput = z.object({
+  sessionId: z.string(),
+});
+
+export const updateSessionActivityInput = z.object({
+  sessionId: z.string(),
 });
 
 export const createSessionInput = z.object({
-  userId: z.string().min(1),
+  userId: z.string(),
   deviceInfo: z.string().optional(),
   ipAddress: z.string().optional(),
 });
 
-export const terminateSessionInput = z.object({
-  sessionId: z.string().min(1),
-  userId: z.string().min(1),
-});
-
-export const terminateAllOtherSessionsInput = z.object({
-  userId: z.string().min(1),
-  currentSessionId: z.string().min(1),
-});
-
-export const adminTerminateSessionInput = z.object({
-  sessionId: z.string().min(1),
-  adminUserId: z.string().min(1),
-});
-
-export const updateSessionActivityInput = z.object({
-  sessionId: z.string().min(1),
-});
-
 export async function listUserSessions(input: z.infer<typeof listUserSessionsInput>) {
   const sessions = await prisma.userSession.findMany({
-    where: {
-      userId: input.userId,
-      isActive: true,
-    },
+    where: { userId: input.userId },
+    orderBy: { lastActivityAt: "desc" },
     select: {
       id: true,
       deviceInfo: true,
@@ -45,10 +43,106 @@ export async function listUserSessions(input: z.infer<typeof listUserSessionsInp
       lastActivityAt: true,
       createdAt: true,
     },
-    orderBy: { lastActivityAt: "desc" },
   });
 
   return sessions;
+}
+
+export async function terminateSession(input: z.infer<typeof terminateSessionInput>) {
+  if (input.currentSessionId && input.sessionId === input.currentSessionId) {
+    throw new SessionManagementError(
+      "Cannot terminate current session",
+      "CANNOT_TERMINATE_CURRENT",
+    );
+  }
+
+  const session = await prisma.userSession.findUnique({
+    where: { id: input.sessionId },
+    select: { id: true, userId: true },
+  });
+
+  if (!session) {
+    throw new SessionManagementError("Session not found", "SESSION_NOT_FOUND");
+  }
+
+  if (session.userId !== input.userId) {
+    throw new SessionManagementError("Session does not belong to user", "UNAUTHORIZED");
+  }
+
+  await prisma.userSession.delete({
+    where: { id: input.sessionId },
+  });
+
+  logger.info({ sessionId: input.sessionId, userId: input.userId }, "Session terminated");
+
+  eventBus.emit("session.terminated", {
+    entity: "session",
+    entityId: input.sessionId,
+    actor: input.userId,
+    timestamp: new Date().toISOString(),
+    metadata: { terminatedBy: "user" },
+  });
+
+  return { success: true };
+}
+
+export async function terminateAllOtherSessions(
+  input: z.infer<typeof terminateAllOtherSessionsInput>,
+) {
+  const result = await prisma.userSession.deleteMany({
+    where: {
+      userId: input.userId,
+      NOT: { id: input.currentSessionId },
+    },
+  });
+
+  logger.info({ userId: input.userId, count: result.count }, "All other sessions terminated");
+
+  if (result.count > 0) {
+    eventBus.emit("session.terminated", {
+      entity: "session",
+      entityId: input.userId,
+      actor: input.userId,
+      timestamp: new Date().toISOString(),
+      metadata: { terminatedBy: "user", count: result.count, type: "terminateAll" },
+    });
+  }
+
+  return { terminatedCount: result.count };
+}
+
+export async function adminTerminateSession(input: z.infer<typeof adminTerminateSessionInput>) {
+  const session = await prisma.userSession.findUnique({
+    where: { id: input.sessionId },
+    select: { id: true, userId: true },
+  });
+
+  if (!session) {
+    throw new SessionManagementError("Session not found", "SESSION_NOT_FOUND");
+  }
+
+  await prisma.userSession.delete({
+    where: { id: input.sessionId },
+  });
+
+  logger.info({ sessionId: input.sessionId }, "Session terminated by admin");
+
+  eventBus.emit("session.terminated", {
+    entity: "session",
+    entityId: input.sessionId,
+    actor: "admin",
+    timestamp: new Date().toISOString(),
+    metadata: { terminatedBy: "admin" },
+  });
+
+  return { success: true };
+}
+
+export async function updateSessionActivity(input: z.infer<typeof updateSessionActivityInput>) {
+  await prisma.userSession.update({
+    where: { id: input.sessionId },
+    data: { lastActivityAt: new Date() },
+  });
 }
 
 export async function createSession(input: z.infer<typeof createSessionInput>) {
@@ -67,107 +161,9 @@ export async function createSession(input: z.infer<typeof createSessionInput>) {
     },
   });
 
-  logger.info({ userId: input.userId, sessionId: session.id }, "User session created");
+  logger.info({ sessionId: session.id, userId: input.userId }, "User session created");
 
   return session;
-}
-
-export async function terminateSession(input: z.infer<typeof terminateSessionInput>) {
-  const session = await prisma.userSession.findFirst({
-    where: {
-      id: input.sessionId,
-      userId: input.userId,
-      isActive: true,
-    },
-  });
-
-  if (!session) {
-    throw new SessionManagementError("Session not found", "SESSION_NOT_FOUND");
-  }
-
-  await prisma.userSession.update({
-    where: { id: input.sessionId },
-    data: { isActive: false },
-  });
-
-  logger.info({ userId: input.userId, sessionId: input.sessionId }, "User session terminated");
-
-  eventBus.emit("session.terminated", {
-    entity: "userSession",
-    entityId: input.sessionId,
-    actor: input.userId,
-    timestamp: new Date().toISOString(),
-    metadata: { targetUserId: input.userId },
-  });
-}
-
-export async function terminateAllOtherSessions(
-  input: z.infer<typeof terminateAllOtherSessionsInput>,
-) {
-  const result = await prisma.userSession.updateMany({
-    where: {
-      userId: input.userId,
-      isActive: true,
-      id: { not: input.currentSessionId },
-    },
-    data: { isActive: false },
-  });
-
-  logger.info(
-    { userId: input.userId, terminatedCount: result.count },
-    "All other sessions terminated",
-  );
-
-  eventBus.emit("session.allTerminated", {
-    entity: "userSession",
-    entityId: input.userId,
-    actor: input.userId,
-    timestamp: new Date().toISOString(),
-    metadata: { terminatedCount: result.count },
-  });
-
-  return { terminatedCount: result.count };
-}
-
-export async function adminTerminateSession(input: z.infer<typeof adminTerminateSessionInput>) {
-  const session = await prisma.userSession.findFirst({
-    where: {
-      id: input.sessionId,
-      isActive: true,
-    },
-  });
-
-  if (!session) {
-    throw new SessionManagementError("Session not found", "SESSION_NOT_FOUND");
-  }
-
-  await prisma.userSession.update({
-    where: { id: input.sessionId },
-    data: { isActive: false },
-  });
-
-  logger.info(
-    { adminUserId: input.adminUserId, sessionId: input.sessionId, targetUserId: session.userId },
-    "Admin terminated user session",
-  );
-
-  eventBus.emit("session.terminated", {
-    entity: "userSession",
-    entityId: input.sessionId,
-    actor: input.adminUserId,
-    timestamp: new Date().toISOString(),
-    metadata: { targetUserId: session.userId, adminAction: true },
-  });
-}
-
-export async function updateSessionActivity(input: z.infer<typeof updateSessionActivityInput>) {
-  await prisma.userSession.updateMany({
-    where: {
-      id: input.sessionId,
-      isActive: true,
-    },
-    data: { lastActivityAt: new Date() },
-  });
 }
 
 export class SessionManagementError extends Error {

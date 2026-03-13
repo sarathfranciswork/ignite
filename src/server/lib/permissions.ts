@@ -238,10 +238,9 @@ export const Action = {
   REPORT_READ: "report.read",
   REPORT_EXPORT: "report.export",
 
-  // Two-factor authentication
-  TWO_FACTOR_SETUP: "twoFactor.setup",
-  TWO_FACTOR_DISABLE: "twoFactor.disable",
-  SESSION_LIST_OWN: "session.list.own",
+  // Two-factor authentication & sessions
+  TWO_FACTOR_MANAGE: "twoFactor.manage",
+  SESSION_READ_OWN: "session.read.own",
   SESSION_TERMINATE_OWN: "session.terminate.own",
   SESSION_TERMINATE_ANY: "session.terminate.any",
 
@@ -417,9 +416,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.GENERIC_SUBMISSION_REVIEW,
     Action.REPORT_READ,
     Action.REPORT_EXPORT,
-    Action.TWO_FACTOR_SETUP,
-    Action.TWO_FACTOR_DISABLE,
-    Action.SESSION_LIST_OWN,
+    Action.TWO_FACTOR_MANAGE,
+    Action.SESSION_READ_OWN,
     Action.SESSION_TERMINATE_OWN,
     Action.SESSION_TERMINATE_ANY,
   ],
@@ -477,9 +475,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.GENERIC_SUBMISSION_READ,
     Action.GENERIC_SUBMISSION_UPDATE_OWN,
     Action.REPORT_READ,
-    Action.TWO_FACTOR_SETUP,
-    Action.TWO_FACTOR_DISABLE,
-    Action.SESSION_LIST_OWN,
+    Action.TWO_FACTOR_MANAGE,
+    Action.SESSION_READ_OWN,
     Action.SESSION_TERMINATE_OWN,
   ],
   EXTERNAL: [
@@ -495,9 +492,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.COMMENT_UPDATE_OWN,
     Action.COMMENT_DELETE_OWN,
     Action.NOTIFICATION_READ_OWN,
-    Action.TWO_FACTOR_SETUP,
-    Action.TWO_FACTOR_DISABLE,
-    Action.SESSION_LIST_OWN,
+    Action.TWO_FACTOR_MANAGE,
+    Action.SESSION_READ_OWN,
     Action.SESSION_TERMINATE_OWN,
   ],
 } as const;
