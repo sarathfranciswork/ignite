@@ -3,7 +3,7 @@
 import { trpc } from "@/lib/trpc";
 import { KpiCard } from "@/components/charts/KpiCard";
 import { FunnelChart } from "@/components/charts/FunnelChart";
-import { ExportPlatformSummaryButton } from "./ExportButtons";
+import { ExportButton } from "./ExportButton";
 import { Briefcase, Lightbulb, FolderKanban, Users } from "lucide-react";
 
 function SummarySkeleton() {
@@ -31,6 +31,7 @@ function SummarySkeleton() {
 
 export function PlatformSummaryTab() {
   const summaryQuery = trpc.report.platformSummary.useQuery({});
+  const exportMutation = trpc.export.platformReport.useMutation();
 
   if (summaryQuery.isLoading) {
     return <SummarySkeleton />;
@@ -46,11 +47,6 @@ export function PlatformSummaryTab() {
 
   const data = summaryQuery.data;
   if (!data) return <SummarySkeleton />;
-
-  const hasData =
-    Object.keys(data.campaignStatusBreakdown).length > 0 ||
-    Object.keys(data.projectStatusBreakdown).length > 0 ||
-    data.topCampaigns.length > 0;
 
   const campaignFunnel = Object.entries(data.campaignStatusBreakdown).map(
     ([status, count], index) => ({
@@ -70,11 +66,12 @@ export function PlatformSummaryTab() {
 
   return (
     <div className="space-y-6">
-      {hasData && (
-        <div className="flex justify-end">
-          <ExportPlatformSummaryButton />
-        </div>
-      )}
+      <div className="flex justify-end">
+        <ExportButton
+          label="Export Platform Report"
+          onExport={() => exportMutation.mutateAsync({})}
+        />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard

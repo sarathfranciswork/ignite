@@ -74,7 +74,7 @@ export function CustomKpiReportTab() {
 
   const excelExport = trpc.export.customKpiReportExcel.useMutation({
     onSuccess(data) {
-      downloadExcel(data.data, data.filename);
+      downloadExcel(data.base64, data.filename);
       toast.success("Custom KPI report exported to Excel");
     },
     onError(error) {
