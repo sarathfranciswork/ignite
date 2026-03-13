@@ -11,6 +11,7 @@ import { campaignComparisonRouter } from "./campaign-comparison";
 import { campaignRouter } from "./campaign";
 import { channelRouter } from "./channel";
 import { clipRouter } from "./clip";
+import { complianceRouter } from "./compliance";
 import { conceptRouter } from "./concept";
 import { dashboardRouter } from "./dashboard";
 import { commentRouter } from "./comment";
@@ -62,6 +63,7 @@ export const appRouter = createTRPCRouter({
   channel: channelRouter,
   clip: clipRouter,
   comment: commentRouter,
+  compliance: complianceRouter,
   concept: conceptRouter,
   communication: communicationRouter,
   dashboard: dashboardRouter,

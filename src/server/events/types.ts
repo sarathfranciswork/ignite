@@ -259,6 +259,11 @@ export interface EventMap {
   "externalSync.configured": EventPayload;
   "externalSync.synced": EventPayload;
   "externalSync.statusUpdated": EventPayload;
+  "gdpr.exportRequested": EventPayload;
+  "gdpr.erasureRequested": EventPayload;
+  "gdpr.erasureCompleted": EventPayload;
+  "gdpr.exportCompleted": EventPayload;
+  "ipWhitelist.updated": EventPayload;
 }
 
 export type EventName = keyof EventMap;
