@@ -207,7 +207,7 @@ describe("updateProcessDefinition", () => {
     pdUpdate.mockResolvedValue(mockDefinition);
     pdFindUnique.mockResolvedValueOnce(mockDefinition); // reload
 
-    const result = await updateProcessDefinition({ id: "pd-1", name: "Updated Name" }, "user-1");
+    const _result = await updateProcessDefinition({ id: "pd-1", name: "Updated Name" }, "user-1");
 
     expect(pdUpdate).toHaveBeenCalledOnce();
     expect(eventBus.emit).toHaveBeenCalledWith("processDefinition.updated", expect.any(Object));
@@ -259,7 +259,7 @@ describe("duplicateProcessDefinition", () => {
     pdCreate.mockResolvedValue(duplicated);
     pdFindUnique.mockResolvedValueOnce(duplicated); // reload after create
 
-    const result = await duplicateProcessDefinition({ id: "pd-1" }, "user-1");
+    const _result = await duplicateProcessDefinition({ id: "pd-1" }, "user-1");
 
     expect(pdCreate).toHaveBeenCalledOnce();
     const createArgs = pdCreate.mock.calls[0]?.[0]?.data;

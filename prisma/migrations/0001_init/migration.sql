@@ -86,7 +86,10 @@ CREATE TYPE "bucket_type" AS ENUM ('MANUAL', 'SMART');
 CREATE TYPE "evaluation_session_status" AS ENUM ('DRAFT', 'ACTIVE', 'COMPLETED', 'ARCHIVED');
 
 -- CreateEnum
-CREATE TYPE "evaluation_session_type" AS ENUM ('SCORECARD', 'PAIRWISE');
+CREATE TYPE "evaluation_session_type" AS ENUM ('SCORECARD', 'PAIRWISE', 'AD_HOC', 'ONE_TEAM');
+
+-- CreateEnum
+CREATE TYPE "evaluation_mode" AS ENUM ('STANDARD', 'AD_HOC', 'ONE_TEAM');
 
 -- CreateEnum
 CREATE TYPE "criterion_field_type" AS ENUM ('SELECTION_SCALE', 'TEXT', 'CHECKBOX');
@@ -108,6 +111,60 @@ CREATE TYPE "MaturityLevel" AS ENUM ('EMERGING', 'GROWING', 'MATURE', 'DECLINING
 
 -- CreateEnum
 CREATE TYPE "portfolio_item_type" AS ENUM ('TREND', 'TECHNOLOGY', 'IDEA', 'SIA');
+
+-- CreateEnum
+CREATE TYPE "project_status" AS ENUM ('ACTIVE', 'ON_HOLD', 'COMPLETED', 'TERMINATED');
+
+-- CreateEnum
+CREATE TYPE "project_team_role" AS ENUM ('LEADER', 'MEMBER', 'GATEKEEPER');
+
+-- CreateEnum
+CREATE TYPE "process_field_type" AS ENUM ('TEXT', 'NUMBER', 'KEYWORD', 'ATTACHMENT', 'DATE', 'USER');
+
+-- CreateEnum
+CREATE TYPE "project_task_status" AS ENUM ('TODO', 'IN_PROGRESS', 'COMPLETED');
+
+-- CreateEnum
+CREATE TYPE "phase_instance_status" AS ENUM ('ELABORATION', 'GATE_REVIEW', 'COMPLETED', 'SKIPPED');
+
+-- CreateEnum
+CREATE TYPE "gate_decision_type" AS ENUM ('FORWARD', 'REWORK', 'POSTPONE', 'TERMINATE');
+
+-- CreateEnum
+CREATE TYPE "campaign_message_status" AS ENUM ('DRAFT', 'SENT', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "audience_segment" AS ENUM ('ALL_MEMBERS', 'CONTRIBUTORS', 'NON_CONTRIBUTORS', 'VIEWERS_NO_CONTRIBUTION', 'SELECTED_IDEA_AUTHORS', 'MANAGERS', 'COACHES', 'EVALUATORS', 'SEEDERS', 'SPONSORS', 'CUSTOM_ROLE');
+
+-- CreateEnum
+CREATE TYPE "communication_channel" AS ENUM ('EMAIL', 'IN_APP', 'FEED');
+
+-- CreateEnum
+CREATE TYPE "communication_status" AS ENUM ('PENDING', 'DELIVERED', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "webhook_status" AS ENUM ('ACTIVE', 'PAUSED', 'DISABLED');
+
+-- CreateEnum
+CREATE TYPE "webhook_delivery_status" AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "concept_status" AS ENUM ('ELABORATION', 'EVALUATION', 'APPROVED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "concept_decision_type" AS ENUM ('APPROVE', 'REJECT', 'REVISE');
+
+-- CreateEnum
+CREATE TYPE "concept_team_role" AS ENUM ('OWNER', 'CONTRIBUTOR', 'REVIEWER');
+
+-- CreateEnum
+CREATE TYPE "submission_definition_status" AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "submission_field_type" AS ENUM ('TEXT', 'TEXTAREA', 'NUMBER', 'SELECT', 'MULTI_SELECT', 'DATE', 'CHECKBOX', 'FILE', 'RICH_TEXT', 'URL');
+
+-- CreateEnum
+CREATE TYPE "generic_submission_status" AS ENUM ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ARCHIVED');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -865,14 +922,20 @@ CREATE TABLE "idea_bucket_assignments" (
 -- CreateTable
 CREATE TABLE "evaluation_sessions" (
     "id" TEXT NOT NULL,
-    "campaign_id" TEXT NOT NULL,
+    "campaign_id" TEXT,
     "title" TEXT NOT NULL,
     "description" TEXT,
     "type" "evaluation_session_type" NOT NULL,
+    "mode" "evaluation_mode" NOT NULL DEFAULT 'STANDARD',
     "status" "evaluation_session_status" NOT NULL DEFAULT 'DRAFT',
     "due_date" TIMESTAMP(3),
     "is_template" BOOLEAN NOT NULL DEFAULT false,
     "template_id" TEXT,
+    "is_collaborative" BOOLEAN NOT NULL DEFAULT false,
+    "facilitator_id" TEXT,
+    "consensus_required" BOOLEAN NOT NULL DEFAULT false,
+    "live_session_started" TIMESTAMP(3),
+    "live_session_ended" TIMESTAMP(3),
     "shortlist_locked" BOOLEAN NOT NULL DEFAULT false,
     "shortlist_locked_at" TIMESTAMP(3),
     "shortlist_locked_by_id" TEXT,
@@ -919,9 +982,11 @@ CREATE TABLE "evaluation_session_evaluators" (
 CREATE TABLE "evaluation_session_ideas" (
     "id" TEXT NOT NULL,
     "session_id" TEXT NOT NULL,
-    "idea_id" TEXT NOT NULL,
+    "idea_id" TEXT,
     "sort_order" INTEGER NOT NULL DEFAULT 0,
     "added_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ad_hoc_title" TEXT,
+    "ad_hoc_description" TEXT,
 
     CONSTRAINT "evaluation_session_ideas_pkey" PRIMARY KEY ("id")
 );
@@ -1093,6 +1158,142 @@ CREATE TABLE "portfolio_items" (
 );
 
 -- CreateTable
+CREATE TABLE "process_definitions" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "created_by_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "process_definitions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "process_phases" (
+    "id" TEXT NOT NULL,
+    "process_definition_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "planned_duration_days" INTEGER,
+    "position" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "process_phases_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "process_phase_activities" (
+    "id" TEXT NOT NULL,
+    "phase_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "is_mandatory" BOOLEAN NOT NULL DEFAULT false,
+    "position" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "process_phase_activities_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "process_phase_activity_tasks" (
+    "id" TEXT NOT NULL,
+    "activity_id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "field_type" "process_field_type" NOT NULL,
+    "is_mandatory" BOOLEAN NOT NULL DEFAULT false,
+    "position" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "process_phase_activity_tasks_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "projects" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "process_definition_id" TEXT NOT NULL,
+    "status" "project_status" NOT NULL DEFAULT 'ACTIVE',
+    "current_phase_id" TEXT,
+    "is_confidential" BOOLEAN NOT NULL DEFAULT false,
+    "created_by_id" TEXT NOT NULL,
+    "source_idea_id" TEXT,
+    "source_concept_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "projects_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "project_team_members" (
+    "id" TEXT NOT NULL,
+    "project_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "role" "project_team_role" NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "project_team_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "project_task_assignments" (
+    "id" TEXT NOT NULL,
+    "project_id" TEXT NOT NULL,
+    "task_id" TEXT NOT NULL,
+    "phase_id" TEXT NOT NULL,
+    "assignee_id" TEXT,
+    "status" "project_task_status" NOT NULL DEFAULT 'TODO',
+    "due_date" TIMESTAMP(3),
+    "text_value" TEXT,
+    "number_value" DOUBLE PRECISION,
+    "date_value" TIMESTAMP(3),
+    "keyword_value" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "file_url" TEXT,
+    "user_value" TEXT,
+    "completed_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "project_task_assignments_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "project_phase_instances" (
+    "id" TEXT NOT NULL,
+    "project_id" TEXT NOT NULL,
+    "phase_id" TEXT NOT NULL,
+    "position" INTEGER NOT NULL,
+    "status" "phase_instance_status" NOT NULL DEFAULT 'ELABORATION',
+    "planned_start_at" TIMESTAMP(3),
+    "planned_end_at" TIMESTAMP(3),
+    "actual_start_at" TIMESTAMP(3),
+    "actual_end_at" TIMESTAMP(3),
+    "rework_feedback" TEXT,
+    "postpone_until" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "project_phase_instances_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "gate_decisions" (
+    "id" TEXT NOT NULL,
+    "phase_instance_id" TEXT NOT NULL,
+    "gatekeeper_id" TEXT NOT NULL,
+    "decision" "gate_decision_type" NOT NULL,
+    "feedback" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "gate_decisions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "scim_tokens" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -1104,6 +1305,264 @@ CREATE TABLE "scim_tokens" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "scim_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "campaign_messages" (
+    "id" TEXT NOT NULL,
+    "campaign_id" TEXT NOT NULL,
+    "subject" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "segment" "audience_segment" NOT NULL DEFAULT 'ALL_MEMBERS',
+    "status" "campaign_message_status" NOT NULL DEFAULT 'DRAFT',
+    "sent_at" TIMESTAMP(3),
+    "sent_by_id" TEXT NOT NULL,
+    "recipient_count" INTEGER NOT NULL DEFAULT 0,
+    "delivered_count" INTEGER NOT NULL DEFAULT 0,
+    "failed_count" INTEGER NOT NULL DEFAULT 0,
+    "post_to_feed" BOOLEAN NOT NULL DEFAULT true,
+    "send_email" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "campaign_messages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "communication_logs" (
+    "id" TEXT NOT NULL,
+    "message_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "channel" "communication_channel" NOT NULL,
+    "status" "communication_status" NOT NULL DEFAULT 'PENDING',
+    "error" TEXT,
+    "sent_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "communication_logs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "webhooks" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "url" TEXT NOT NULL,
+    "secret" TEXT NOT NULL,
+    "status" "webhook_status" NOT NULL DEFAULT 'ACTIVE',
+    "events" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "description" TEXT,
+    "created_by_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "webhooks_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "webhook_deliveries" (
+    "id" TEXT NOT NULL,
+    "webhook_id" TEXT NOT NULL,
+    "event_name" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "status" "webhook_delivery_status" NOT NULL DEFAULT 'PENDING',
+    "http_status_code" INTEGER,
+    "response_body" TEXT,
+    "error_message" TEXT,
+    "attempt_count" INTEGER NOT NULL DEFAULT 0,
+    "next_retry_at" TIMESTAMP(3),
+    "delivered_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "webhook_deliveries_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "api_keys" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "key_prefix" TEXT NOT NULL,
+    "key_hash" TEXT NOT NULL,
+    "scopes" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "expires_at" TIMESTAMP(3),
+    "last_used_at" TIMESTAMP(3),
+    "created_by_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "api_keys_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "concepts" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "status" "concept_status" NOT NULL DEFAULT 'ELABORATION',
+    "owner_id" TEXT NOT NULL,
+    "source_idea_id" TEXT,
+    "problem_statement" TEXT,
+    "proposed_solution" TEXT,
+    "value_proposition" TEXT,
+    "swot_strengths" TEXT,
+    "swot_weaknesses" TEXT,
+    "swot_opportunities" TEXT,
+    "swot_threats" TEXT,
+    "target_market" TEXT,
+    "resource_requirements" TEXT,
+    "expected_roi" TEXT,
+    "risk_assessment" TEXT,
+    "created_by_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "concepts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "concept_team_members" (
+    "id" TEXT NOT NULL,
+    "concept_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "role" "concept_team_role" NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "concept_team_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "concept_decisions" (
+    "id" TEXT NOT NULL,
+    "concept_id" TEXT NOT NULL,
+    "decision" "concept_decision_type" NOT NULL,
+    "feedback" TEXT,
+    "decided_by" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "concept_decisions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "consensus_notes" (
+    "id" TEXT NOT NULL,
+    "session_id" TEXT NOT NULL,
+    "idea_id" TEXT NOT NULL,
+    "author_id" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "consensus_notes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "submission_definitions" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "status" "submission_definition_status" NOT NULL DEFAULT 'DRAFT',
+    "slug" TEXT NOT NULL,
+    "campaign_id" TEXT,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
+    "created_by_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "submission_definitions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "submission_fields" (
+    "id" TEXT NOT NULL,
+    "definition_id" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "field_key" TEXT NOT NULL,
+    "field_type" "submission_field_type" NOT NULL,
+    "is_required" BOOLEAN NOT NULL DEFAULT false,
+    "sort_order" INTEGER NOT NULL DEFAULT 0,
+    "placeholder" TEXT,
+    "help_text" TEXT,
+    "options" JSONB,
+    "validation" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "submission_fields_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "generic_submissions" (
+    "id" TEXT NOT NULL,
+    "definition_id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "status" "generic_submission_status" NOT NULL DEFAULT 'DRAFT',
+    "submitted_by_id" TEXT NOT NULL,
+    "reviewed_by_id" TEXT,
+    "review_note" TEXT,
+    "submitted_at" TIMESTAMP(3),
+    "reviewed_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "generic_submissions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "submission_field_values" (
+    "id" TEXT NOT NULL,
+    "submission_id" TEXT NOT NULL,
+    "field_id" TEXT NOT NULL,
+    "text_value" TEXT,
+    "number_value" DOUBLE PRECISION,
+    "bool_value" BOOLEAN,
+    "date_value" TIMESTAMP(3),
+    "json_value" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "submission_field_values_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "audit_logs" (
+    "id" TEXT NOT NULL,
+    "actor_id" TEXT,
+    "actor_email" TEXT,
+    "action" TEXT NOT NULL,
+    "entity" TEXT NOT NULL,
+    "entity_id" TEXT,
+    "ip_address" TEXT,
+    "user_agent" TEXT,
+    "metadata" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "two_factor_auth" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "secret" TEXT NOT NULL,
+    "is_enabled" BOOLEAN NOT NULL DEFAULT false,
+    "backup_codes" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "verified_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "two_factor_auth_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_sessions" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "device_info" TEXT,
+    "ip_address" TEXT,
+    "last_activity_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_sessions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -1509,6 +1968,9 @@ CREATE INDEX "evaluation_sessions_campaign_id_idx" ON "evaluation_sessions"("cam
 CREATE INDEX "evaluation_sessions_status_idx" ON "evaluation_sessions"("status");
 
 -- CreateIndex
+CREATE INDEX "evaluation_sessions_mode_idx" ON "evaluation_sessions"("mode");
+
+-- CreateIndex
 CREATE INDEX "evaluation_sessions_created_by_id_idx" ON "evaluation_sessions"("created_by_id");
 
 -- CreateIndex
@@ -1635,10 +2097,244 @@ CREATE INDEX "portfolio_items_entity_type_entity_id_idx" ON "portfolio_items"("e
 CREATE UNIQUE INDEX "portfolio_items_portfolio_id_entity_type_entity_id_key" ON "portfolio_items"("portfolio_id", "entity_type", "entity_id");
 
 -- CreateIndex
+CREATE INDEX "process_definitions_created_by_id_idx" ON "process_definitions"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "process_phases_process_definition_id_idx" ON "process_phases"("process_definition_id");
+
+-- CreateIndex
+CREATE INDEX "process_phase_activities_phase_id_idx" ON "process_phase_activities"("phase_id");
+
+-- CreateIndex
+CREATE INDEX "process_phase_activity_tasks_activity_id_idx" ON "process_phase_activity_tasks"("activity_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "projects_source_concept_id_key" ON "projects"("source_concept_id");
+
+-- CreateIndex
+CREATE INDEX "projects_process_definition_id_idx" ON "projects"("process_definition_id");
+
+-- CreateIndex
+CREATE INDEX "projects_created_by_id_idx" ON "projects"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "projects_source_idea_id_idx" ON "projects"("source_idea_id");
+
+-- CreateIndex
+CREATE INDEX "projects_source_concept_id_idx" ON "projects"("source_concept_id");
+
+-- CreateIndex
+CREATE INDEX "projects_status_idx" ON "projects"("status");
+
+-- CreateIndex
+CREATE INDEX "project_team_members_project_id_idx" ON "project_team_members"("project_id");
+
+-- CreateIndex
+CREATE INDEX "project_team_members_user_id_idx" ON "project_team_members"("user_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "project_team_members_project_id_user_id_key" ON "project_team_members"("project_id", "user_id");
+
+-- CreateIndex
+CREATE INDEX "project_task_assignments_project_id_idx" ON "project_task_assignments"("project_id");
+
+-- CreateIndex
+CREATE INDEX "project_task_assignments_task_id_idx" ON "project_task_assignments"("task_id");
+
+-- CreateIndex
+CREATE INDEX "project_task_assignments_phase_id_idx" ON "project_task_assignments"("phase_id");
+
+-- CreateIndex
+CREATE INDEX "project_task_assignments_assignee_id_idx" ON "project_task_assignments"("assignee_id");
+
+-- CreateIndex
+CREATE INDEX "project_task_assignments_status_idx" ON "project_task_assignments"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "project_task_assignments_project_id_task_id_key" ON "project_task_assignments"("project_id", "task_id");
+
+-- CreateIndex
+CREATE INDEX "project_phase_instances_project_id_idx" ON "project_phase_instances"("project_id");
+
+-- CreateIndex
+CREATE INDEX "project_phase_instances_phase_id_idx" ON "project_phase_instances"("phase_id");
+
+-- CreateIndex
+CREATE INDEX "project_phase_instances_status_idx" ON "project_phase_instances"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "project_phase_instances_project_id_phase_id_key" ON "project_phase_instances"("project_id", "phase_id");
+
+-- CreateIndex
+CREATE INDEX "gate_decisions_phase_instance_id_idx" ON "gate_decisions"("phase_instance_id");
+
+-- CreateIndex
+CREATE INDEX "gate_decisions_gatekeeper_id_idx" ON "gate_decisions"("gatekeeper_id");
+
+-- CreateIndex
 CREATE INDEX "scim_tokens_token_hash_idx" ON "scim_tokens"("token_hash");
 
 -- CreateIndex
 CREATE INDEX "scim_tokens_created_by_id_idx" ON "scim_tokens"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "campaign_messages_campaign_id_idx" ON "campaign_messages"("campaign_id");
+
+-- CreateIndex
+CREATE INDEX "campaign_messages_campaign_id_status_idx" ON "campaign_messages"("campaign_id", "status");
+
+-- CreateIndex
+CREATE INDEX "campaign_messages_sent_by_id_idx" ON "campaign_messages"("sent_by_id");
+
+-- CreateIndex
+CREATE INDEX "campaign_messages_sent_at_idx" ON "campaign_messages"("sent_at");
+
+-- CreateIndex
+CREATE INDEX "communication_logs_message_id_idx" ON "communication_logs"("message_id");
+
+-- CreateIndex
+CREATE INDEX "communication_logs_user_id_idx" ON "communication_logs"("user_id");
+
+-- CreateIndex
+CREATE INDEX "communication_logs_message_id_status_idx" ON "communication_logs"("message_id", "status");
+
+-- CreateIndex
+CREATE INDEX "webhooks_created_by_id_idx" ON "webhooks"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "webhooks_status_idx" ON "webhooks"("status");
+
+-- CreateIndex
+CREATE INDEX "webhook_deliveries_webhook_id_idx" ON "webhook_deliveries"("webhook_id");
+
+-- CreateIndex
+CREATE INDEX "webhook_deliveries_webhook_id_status_idx" ON "webhook_deliveries"("webhook_id", "status");
+
+-- CreateIndex
+CREATE INDEX "webhook_deliveries_status_next_retry_at_idx" ON "webhook_deliveries"("status", "next_retry_at");
+
+-- CreateIndex
+CREATE INDEX "webhook_deliveries_created_at_idx" ON "webhook_deliveries"("created_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "api_keys_key_hash_key" ON "api_keys"("key_hash");
+
+-- CreateIndex
+CREATE INDEX "api_keys_key_hash_idx" ON "api_keys"("key_hash");
+
+-- CreateIndex
+CREATE INDEX "api_keys_created_by_id_idx" ON "api_keys"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "api_keys_is_active_idx" ON "api_keys"("is_active");
+
+-- CreateIndex
+CREATE INDEX "concepts_owner_id_idx" ON "concepts"("owner_id");
+
+-- CreateIndex
+CREATE INDEX "concepts_created_by_id_idx" ON "concepts"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "concepts_source_idea_id_idx" ON "concepts"("source_idea_id");
+
+-- CreateIndex
+CREATE INDEX "concepts_status_idx" ON "concepts"("status");
+
+-- CreateIndex
+CREATE INDEX "concept_team_members_concept_id_idx" ON "concept_team_members"("concept_id");
+
+-- CreateIndex
+CREATE INDEX "concept_team_members_user_id_idx" ON "concept_team_members"("user_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "concept_team_members_concept_id_user_id_key" ON "concept_team_members"("concept_id", "user_id");
+
+-- CreateIndex
+CREATE INDEX "concept_decisions_concept_id_idx" ON "concept_decisions"("concept_id");
+
+-- CreateIndex
+CREATE INDEX "consensus_notes_session_id_idx" ON "consensus_notes"("session_id");
+
+-- CreateIndex
+CREATE INDEX "consensus_notes_session_id_idea_id_idx" ON "consensus_notes"("session_id", "idea_id");
+
+-- CreateIndex
+CREATE INDEX "consensus_notes_author_id_idx" ON "consensus_notes"("author_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "submission_definitions_slug_key" ON "submission_definitions"("slug");
+
+-- CreateIndex
+CREATE INDEX "submission_definitions_campaign_id_idx" ON "submission_definitions"("campaign_id");
+
+-- CreateIndex
+CREATE INDEX "submission_definitions_status_idx" ON "submission_definitions"("status");
+
+-- CreateIndex
+CREATE INDEX "submission_definitions_created_by_id_idx" ON "submission_definitions"("created_by_id");
+
+-- CreateIndex
+CREATE INDEX "submission_fields_definition_id_idx" ON "submission_fields"("definition_id");
+
+-- CreateIndex
+CREATE INDEX "submission_fields_definition_id_sort_order_idx" ON "submission_fields"("definition_id", "sort_order");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "submission_fields_definition_id_field_key_key" ON "submission_fields"("definition_id", "field_key");
+
+-- CreateIndex
+CREATE INDEX "generic_submissions_definition_id_idx" ON "generic_submissions"("definition_id");
+
+-- CreateIndex
+CREATE INDEX "generic_submissions_submitted_by_id_idx" ON "generic_submissions"("submitted_by_id");
+
+-- CreateIndex
+CREATE INDEX "generic_submissions_reviewed_by_id_idx" ON "generic_submissions"("reviewed_by_id");
+
+-- CreateIndex
+CREATE INDEX "generic_submissions_status_idx" ON "generic_submissions"("status");
+
+-- CreateIndex
+CREATE INDEX "generic_submissions_definition_id_status_idx" ON "generic_submissions"("definition_id", "status");
+
+-- CreateIndex
+CREATE INDEX "submission_field_values_submission_id_idx" ON "submission_field_values"("submission_id");
+
+-- CreateIndex
+CREATE INDEX "submission_field_values_field_id_idx" ON "submission_field_values"("field_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "submission_field_values_submission_id_field_id_key" ON "submission_field_values"("submission_id", "field_id");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_actor_id_idx" ON "audit_logs"("actor_id");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_action_idx" ON "audit_logs"("action");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_entity_idx" ON "audit_logs"("entity");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_entity_id_idx" ON "audit_logs"("entity_id");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_created_at_idx" ON "audit_logs"("created_at");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_actor_id_created_at_idx" ON "audit_logs"("actor_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "audit_logs_entity_entity_id_idx" ON "audit_logs"("entity", "entity_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "two_factor_auth_user_id_key" ON "two_factor_auth"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_user_id_idx" ON "user_sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_sessions_last_activity_at_idx" ON "user_sessions"("last_activity_at");
 
 -- AddForeignKey
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1860,6 +2556,9 @@ ALTER TABLE "idea_bucket_assignments" ADD CONSTRAINT "idea_bucket_assignments_bu
 ALTER TABLE "idea_bucket_assignments" ADD CONSTRAINT "idea_bucket_assignments_idea_id_fkey" FOREIGN KEY ("idea_id") REFERENCES "ideas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "evaluation_sessions" ADD CONSTRAINT "evaluation_sessions_facilitator_id_fkey" FOREIGN KEY ("facilitator_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "evaluation_sessions" ADD CONSTRAINT "evaluation_sessions_shortlist_locked_by_id_fkey" FOREIGN KEY ("shortlist_locked_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1944,5 +2643,134 @@ ALTER TABLE "innovation_portfolios" ADD CONSTRAINT "innovation_portfolios_create
 ALTER TABLE "portfolio_items" ADD CONSTRAINT "portfolio_items_portfolio_id_fkey" FOREIGN KEY ("portfolio_id") REFERENCES "innovation_portfolios"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "process_definitions" ADD CONSTRAINT "process_definitions_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "process_phases" ADD CONSTRAINT "process_phases_process_definition_id_fkey" FOREIGN KEY ("process_definition_id") REFERENCES "process_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "process_phase_activities" ADD CONSTRAINT "process_phase_activities_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "process_phases"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "process_phase_activity_tasks" ADD CONSTRAINT "process_phase_activity_tasks_activity_id_fkey" FOREIGN KEY ("activity_id") REFERENCES "process_phase_activities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_process_definition_id_fkey" FOREIGN KEY ("process_definition_id") REFERENCES "process_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_current_phase_id_fkey" FOREIGN KEY ("current_phase_id") REFERENCES "process_phases"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_source_idea_id_fkey" FOREIGN KEY ("source_idea_id") REFERENCES "ideas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "projects" ADD CONSTRAINT "projects_source_concept_id_fkey" FOREIGN KEY ("source_concept_id") REFERENCES "concepts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_team_members" ADD CONSTRAINT "project_team_members_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_team_members" ADD CONSTRAINT "project_team_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_task_assignments" ADD CONSTRAINT "project_task_assignments_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_task_assignments" ADD CONSTRAINT "project_task_assignments_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "process_phase_activity_tasks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_task_assignments" ADD CONSTRAINT "project_task_assignments_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "process_phases"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_task_assignments" ADD CONSTRAINT "project_task_assignments_assignee_id_fkey" FOREIGN KEY ("assignee_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_phase_instances" ADD CONSTRAINT "project_phase_instances_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "project_phase_instances" ADD CONSTRAINT "project_phase_instances_phase_id_fkey" FOREIGN KEY ("phase_id") REFERENCES "process_phases"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "gate_decisions" ADD CONSTRAINT "gate_decisions_phase_instance_id_fkey" FOREIGN KEY ("phase_instance_id") REFERENCES "project_phase_instances"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "gate_decisions" ADD CONSTRAINT "gate_decisions_gatekeeper_id_fkey" FOREIGN KEY ("gatekeeper_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "scim_tokens" ADD CONSTRAINT "scim_tokens_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "campaign_messages" ADD CONSTRAINT "campaign_messages_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "campaign_messages" ADD CONSTRAINT "campaign_messages_sent_by_id_fkey" FOREIGN KEY ("sent_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "communication_logs" ADD CONSTRAINT "communication_logs_message_id_fkey" FOREIGN KEY ("message_id") REFERENCES "campaign_messages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "webhooks" ADD CONSTRAINT "webhooks_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_webhook_id_fkey" FOREIGN KEY ("webhook_id") REFERENCES "webhooks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "api_keys" ADD CONSTRAINT "api_keys_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "concepts" ADD CONSTRAINT "concepts_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "concepts" ADD CONSTRAINT "concepts_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "concepts" ADD CONSTRAINT "concepts_source_idea_id_fkey" FOREIGN KEY ("source_idea_id") REFERENCES "ideas"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "concept_team_members" ADD CONSTRAINT "concept_team_members_concept_id_fkey" FOREIGN KEY ("concept_id") REFERENCES "concepts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "concept_team_members" ADD CONSTRAINT "concept_team_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "concept_decisions" ADD CONSTRAINT "concept_decisions_concept_id_fkey" FOREIGN KEY ("concept_id") REFERENCES "concepts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "consensus_notes" ADD CONSTRAINT "consensus_notes_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "evaluation_sessions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "consensus_notes" ADD CONSTRAINT "consensus_notes_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "submission_definitions" ADD CONSTRAINT "submission_definitions_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "campaigns"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "submission_definitions" ADD CONSTRAINT "submission_definitions_created_by_id_fkey" FOREIGN KEY ("created_by_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "submission_fields" ADD CONSTRAINT "submission_fields_definition_id_fkey" FOREIGN KEY ("definition_id") REFERENCES "submission_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "generic_submissions" ADD CONSTRAINT "generic_submissions_definition_id_fkey" FOREIGN KEY ("definition_id") REFERENCES "submission_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "generic_submissions" ADD CONSTRAINT "generic_submissions_submitted_by_id_fkey" FOREIGN KEY ("submitted_by_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "generic_submissions" ADD CONSTRAINT "generic_submissions_reviewed_by_id_fkey" FOREIGN KEY ("reviewed_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "submission_field_values" ADD CONSTRAINT "submission_field_values_submission_id_fkey" FOREIGN KEY ("submission_id") REFERENCES "generic_submissions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "submission_field_values" ADD CONSTRAINT "submission_field_values_field_id_fkey" FOREIGN KEY ("field_id") REFERENCES "submission_fields"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "two_factor_auth" ADD CONSTRAINT "two_factor_auth_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
