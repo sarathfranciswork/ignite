@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { trpc } from "@/lib/trpc";
 import { TEMPLATE_VARIABLES } from "@/server/services/notification-template.schemas";
 
@@ -345,7 +346,9 @@ export default function NotificationTemplatesPage() {
                   </p>
                   <div
                     className="mt-2 rounded border border-gray-100 bg-gray-50 p-3 text-sm"
-                    dangerouslySetInnerHTML={{ __html: previewContent.body ?? "" }}
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeHtml(previewContent.body ?? ""),
+                    }}
                   />
                 </div>
               )}
