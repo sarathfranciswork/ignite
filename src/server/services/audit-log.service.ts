@@ -28,6 +28,47 @@ interface CreateAuditLogEntry {
   metadata?: Record<string, unknown>;
 }
 
+function escapeCsvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function buildAuditLogWhereClause(input: {
+  actorId?: string;
+  action?: string;
+  entity?: string;
+  entityId?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}): Prisma.AuditLogWhereInput {
+  const where: Prisma.AuditLogWhereInput = {};
+
+  if (input.actorId) where.actorId = input.actorId;
+  if (input.action) where.action = input.action;
+  if (input.entity) where.entity = input.entity;
+  if (input.entityId) where.entityId = input.entityId;
+
+  if (input.search) {
+    where.OR = [
+      { action: { contains: input.search, mode: "insensitive" } },
+      { entity: { contains: input.search, mode: "insensitive" } },
+      { actorEmail: { contains: input.search, mode: "insensitive" } },
+    ];
+  }
+
+  if (input.startDate || input.endDate) {
+    const dateFilter: Record<string, Date> = {};
+    if (input.startDate) dateFilter.gte = new Date(input.startDate);
+    if (input.endDate) dateFilter.lte = new Date(input.endDate);
+    where.createdAt = dateFilter;
+  }
+
+  return where;
+}
+
 export async function createAuditLogEntry(entry: CreateAuditLogEntry): Promise<void> {
   try {
     await prisma.auditLog.create({
@@ -49,42 +90,7 @@ export async function createAuditLogEntry(entry: CreateAuditLogEntry): Promise<v
 
 export async function listAuditLogs(input: AuditLogListInput) {
   const limit = input.limit ?? 50;
-  const where: Record<string, unknown> = {};
-
-  if (input.actorId) {
-    where.actorId = input.actorId;
-  }
-
-  if (input.action) {
-    where.action = input.action;
-  }
-
-  if (input.entity) {
-    where.entity = input.entity;
-  }
-
-  if (input.entityId) {
-    where.entityId = input.entityId;
-  }
-
-  if (input.search) {
-    where.OR = [
-      { action: { contains: input.search, mode: "insensitive" } },
-      { entity: { contains: input.search, mode: "insensitive" } },
-      { actorEmail: { contains: input.search, mode: "insensitive" } },
-    ];
-  }
-
-  if (input.startDate || input.endDate) {
-    const dateFilter: Record<string, Date> = {};
-    if (input.startDate) dateFilter.gte = new Date(input.startDate);
-    if (input.endDate) dateFilter.lte = new Date(input.endDate);
-    where.createdAt = dateFilter;
-  }
-
-  if (input.cursor) {
-    where.id = undefined;
-  }
+  const where = buildAuditLogWhereClause(input);
 
   const items = await prisma.auditLog.findMany({
     where,
@@ -115,27 +121,7 @@ export async function getAuditLogById(id: string) {
 }
 
 export async function exportAuditLogs(input: AuditLogExportInput) {
-  const where: Record<string, unknown> = {};
-
-  if (input.actorId) where.actorId = input.actorId;
-  if (input.action) where.action = input.action;
-  if (input.entity) where.entity = input.entity;
-  if (input.entityId) where.entityId = input.entityId;
-
-  if (input.search) {
-    where.OR = [
-      { action: { contains: input.search, mode: "insensitive" } },
-      { entity: { contains: input.search, mode: "insensitive" } },
-      { actorEmail: { contains: input.search, mode: "insensitive" } },
-    ];
-  }
-
-  if (input.startDate || input.endDate) {
-    const dateFilter: Record<string, Date> = {};
-    if (input.startDate) dateFilter.gte = new Date(input.startDate);
-    if (input.endDate) dateFilter.lte = new Date(input.endDate);
-    where.createdAt = dateFilter;
-  }
+  const where = buildAuditLogWhereClause(input);
 
   const entries = await prisma.auditLog.findMany({
     where,
@@ -174,7 +160,10 @@ export async function exportAuditLogs(input: AuditLogExportInput) {
     entry.ipAddress ?? "",
   ]);
 
-  const csvContent = [csvHeaders.join(","), ...csvRows.map((row) => row.join(","))].join("\n");
+  const csvContent = [
+    csvHeaders.map(escapeCsvField).join(","),
+    ...csvRows.map((row) => row.map(escapeCsvField).join(",")),
+  ].join("\n");
 
   return {
     format: "csv" as const,
