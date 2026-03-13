@@ -658,6 +658,8 @@ model Idea {
   pairwiseAsIdeaB        PairwiseComparison[]      @relation("PairwiseIdeaB")
   sourceForProjects      Project[]                 @relation("ProjectSourceIdea")
   sourceForConcepts      Concept[]                 @relation("ConceptSourceIdea")
+  predictiveScores       PredictiveScore[]
+  autoTags               AutoTag[]
 
   @@index([campaignId])
   @@index([contributorId])
@@ -854,10 +856,11 @@ model Organization {
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
 
-  managers           OrganizationManager[]
-  contacts           Contact[]
-  useCases           UseCaseOrganization[]
-  scoutingBoardCards ScoutingBoardCard[]
+  managers                OrganizationManager[]
+  contacts                Contact[]
+  useCases                UseCaseOrganization[]
+  scoutingBoardCards      ScoutingBoardCard[]
+  scoutingRecommendations ScoutingRecommendation[] @relation("ScoutingRecommendationOrg")
 
   @@index([relationshipStatus])
   @@index([name])
@@ -1715,11 +1718,12 @@ model StrategicInnovationArea {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  createdBy     User              @relation("SiaCreatedBy", fields: [createdById], references: [id])
-  campaigns     Campaign[]        @relation("CampaignSia")
-  campaignLinks CampaignSiaLink[] @relation("CampaignSiaLinks")
-  trends        TrendSiaLink[]
-  technologies  TechSiaLink[]
+  createdBy               User                     @relation("SiaCreatedBy", fields: [createdById], references: [id])
+  campaigns               Campaign[]               @relation("CampaignSia")
+  campaignLinks           CampaignSiaLink[]        @relation("CampaignSiaLinks")
+  trends                  TrendSiaLink[]
+  technologies            TechSiaLink[]
+  scoutingRecommendations ScoutingRecommendation[]
 
   @@index([isActive])
   @@index([createdById])
@@ -3050,4 +3054,72 @@ model TranslationConfig {
 
   @@index([spaceId])
   @@map("translation_configs")
+}
+
+// ── AI Predictive Scoring & Scouting ────────────────────────
+
+enum AutoTagSource {
+  AI_CATEGORIZATION
+  AI_EXTRACTION
+
+  @@map("auto_tag_source")
+}
+
+model PredictiveScore {
+  id               String   @id @default(cuid())
+  ideaId           String   @map("idea_id")
+  overallScore     Float    @map("overall_score")
+  feasibilityScore Float    @map("feasibility_score")
+  impactScore      Float    @map("impact_score")
+  alignmentScore   Float    @map("alignment_score")
+  confidenceLevel  Float    @map("confidence_level")
+  reasoning        String   @db.Text
+  modelVersion     String   @map("model_version")
+  scoredAt         DateTime @default(now()) @map("scored_at")
+
+  idea Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([ideaId])
+  @@index([ideaId, scoredAt(sort: Desc)])
+  @@index([overallScore(sort: Desc)])
+  @@map("predictive_scores")
+}
+
+model AutoTag {
+  id         String        @id @default(cuid())
+  ideaId     String        @map("idea_id")
+  tag        String
+  confidence Float
+  source     AutoTagSource
+  isAccepted Boolean?      @map("is_accepted")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  idea Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+
+  @@index([ideaId])
+  @@index([ideaId, source])
+  @@index([tag])
+  @@map("auto_tags")
+}
+
+model ScoutingRecommendation {
+  id             String   @id @default(cuid())
+  siaId          String   @map("sia_id")
+  organizationId String?  @map("organization_id")
+  title          String
+  description    String   @db.Text
+  relevanceScore Float    @map("relevance_score")
+  reasoning      String   @db.Text
+  source         String
+  isDismissed    Boolean  @default(false) @map("is_dismissed")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sia          StrategicInnovationArea @relation(fields: [siaId], references: [id], onDelete: Cascade)
+  organization Organization?           @relation("ScoutingRecommendationOrg", fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([siaId])
+  @@index([siaId, relevanceScore(sort: Desc)])
+  @@index([organizationId])
+  @@index([isDismissed])
+  @@map("scouting_recommendations")
 }

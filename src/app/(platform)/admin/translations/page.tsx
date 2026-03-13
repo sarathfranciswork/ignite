@@ -230,8 +230,8 @@ export default function TranslationsPage() {
                 <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
                   <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
                   <p className="text-xs text-amber-700">
-                    Translation API requests are rate-limited to{" "}
-                    <strong>{watchMaxRequests}</strong> requests per hour per space.
+                    Translation API requests are rate-limited to <strong>{watchMaxRequests}</strong>{" "}
+                    requests per hour per space.
                   </p>
                 </div>
               </>

@@ -4,6 +4,7 @@ import { adhocEvaluationRouter } from "./adhoc-evaluation";
 import { auditLogRouter } from "./audit-log";
 import { adminRouter } from "./admin";
 import { aiRouter } from "./ai";
+import { aiInsightsRouter } from "./ai-insights";
 import { apiKeyRouter } from "./api-key";
 import { authRouter } from "./auth";
 import { biConnectorRouter } from "./bi-connector";
@@ -58,6 +59,7 @@ export const appRouter = createTRPCRouter({
   auditLog: auditLogRouter,
   admin: adminRouter,
   ai: aiRouter,
+  aiInsights: aiInsightsRouter,
   apiKey: apiKeyRouter,
   auth: authRouter,
   biConnector: biConnectorRouter,

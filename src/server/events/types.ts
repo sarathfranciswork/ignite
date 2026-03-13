@@ -273,6 +273,13 @@ export interface EventMap {
   "perspective.removed": EventPayload;
   "translation.created": EventPayload;
   "translation.updated": EventPayload;
+  "ai.ideaScored": EventPayload;
+  "ai.ideaCategorized": EventPayload;
+  "ai.recommendationGenerated": EventPayload;
+  "ai.tagAccepted": EventPayload;
+  "ai.tagRejected": EventPayload;
+  "ai.recommendationDismissed": EventPayload;
+  "ai.recommendationLinked": EventPayload;
 }
 
 export type EventName = keyof EventMap;
