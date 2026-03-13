@@ -148,7 +148,7 @@ export const aiInsightsRouter = createTRPCRouter({
     }),
 
   batchCategorize: protectedProcedure
-    .use(requirePermission(Action.AI_BATCH_SCORE))
+    .use(requirePermission(Action.AI_CATEGORIZE))
     .input(batchCategorizeInput)
     .mutation(async ({ ctx, input }) => {
       try {
