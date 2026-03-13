@@ -104,6 +104,8 @@ model User {
   createdTeamsIntegrations   TeamsIntegration[]          @relation("TeamsIntegrationCreatedBy")
   createdSlackIntegrations   SlackIntegration[]          @relation("SlackIntegrationCreatedBy")
   createdExternalSyncs       ExternalSync[]              @relation("ExternalSyncCreatedBy")
+  gdprRequests               GdprRequest[]               @relation("UserGdprRequests")
+  createdIpWhitelists        IpWhitelist[]               @relation("IpWhitelistCreatedBy")
 
   @@map("users")
 }
@@ -304,7 +306,9 @@ model InnovationSpace {
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
   memberships   InnovationSpaceMembership[]
-  externalSyncs ExternalSync[]              @relation("SpaceExternalSyncs")
+  externalSyncs       ExternalSync[]              @relation("SpaceExternalSyncs")
+  dataResidencyConfig DataResidencyConfig?        @relation("SpaceDataResidency")
+  ipWhitelists        IpWhitelist[]               @relation("SpaceIpWhitelist")
 
   @@index([status])
   @@index([slug])
@@ -2798,4 +2802,82 @@ model SyncedItem {
   @@index([entityType, entityId])
   @@index([syncStatus])
   @@map("synced_items")
+}
+
+// ── Compliance: Data Residency, GDPR, IP Whitelisting ─────────
+
+enum DataRegion {
+  US
+  EU
+  APAC
+
+  @@map("data_region")
+}
+
+enum GdprRequestType {
+  DATA_EXPORT
+  DATA_ERASURE
+  DATA_RECTIFICATION
+
+  @@map("gdpr_request_type")
+}
+
+enum GdprRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("gdpr_request_status")
+}
+
+model DataResidencyConfig {
+  id                String     @id @default(cuid())
+  spaceId           String     @unique @map("space_id")
+  region            DataRegion @default(US)
+  dataRetentionDays Int        @default(365) @map("data_retention_days")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  space InnovationSpace @relation("SpaceDataResidency", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@map("data_residency_configs")
+}
+
+model GdprRequest {
+  id          String            @id @default(cuid())
+  userId      String            @map("user_id")
+  requestType GdprRequestType   @map("request_type")
+  status      GdprRequestStatus @default(PENDING)
+  requestedAt DateTime          @default(now()) @map("requested_at")
+  completedAt DateTime?         @map("completed_at")
+  resultUrl   String?           @map("result_url") @db.Text
+  notes       String?           @db.Text
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  user User @relation("UserGdprRequests", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([requestType])
+  @@map("gdpr_requests")
+}
+
+model IpWhitelist {
+  id          String   @id @default(cuid())
+  spaceId     String   @map("space_id")
+  cidr        String
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  space     InnovationSpace @relation("SpaceIpWhitelist", fields: [spaceId], references: [id], onDelete: Cascade)
+  createdBy User            @relation("IpWhitelistCreatedBy", fields: [createdById], references: [id])
+
+  @@index([spaceId])
+  @@index([createdById])
+  @@index([isActive])
+  @@map("ip_whitelists")
 }

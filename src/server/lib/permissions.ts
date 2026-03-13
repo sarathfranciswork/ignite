@@ -270,6 +270,16 @@ export const Action = {
   EXTERNAL_SYNC_DELETE: "externalSync.delete",
   EXTERNAL_SYNC_EXECUTE: "externalSync.execute",
 
+  // Compliance (GDPR, Data Residency, IP Whitelist)
+  COMPLIANCE_GDPR_REQUEST: "compliance.gdpr.request",
+  COMPLIANCE_GDPR_MANAGE: "compliance.gdpr.manage",
+  COMPLIANCE_GDPR_LIST: "compliance.gdpr.list",
+  COMPLIANCE_RESIDENCY_CONFIGURE: "compliance.residency.configure",
+  COMPLIANCE_RESIDENCY_READ: "compliance.residency.read",
+  COMPLIANCE_IP_WHITELIST_CREATE: "compliance.ipWhitelist.create",
+  COMPLIANCE_IP_WHITELIST_READ: "compliance.ipWhitelist.read",
+  COMPLIANCE_IP_WHITELIST_DELETE: "compliance.ipWhitelist.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -462,6 +472,14 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.EXTERNAL_SYNC_UPDATE,
     Action.EXTERNAL_SYNC_DELETE,
     Action.EXTERNAL_SYNC_EXECUTE,
+    Action.COMPLIANCE_GDPR_REQUEST,
+    Action.COMPLIANCE_GDPR_MANAGE,
+    Action.COMPLIANCE_GDPR_LIST,
+    Action.COMPLIANCE_RESIDENCY_CONFIGURE,
+    Action.COMPLIANCE_RESIDENCY_READ,
+    Action.COMPLIANCE_IP_WHITELIST_CREATE,
+    Action.COMPLIANCE_IP_WHITELIST_READ,
+    Action.COMPLIANCE_IP_WHITELIST_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -521,6 +539,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.TWO_FACTOR_DISABLE,
     Action.SESSION_LIST_OWN,
     Action.SESSION_TERMINATE_OWN,
+    Action.COMPLIANCE_GDPR_REQUEST,
+    Action.COMPLIANCE_GDPR_LIST,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,
