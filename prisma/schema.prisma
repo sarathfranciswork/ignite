@@ -107,6 +107,7 @@ model User {
   gdprRequests               GdprRequest[]               @relation("UserGdprRequests")
   createdIpWhitelists        IpWhitelist[]               @relation("IpWhitelistCreatedBy")
   createdBiConnectors        BiConnector[]               @relation("BiConnectorCreatedBy")
+  gamificationScores         UserScore[]
 
   @@map("users")
 }
@@ -441,6 +442,8 @@ model Campaign {
   submissionDefinitions SubmissionDefinition[]
   teamsIntegrations     TeamsIntegration[]       @relation("CampaignTeamsIntegrations")
   slackIntegrations     SlackIntegration[]       @relation("CampaignSlackIntegrations")
+  gamificationConfig    GamificationConfig?
+  userScores            UserScore[]
 
   @@index([status])
   @@index([submissionType])
@@ -760,11 +763,12 @@ model Comment {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  idea     Idea             @relation(fields: [ideaId], references: [id], onDelete: Cascade)
-  author   User             @relation("CommentAuthor", fields: [authorId], references: [id])
-  parent   Comment?         @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  Comment[]        @relation("CommentThread")
-  mentions CommentMention[]
+  idea        Idea                   @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  author      User                   @relation("CommentAuthor", fields: [authorId], references: [id])
+  parent      Comment?               @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[]              @relation("CommentThread")
+  mentions    CommentMention[]
+  perspective DiscussionPerspective?
 
   @@index([ideaId])
   @@index([authorId])
@@ -2914,4 +2918,69 @@ model BiConnector {
   @@index([provider])
   @@index([isActive])
   @@map("bi_connectors")
+}
+
+// ── Gamification Models ──────────────────────────────────────
+
+model GamificationConfig {
+  id               String   @id @default(cuid())
+  campaignId       String   @unique @map("campaign_id")
+  isActive         Boolean  @default(false) @map("is_active")
+  ideaWeight       Int      @default(5) @map("idea_weight")
+  commentWeight    Int      @default(3) @map("comment_weight")
+  likeWeight       Int      @default(1) @map("like_weight")
+  evaluationWeight Int      @default(4) @map("evaluation_weight")
+  showLeaderboard  Boolean  @default(true) @map("show_leaderboard")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("gamification_configs")
+}
+
+model UserScore {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  campaignId       String   @map("campaign_id")
+  totalScore       Int      @default(0) @map("total_score")
+  ideasCount       Int      @default(0) @map("ideas_count")
+  commentsCount    Int      @default(0) @map("comments_count")
+  likesCount       Int      @default(0) @map("likes_count")
+  evaluationsCount Int      @default(0) @map("evaluations_count")
+  rank             Int?
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, campaignId])
+  @@index([campaignId, totalScore(sort: Desc)])
+  @@index([userId])
+  @@map("user_scores")
+}
+
+// ── Discussion Perspectives (Six Thinking Hats) ──────────────
+
+enum ThinkingHatPerspective {
+  WHITE_FACTS
+  RED_EMOTION
+  BLACK_CAUTION
+  YELLOW_OPTIMISM
+  GREEN_CREATIVITY
+  BLUE_PROCESS
+
+  @@map("thinking_hat_perspective")
+}
+
+model DiscussionPerspective {
+  id          String                 @id @default(cuid())
+  commentId   String                 @unique @map("comment_id")
+  perspective ThinkingHatPerspective
+  createdAt   DateTime               @default(now()) @map("created_at")
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([perspective])
+  @@map("discussion_perspectives")
 }

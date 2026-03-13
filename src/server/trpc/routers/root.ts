@@ -22,6 +22,7 @@ import { externalInvitationRouter } from "./external-invitation";
 import { evaluationRouter } from "./evaluation";
 import { exportRouter } from "./export";
 import { externalSyncRouter } from "./external-sync";
+import { gamificationRouter } from "./gamification";
 import { ideaRouter } from "./idea";
 import { insightRouter } from "./insight";
 import { notificationRouter } from "./notification";
@@ -74,6 +75,7 @@ export const appRouter = createTRPCRouter({
   export: exportRouter,
   externalInvitation: externalInvitationRouter,
   externalSync: externalSyncRouter,
+  gamification: gamificationRouter,
   idea: ideaRouter,
   insight: insightRouter,
   notification: notificationRouter,

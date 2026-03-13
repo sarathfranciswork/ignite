@@ -286,6 +286,12 @@ export const Action = {
   BI_CONNECTOR_UPDATE: "biConnector.update",
   BI_CONNECTOR_DELETE: "biConnector.delete",
 
+  // Gamification
+  GAMIFICATION_CONFIGURE: "gamification.configure",
+  GAMIFICATION_READ: "gamification.read",
+  GAMIFICATION_RECALCULATE: "gamification.recalculate",
+  GAMIFICATION_SET_PERSPECTIVE: "gamification.setPerspective",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -490,6 +496,9 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.BI_CONNECTOR_READ,
     Action.BI_CONNECTOR_UPDATE,
     Action.BI_CONNECTOR_DELETE,
+    Action.GAMIFICATION_CONFIGURE,
+    Action.GAMIFICATION_READ,
+    Action.GAMIFICATION_SET_PERSPECTIVE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -552,6 +561,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.COMPLIANCE_GDPR_REQUEST,
     Action.COMPLIANCE_GDPR_LIST,
     Action.BI_CONNECTOR_READ,
+    Action.GAMIFICATION_READ,
+    Action.GAMIFICATION_SET_PERSPECTIVE,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,
@@ -614,6 +625,9 @@ export const RESOURCE_ROLE_PERMISSIONS: Record<ResourceRoleName, readonly Action
     Action.COMMUNICATION_READ,
     Action.COMMUNICATION_SEND,
     Action.COMMUNICATION_DELETE,
+    Action.GAMIFICATION_CONFIGURE,
+    Action.GAMIFICATION_READ,
+    Action.GAMIFICATION_SET_PERSPECTIVE,
   ],
   CAMPAIGN_COACH: [
     Action.CAMPAIGN_READ,

@@ -266,6 +266,11 @@ export interface EventMap {
   "ipWhitelist.updated": EventPayload;
   "biConnector.configured": EventPayload;
   "biConnector.refreshed": EventPayload;
+  "gamification.scoreUpdated": EventPayload;
+  "gamification.leaderboardChanged": EventPayload;
+  "gamification.configured": EventPayload;
+  "perspective.set": EventPayload;
+  "perspective.removed": EventPayload;
 }
 
 export type EventName = keyof EventMap;

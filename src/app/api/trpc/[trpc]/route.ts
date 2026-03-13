@@ -9,6 +9,7 @@ import { registerPushListeners } from "@/server/events/listeners/push.listener";
 import { registerAuditLogListeners } from "@/server/events/listeners/audit-log.listener";
 import { registerSlackListeners } from "@/server/events/listeners/slack.listener";
 import { registerTeamsListeners } from "@/server/events/listeners/teams.listener";
+import { registerGamificationListeners } from "@/server/events/listeners/gamification.listener";
 import { initializeJobWorkers } from "@/server/jobs/init";
 
 registerNotificationListeners();
@@ -19,6 +20,7 @@ registerPushListeners();
 registerAuditLogListeners();
 registerSlackListeners();
 registerTeamsListeners();
+registerGamificationListeners();
 initializeJobWorkers().catch(() => {
   // Initialization errors are logged internally — non-blocking
 });
