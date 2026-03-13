@@ -99,6 +99,7 @@ export const Action = {
   ORGANIZATION_MANAGE_CONTACTS: "organization.manageContacts",
   ORGANIZATION_SET_CONFIDENTIAL: "organization.setConfidential",
   ORGANIZATION_READ_CONFIDENTIAL: "organization.readConfidential",
+  ORGANIZATION_IMPORT: "organization.import",
 
   // Search
   SEARCH_GLOBAL: "search.global",
@@ -325,6 +326,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.ORGANIZATION_MANAGE_CONTACTS,
     Action.ORGANIZATION_SET_CONFIDENTIAL,
     Action.ORGANIZATION_READ_CONFIDENTIAL,
+    Action.ORGANIZATION_IMPORT,
     Action.SCOUTING_BOARD_CREATE,
     Action.SCOUTING_BOARD_READ,
     Action.SCOUTING_BOARD_UPDATE,

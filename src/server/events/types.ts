@@ -241,6 +241,8 @@ export interface EventMap {
   "genericSubmission.submitted": EventPayload;
   "genericSubmission.reviewed": EventPayload;
   "genericSubmission.deleted": EventPayload;
+  "organization.imported": EventPayload;
+  "organization.batchImported": EventPayload;
   "report.exported": EventPayload;
   "twoFactor.enabled": EventPayload;
   "twoFactor.disabled": EventPayload;
