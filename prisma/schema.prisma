@@ -108,6 +108,7 @@ model User {
   createdIpWhitelists        IpWhitelist[]               @relation("IpWhitelistCreatedBy")
   createdBiConnectors        BiConnector[]               @relation("BiConnectorCreatedBy")
   gamificationScores         UserScore[]
+  contentTranslations        ContentTranslation[]        @relation("ContentTranslationTranslatedBy")
 
   @@map("users")
 }
@@ -312,6 +313,7 @@ model InnovationSpace {
   dataResidencyConfig DataResidencyConfig?        @relation("SpaceDataResidency")
   ipWhitelists        IpWhitelist[]               @relation("SpaceIpWhitelist")
   biConnectors        BiConnector[]               @relation("SpaceBiConnectors")
+  translationConfig   TranslationConfig?          @relation("SpaceTranslationConfig")
 
   @@index([status])
   @@index([slug])
@@ -2983,4 +2985,69 @@ model DiscussionPerspective {
 
   @@index([perspective])
   @@map("discussion_perspectives")
+}
+
+// ── Translation Models ───────────────────────────────────────
+
+enum TranslationEntityType {
+  IDEA
+  CAMPAIGN
+  COMMENT
+
+  @@map("translation_entity_type")
+}
+
+enum TranslationSource {
+  MANUAL
+  DEEPL
+  GOOGLE
+
+  @@map("translation_source")
+}
+
+enum TranslationProvider {
+  NONE
+  DEEPL
+  GOOGLE
+
+  @@map("translation_provider")
+}
+
+model ContentTranslation {
+  id             String                @id @default(cuid())
+  entityType     TranslationEntityType @map("entity_type")
+  entityId       String                @map("entity_id")
+  field          String
+  locale         String
+  translatedText String                @map("translated_text") @db.Text
+  source         TranslationSource     @default(MANUAL)
+  translatedById String?               @map("translated_by_id")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  translatedBy User? @relation("ContentTranslationTranslatedBy", fields: [translatedById], references: [id], onDelete: SetNull)
+
+  @@unique([entityType, entityId, field, locale])
+  @@index([entityType, entityId])
+  @@index([locale])
+  @@index([translatedById])
+  @@map("content_translations")
+}
+
+model TranslationConfig {
+  id                    String              @id @default(cuid())
+  spaceId               String              @unique @map("space_id")
+  defaultLocale         String              @default("en") @map("default_locale")
+  enabledLocales        String[]            @default(["en"]) @map("enabled_locales")
+  autoTranslateProvider TranslationProvider @default(NONE) @map("auto_translate_provider")
+  apiKeyEncrypted       String?             @map("api_key_encrypted") @db.Text
+  fallbackChain         Json                @default("{}") @map("fallback_chain")
+  maxRequestsPerHour    Int                 @default(100) @map("max_requests_per_hour")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+
+  space InnovationSpace @relation("SpaceTranslationConfig", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+  @@map("translation_configs")
 }
