@@ -52,7 +52,22 @@ export const exportEvaluationResultsInput = z.object({
   evaluationSessionId: z.string().cuid().optional(),
 });
 
+export const exportPartneringReportInput = z.object({
+  organizationIds: z.array(z.string().cuid()).optional(),
+  relationshipStatus: z
+    .enum(["IDENTIFIED", "VERIFIED", "QUALIFIED", "EVALUATION", "PILOT", "PARTNERSHIP", "ARCHIVED"])
+    .optional(),
+  dateRange: z
+    .object({
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+    })
+    .optional(),
+  includeUseCasePipeline: z.boolean().default(true),
+});
+
 export type ExportCampaignReportInput = z.infer<typeof exportCampaignReportInput>;
 export type ExportPlatformReportInput = z.infer<typeof exportPlatformReportInput>;
 export type ExportIdeaListInput = z.infer<typeof exportIdeaListInput>;
 export type ExportEvaluationResultsInput = z.infer<typeof exportEvaluationResultsInput>;
+export type ExportPartneringReportInput = z.infer<typeof exportPartneringReportInput>;
