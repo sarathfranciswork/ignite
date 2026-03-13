@@ -1,19 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { Settings, RotateCcw, Trash2 } from "lucide-react";
-
-interface GamificationConfigFormProps {
-  campaignId: string;
-  initialConfig?: {
-    isActive: boolean;
-    ideaWeight: number;
-    commentWeight: number;
-    likeWeight: number;
-    evaluationWeight: number;
-    showLeaderboard: boolean;
-  } | null;
-}
 
 function WeightInput({
   label,
@@ -42,16 +31,16 @@ function WeightInput({
   );
 }
 
-export default function GamificationConfigPage({
-  campaignId,
-  initialConfig,
-}: GamificationConfigFormProps) {
-  const [isActive, setIsActive] = useState(initialConfig?.isActive ?? false);
-  const [ideaWeight, setIdeaWeight] = useState(initialConfig?.ideaWeight ?? 5);
-  const [commentWeight, setCommentWeight] = useState(initialConfig?.commentWeight ?? 3);
-  const [likeWeight, setLikeWeight] = useState(initialConfig?.likeWeight ?? 1);
-  const [evaluationWeight, setEvaluationWeight] = useState(initialConfig?.evaluationWeight ?? 4);
-  const [showLeaderboard, setShowLeaderboard] = useState(initialConfig?.showLeaderboard ?? true);
+export default function GamificationConfigPage() {
+  const params = useParams<{ id: string }>();
+  const campaignId = params.id;
+
+  const [isActive, setIsActive] = useState(false);
+  const [ideaWeight, setIdeaWeight] = useState(5);
+  const [commentWeight, setCommentWeight] = useState(3);
+  const [likeWeight, setLikeWeight] = useState(1);
+  const [evaluationWeight, setEvaluationWeight] = useState(4);
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
