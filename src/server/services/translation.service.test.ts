@@ -54,8 +54,34 @@ vi.mock("./translation-provider", () => ({
   })),
 }));
 
+vi.mock("@/server/lib/redis", () => {
+  const store = new Map<string, { value: string; expiresAt: number }>();
+  return {
+    cacheGet: vi.fn(async (key: string) => {
+      const entry = store.get(key);
+      if (!entry || entry.expiresAt <= Date.now()) {
+        store.delete(key);
+        return null;
+      }
+      return entry.value;
+    }),
+    cacheSet: vi.fn(async (key: string, value: string, ttl: number) => {
+      store.set(key, { value, expiresAt: Date.now() + ttl * 1000 });
+    }),
+    cacheDel: vi.fn(),
+    cacheDelPattern: vi.fn(),
+    clearMemoryCache: vi.fn(() => store.clear()),
+  };
+});
+
+vi.mock("@/server/lib/encryption", () => ({
+  encrypt: vi.fn((val: string) => `encrypted:${val}`),
+  decrypt: vi.fn((val: string) => val.replace("encrypted:", "")),
+}));
+
 const { prisma } = await import("@/server/lib/prisma");
 const { eventBus } = await import("@/server/events/event-bus");
+const { clearMemoryCache } = await import("@/server/lib/redis");
 
 const mockTranslation = {
   id: "trans-1",
@@ -86,6 +112,7 @@ const mockConfig = {
 describe("TranslationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (clearMemoryCache as Mock)();
   });
 
   describe("translateContent", () => {

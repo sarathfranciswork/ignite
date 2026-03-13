@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { trpc } from "@/lib/trpc";
-import { Globe, Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import type { TranslationConfigureInput } from "@/server/services/translation.schemas";
 
 const LOCALES = [
   { code: "en", label: "English" },
@@ -35,13 +36,33 @@ interface TranslationConfigData {
   maxRequestsPerHour: number;
 }
 
+function TranslationsPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="h-7 w-48 animate-pulse rounded bg-gray-200" />
+        <div className="mt-2 h-4 w-80 animate-pulse rounded bg-gray-100" />
+      </div>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
+          <div className="mt-2 h-4 w-64 animate-pulse rounded bg-gray-100" />
+          <div className="mt-3 h-10 w-48 animate-pulse rounded bg-gray-100" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TranslationsPage() {
-  const defaultSpaceId = "default";
+  const spaces = trpc.space.list.useQuery({ limit: 1 }, { select: (data) => data.items });
+  const spaceId = spaces.data?.[0]?.id ?? "";
 
   const configProcedure = trpc.translation.getConfig;
-  const { data: config, isLoading } = configProcedure.useQuery({
-    spaceId: defaultSpaceId,
-  });
+  const { data: config, isLoading: isConfigLoading } = configProcedure.useQuery(
+    { spaceId },
+    { enabled: !!spaceId },
+  );
 
   const [formData, setFormData] = React.useState<TranslationConfigData>({
     defaultLocale: "en",
@@ -77,19 +98,16 @@ export default function TranslationsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload: Record<string, unknown> = {
-      spaceId: defaultSpaceId,
+    const payload: TranslationConfigureInput = {
+      spaceId,
       defaultLocale: formData.defaultLocale,
       enabledLocales: formData.enabledLocales,
-      autoTranslateProvider: formData.autoTranslateProvider,
+      autoTranslateProvider: formData.autoTranslateProvider as "NONE" | "DEEPL" | "GOOGLE",
       maxRequestsPerHour: formData.maxRequestsPerHour,
+      ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
     };
 
-    if (formData.apiKey) {
-      payload.apiKey = formData.apiKey;
-    }
-
-    configureMutation.mutate(payload as Parameters<typeof configureMutation.mutate>[0]);
+    configureMutation.mutate(payload);
   };
 
   const toggleLocale = (code: string) => {
@@ -103,13 +121,8 @@ export default function TranslationsPage() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Globe className="h-5 w-5 animate-spin text-gray-400" />
-        <span className="ml-2 text-sm text-gray-500">Loading translation settings...</span>
-      </div>
-    );
+  if (spaces.isLoading || isConfigLoading) {
+    return <TranslationsPageSkeleton />;
   }
 
   return (

@@ -95,10 +95,12 @@ export class GoogleTranslateAdapter implements TranslationProviderAdapter {
       "Sending batch translation request to Google Translate",
     );
 
-    const url = `${this.baseUrl}?key=${this.apiKey}`;
-    const response = await fetch(url, {
+    const response = await fetch(this.baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": this.apiKey,
+      },
       body: JSON.stringify(body),
     });
 
