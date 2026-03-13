@@ -29,6 +29,7 @@ import { projectRouter } from "./project";
 import { pushRouter } from "./push";
 import { reportRouter } from "./report";
 import { searchRouter } from "./search";
+import { securityRouter } from "./security";
 import { spaceRouter } from "./space";
 import { submissionRouter } from "./submission";
 import { ssoRouter } from "./sso";
@@ -73,6 +74,7 @@ export const appRouter = createTRPCRouter({
   push: pushRouter,
   report: reportRouter,
   search: searchRouter,
+  security: securityRouter,
   scoutingBoard: scoutingBoardRouter,
   scoutingMission: scoutingMissionRouter,
   sia: siaRouter,

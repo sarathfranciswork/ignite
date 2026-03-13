@@ -57,6 +57,21 @@ export const authConfig: NextAuthConfig = {
 
       const user = auth?.user;
       const role = user && "globalRole" in user ? user.globalRole : undefined;
+      const twoFactorPending =
+        user && "twoFactorPending" in user ? user.twoFactorPending : undefined;
+
+      // Users with pending 2FA can only access the verification page
+      if (twoFactorPending === true) {
+        if (!pathname.startsWith("/verify-2fa")) {
+          return Response.redirect(new URL("/verify-2fa", nextUrl.origin));
+        }
+        return true;
+      }
+
+      // Prevent verified users from accessing the 2FA verification page
+      if (pathname.startsWith("/verify-2fa")) {
+        return Response.redirect(new URL("/dashboard", nextUrl.origin));
+      }
 
       // Admin routes require PLATFORM_ADMIN or INNOVATION_MANAGER role
       if (pathname.startsWith("/admin")) {

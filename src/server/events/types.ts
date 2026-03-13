@@ -242,6 +242,11 @@ export interface EventMap {
   "genericSubmission.reviewed": EventPayload;
   "genericSubmission.deleted": EventPayload;
   "report.exported": EventPayload;
+  "twoFactor.enabled": EventPayload;
+  "twoFactor.disabled": EventPayload;
+  "twoFactor.backupCodesRegenerated": EventPayload;
+  "session.terminated": EventPayload;
+  "session.allTerminated": EventPayload;
 }
 
 export type EventName = keyof EventMap;

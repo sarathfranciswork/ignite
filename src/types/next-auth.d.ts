@@ -9,6 +9,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       globalRole?: GlobalRole;
+      twoFactorPending?: boolean;
     };
   }
 }
@@ -17,5 +18,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     globalRole?: GlobalRole;
+    twoFactorPending?: boolean;
   }
 }
