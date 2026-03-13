@@ -41,8 +41,15 @@ vi.mock("@/server/events/event-bus", () => ({
   },
 }));
 
+vi.mock("@/server/lib/env", () => ({
+  env: {
+    TOTP_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  },
+}));
+
 const { prisma } = await import("@/server/lib/prisma");
 const { eventBus } = await import("@/server/events/event-bus");
+const envModule = (await import("@/server/lib/env")) as { env: Record<string, string | undefined> };
 
 const userFindUnique = prisma.user.findUnique as unknown as Mock;
 const prismaMock = prisma as unknown as Record<string, Record<string, Mock>>;
@@ -117,7 +124,8 @@ describe("totp.service", () => {
     });
 
     it("throws ENCRYPTION_KEY_MISSING without encryption key", async () => {
-      delete process.env.TOTP_ENCRYPTION_KEY;
+      const originalKey = envModule.env.TOTP_ENCRYPTION_KEY;
+      envModule.env.TOTP_ENCRYPTION_KEY = undefined;
       userFindUnique.mockResolvedValue({ id: "user-1", email: "test@example.com" });
       tfaFindUnique.mockResolvedValue(null);
 
@@ -125,6 +133,7 @@ describe("totp.service", () => {
       await expect(generateSecret({ userId: "user-1" })).rejects.toMatchObject({
         code: "ENCRYPTION_KEY_MISSING",
       });
+      envModule.env.TOTP_ENCRYPTION_KEY = originalKey;
     });
   });
 
