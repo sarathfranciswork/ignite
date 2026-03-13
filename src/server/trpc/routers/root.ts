@@ -19,6 +19,7 @@ import { engagementRouter } from "./engagement";
 import { externalInvitationRouter } from "./external-invitation";
 import { evaluationRouter } from "./evaluation";
 import { exportRouter } from "./export";
+import { externalSyncRouter } from "./external-sync";
 import { ideaRouter } from "./idea";
 import { insightRouter } from "./insight";
 import { notificationRouter } from "./notification";
@@ -68,6 +69,7 @@ export const appRouter = createTRPCRouter({
   evaluation: evaluationRouter,
   export: exportRouter,
   externalInvitation: externalInvitationRouter,
+  externalSync: externalSyncRouter,
   idea: ideaRouter,
   insight: insightRouter,
   notification: notificationRouter,
