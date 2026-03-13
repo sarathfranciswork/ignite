@@ -45,6 +45,7 @@ import { siaRouter } from "./sia";
 import { slackIntegrationRouter } from "./slack-integration";
 import { teamsRouter } from "./teams";
 import { technologyRouter } from "./technology";
+import { translationRouter } from "./translation";
 import { trendRouter } from "./trend";
 import { useCaseRouter } from "./use-case";
 import { userRouter } from "./user";
@@ -95,6 +96,7 @@ export const appRouter = createTRPCRouter({
   slackIntegration: slackIntegrationRouter,
   teams: teamsRouter,
   technology: technologyRouter,
+  translation: translationRouter,
   trend: trendRouter,
   space: spaceRouter,
   sso: ssoRouter,

@@ -292,6 +292,13 @@ export const Action = {
   GAMIFICATION_RECALCULATE: "gamification.recalculate",
   GAMIFICATION_SET_PERSPECTIVE: "gamification.setPerspective",
 
+  // Translation management
+  TRANSLATION_CREATE: "translation.create",
+  TRANSLATION_READ: "translation.read",
+  TRANSLATION_UPDATE: "translation.update",
+  TRANSLATION_DELETE: "translation.delete",
+  TRANSLATION_CONFIGURE: "translation.configure",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -499,6 +506,11 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.GAMIFICATION_CONFIGURE,
     Action.GAMIFICATION_READ,
     Action.GAMIFICATION_SET_PERSPECTIVE,
+    Action.TRANSLATION_CREATE,
+    Action.TRANSLATION_READ,
+    Action.TRANSLATION_UPDATE,
+    Action.TRANSLATION_DELETE,
+    Action.TRANSLATION_CONFIGURE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -563,6 +575,8 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.BI_CONNECTOR_READ,
     Action.GAMIFICATION_READ,
     Action.GAMIFICATION_SET_PERSPECTIVE,
+    Action.TRANSLATION_CREATE,
+    Action.TRANSLATION_READ,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,

@@ -271,6 +271,8 @@ export interface EventMap {
   "gamification.configured": EventPayload;
   "perspective.set": EventPayload;
   "perspective.removed": EventPayload;
+  "translation.created": EventPayload;
+  "translation.updated": EventPayload;
 }
 
 export type EventName = keyof EventMap;
