@@ -2584,6 +2584,30 @@ model SubmissionFieldValue {
   @@map("submission_field_values")
 }
 
+// ── Audit Log ─────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  @map("actor_id")
+  actorEmail String?  @map("actor_email")
+  action     String
+  entity     String
+  entityId   String?  @map("entity_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent") @db.Text
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entity])
+  @@index([entityId])
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
 // ── Two-Factor Authentication ─────────────────────────────────
 
 model TwoFactorAuth {

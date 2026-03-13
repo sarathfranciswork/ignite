@@ -19,6 +19,7 @@ import {
   KeyRound,
   Webhook,
   Key,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ const systemAdminNav: AdminNavItem[] = [
   { label: "Groups", href: "/admin/groups", icon: UsersRound },
   { label: "Spaces", href: "/admin/spaces", icon: Globe },
   { label: "System Health", href: "/admin/health", icon: Activity },
+  { label: "Audit Log", href: "/admin/audit-log", icon: ScrollText },
   { label: "Settings", href: "/admin/settings", icon: Settings },
   { label: "SCIM", href: "/admin/scim", icon: KeyRound },
 ];

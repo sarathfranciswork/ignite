@@ -1,6 +1,7 @@
 import { createTRPCRouter } from "../trpc";
 import { activityRouter } from "./activity";
 import { adhocEvaluationRouter } from "./adhoc-evaluation";
+import { auditLogRouter } from "./audit-log";
 import { adminRouter } from "./admin";
 import { aiRouter } from "./ai";
 import { apiKeyRouter } from "./api-key";
@@ -46,6 +47,7 @@ import { whiteLabelRouter } from "./white-label";
 export const appRouter = createTRPCRouter({
   activity: activityRouter,
   adhocEvaluation: adhocEvaluationRouter,
+  auditLog: auditLogRouter,
   admin: adminRouter,
   ai: aiRouter,
   apiKey: apiKeyRouter,
