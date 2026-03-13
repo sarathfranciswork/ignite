@@ -10,6 +10,7 @@ import { bucketRouter } from "./bucket";
 import { campaignComparisonRouter } from "./campaign-comparison";
 import { campaignRouter } from "./campaign";
 import { channelRouter } from "./channel";
+import { clipRouter } from "./clip";
 import { conceptRouter } from "./concept";
 import { dashboardRouter } from "./dashboard";
 import { commentRouter } from "./comment";
@@ -58,6 +59,7 @@ export const appRouter = createTRPCRouter({
   campaign: campaignRouter,
   campaignComparison: campaignComparisonRouter,
   channel: channelRouter,
+  clip: clipRouter,
   comment: commentRouter,
   concept: conceptRouter,
   communication: communicationRouter,
