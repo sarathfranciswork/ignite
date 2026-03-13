@@ -101,6 +101,7 @@ model User {
   reviewedGenericSubs        GenericSubmission[]         @relation("GenericSubmissionReviewer")
   twoFactorAuth              TwoFactorAuth?
   userSessions               UserSession[]
+  createdTeamsIntegrations   TeamsIntegration[]          @relation("TeamsIntegrationCreatedBy")
 
   @@map("users")
 }
@@ -429,6 +430,7 @@ model Campaign {
   siaLinks              CampaignSiaLink[]
   messages              CampaignMessage[]
   submissionDefinitions SubmissionDefinition[]
+  teamsIntegrations     TeamsIntegration[]       @relation("CampaignTeamsIntegrations")
 
   @@index([status])
   @@index([submissionType])
@@ -535,8 +537,9 @@ model Channel {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy User            @relation("ChannelCreatedBy", fields: [createdById], references: [id])
-  members   ChannelMember[]
+  createdBy         User               @relation("ChannelCreatedBy", fields: [createdById], references: [id])
+  members           ChannelMember[]
+  teamsIntegrations TeamsIntegration[] @relation("ChannelTeamsIntegrations")
 
   @@index([status])
   @@index([createdById])
@@ -2606,6 +2609,42 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+// ── Microsoft Teams Integration ────────────────────────────────
+
+enum TeamsIntegrationStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+
+  @@map("teams_integration_status")
+}
+
+model TeamsIntegration {
+  id          String                 @id @default(cuid())
+  name        String
+  webhookUrl  String                 @map("webhook_url")
+  status      TeamsIntegrationStatus @default(ACTIVE)
+  events      String[]               @default([])
+  description String?                @db.Text
+  campaignId  String?                @map("campaign_id")
+  channelId   String?                @map("channel_id")
+  createdById String                 @map("created_by_id")
+  lastError   String?                @map("last_error") @db.Text
+  lastSentAt  DateTime?              @map("last_sent_at")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+
+  createdBy User      @relation("TeamsIntegrationCreatedBy", fields: [createdById], references: [id])
+  campaign  Campaign? @relation("CampaignTeamsIntegrations", fields: [campaignId], references: [id], onDelete: SetNull)
+  channel   Channel?  @relation("ChannelTeamsIntegrations", fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@index([status])
+  @@index([campaignId])
+  @@index([channelId])
+  @@map("teams_integrations")
 }
 
 // ── Two-Factor Authentication ─────────────────────────────────

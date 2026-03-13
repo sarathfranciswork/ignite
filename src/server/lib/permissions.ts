@@ -251,6 +251,12 @@ export const Action = {
   AUDIT_LOG_EXPORT: "auditLog.export",
   AUDIT_LOG_CONFIGURE: "auditLog.configure",
 
+  // Teams integration management
+  TEAMS_INTEGRATION_CREATE: "teamsIntegration.create",
+  TEAMS_INTEGRATION_READ: "teamsIntegration.read",
+  TEAMS_INTEGRATION_UPDATE: "teamsIntegration.update",
+  TEAMS_INTEGRATION_DELETE: "teamsIntegration.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -430,6 +436,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SESSION_TERMINATE_OWN,
     Action.SESSION_TERMINATE_ANY,
     Action.AUDIT_LOG_READ,
+    Action.TEAMS_INTEGRATION_CREATE,
+    Action.TEAMS_INTEGRATION_READ,
+    Action.TEAMS_INTEGRATION_UPDATE,
+    Action.TEAMS_INTEGRATION_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,

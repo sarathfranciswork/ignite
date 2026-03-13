@@ -249,6 +249,9 @@ export interface EventMap {
   "twoFactor.backupCodesRegenerated": EventPayload;
   "session.terminated": EventPayload;
   "session.allTerminated": EventPayload;
+  "teams.integrationCreated": EventPayload;
+  "teams.integrationUpdated": EventPayload;
+  "teams.integrationDeleted": EventPayload;
 }
 
 export type EventName = keyof EventMap;
