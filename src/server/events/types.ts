@@ -252,6 +252,9 @@ export interface EventMap {
   "teams.integrationCreated": EventPayload;
   "teams.integrationUpdated": EventPayload;
   "teams.integrationDeleted": EventPayload;
+  "slack.integrationCreated": EventPayload;
+  "slack.integrationUpdated": EventPayload;
+  "slack.integrationDeleted": EventPayload;
 }
 
 export type EventName = keyof EventMap;

@@ -257,6 +257,12 @@ export const Action = {
   TEAMS_INTEGRATION_UPDATE: "teamsIntegration.update",
   TEAMS_INTEGRATION_DELETE: "teamsIntegration.delete",
 
+  // Slack integration management
+  SLACK_INTEGRATION_CREATE: "slackIntegration.create",
+  SLACK_INTEGRATION_READ: "slackIntegration.read",
+  SLACK_INTEGRATION_UPDATE: "slackIntegration.update",
+  SLACK_INTEGRATION_DELETE: "slackIntegration.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -440,6 +446,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.TEAMS_INTEGRATION_READ,
     Action.TEAMS_INTEGRATION_UPDATE,
     Action.TEAMS_INTEGRATION_DELETE,
+    Action.SLACK_INTEGRATION_CREATE,
+    Action.SLACK_INTEGRATION_READ,
+    Action.SLACK_INTEGRATION_UPDATE,
+    Action.SLACK_INTEGRATION_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
