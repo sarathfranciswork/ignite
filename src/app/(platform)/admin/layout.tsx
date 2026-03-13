@@ -20,6 +20,7 @@ import {
   Webhook,
   Key,
   ScrollText,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ const systemAdminNav: AdminNavItem[] = [
 const integrationNav: AdminNavItem[] = [
   { label: "Webhooks", href: "/admin/webhooks", icon: Webhook },
   { label: "API Keys", href: "/admin/api-keys", icon: Key },
+  { label: "MS Teams", href: "/admin/teams", icon: MessageSquare },
 ];
 
 const innovationConfigNav: AdminNavItem[] = [
