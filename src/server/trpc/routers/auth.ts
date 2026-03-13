@@ -31,7 +31,7 @@ export const authRouter = createTRPCRouter({
 
       try {
         const result = await verifyCode({ userId, code: input.code });
-        if (!result.verified) {
+        if (!result.valid) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid verification code" });
         }
         return { verified: true, method: result.method };

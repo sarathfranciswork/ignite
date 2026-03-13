@@ -21,7 +21,7 @@ import {
 
 export const securityRouter = createTRPCRouter({
   twoFactorSetup: protectedProcedure
-    .use(requirePermission(Action.TWO_FACTOR_SETUP))
+    .use(requirePermission(Action.TWO_FACTOR_MANAGE))
     .mutation(async ({ ctx }) => {
       try {
         return await generateSecret({ userId: ctx.session.user.id });
@@ -30,7 +30,7 @@ export const securityRouter = createTRPCRouter({
           if (error.code === "ALREADY_ENABLED") {
             throw new TRPCError({ code: "CONFLICT", message: error.message });
           }
-          if (error.code === "ENCRYPTION_KEY_MISSING" || error.code === "ENCRYPTION_KEY_INVALID") {
+          if (error.code === "ENCRYPTION_KEY_MISSING") {
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",
               message: "2FA configuration error",
@@ -42,14 +42,14 @@ export const securityRouter = createTRPCRouter({
     }),
 
   twoFactorVerify: protectedProcedure
-    .use(requirePermission(Action.TWO_FACTOR_SETUP))
+    .use(requirePermission(Action.TWO_FACTOR_MANAGE))
     .input(z.object({ totpCode: z.string().length(6) }))
     .mutation(async ({ ctx, input }) => {
       try {
         return await verifyAndEnable({ userId: ctx.session.user.id, totpCode: input.totpCode });
       } catch (error) {
         if (error instanceof TotpServiceError) {
-          if (error.code === "SETUP_NOT_FOUND") {
+          if (error.code === "NOT_SETUP") {
             throw new TRPCError({ code: "NOT_FOUND", message: error.message });
           }
           if (error.code === "ALREADY_ENABLED") {
@@ -64,12 +64,12 @@ export const securityRouter = createTRPCRouter({
     }),
 
   twoFactorDisable: protectedProcedure
-    .use(requirePermission(Action.TWO_FACTOR_DISABLE))
+    .use(requirePermission(Action.TWO_FACTOR_MANAGE))
     .input(z.object({ totpCode: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       try {
         const result = await verifyCode({ userId: ctx.session.user.id, code: input.totpCode });
-        if (!result.verified) {
+        if (!result.valid) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid verification code" });
         }
         await disableTwoFactor({ userId: ctx.session.user.id });
@@ -86,12 +86,12 @@ export const securityRouter = createTRPCRouter({
     }),
 
   twoFactorRegenerateBackupCodes: protectedProcedure
-    .use(requirePermission(Action.TWO_FACTOR_SETUP))
+    .use(requirePermission(Action.TWO_FACTOR_MANAGE))
     .input(z.object({ totpCode: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       try {
         const result = await verifyCode({ userId: ctx.session.user.id, code: input.totpCode });
-        if (!result.verified) {
+        if (!result.valid) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid verification code" });
         }
         return await regenerateBackupCodes({ userId: ctx.session.user.id });
@@ -107,13 +107,13 @@ export const securityRouter = createTRPCRouter({
     }),
 
   twoFactorStatus: protectedProcedure
-    .use(requirePermission(Action.TWO_FACTOR_SETUP))
+    .use(requirePermission(Action.TWO_FACTOR_MANAGE))
     .query(async ({ ctx }) => {
-      return await getTwoFactorStatus({ userId: ctx.session.user.id });
+      return await getTwoFactorStatus(ctx.session.user.id);
     }),
 
   sessionList: protectedProcedure
-    .use(requirePermission(Action.SESSION_LIST_OWN))
+    .use(requirePermission(Action.SESSION_READ_OWN))
     .query(async ({ ctx }) => {
       return await listUserSessions({ userId: ctx.session.user.id });
     }),
@@ -149,11 +149,10 @@ export const securityRouter = createTRPCRouter({
   adminSessionTerminate: protectedProcedure
     .use(requirePermission(Action.SESSION_TERMINATE_ANY))
     .input(z.object({ sessionId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       try {
         await adminTerminateSession({
           sessionId: input.sessionId,
-          adminUserId: ctx.session.user.id,
         });
         return { success: true };
       } catch (error) {
