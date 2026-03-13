@@ -1,31 +1,59 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "@/server/trpc/routers/root";
 import { createTRPCContext } from "@/server/trpc/trpc";
-import { registerNotificationListeners } from "@/server/events/listeners/notification.listener";
-import { registerGraduationListeners } from "@/server/events/listeners/graduation.listener";
-import { registerActivityListeners } from "@/server/events/listeners/activity.listener";
-import { registerEmbeddingListeners } from "@/server/events/listeners/embedding.listener";
-import { registerPushListeners } from "@/server/events/listeners/push.listener";
-import { registerAuditLogListeners } from "@/server/events/listeners/audit-log.listener";
-import { registerSlackListeners } from "@/server/events/listeners/slack.listener";
-import { registerTeamsListeners } from "@/server/events/listeners/teams.listener";
-import { registerGamificationListeners } from "@/server/events/listeners/gamification.listener";
-import { initializeJobWorkers } from "@/server/jobs/init";
+import { logger } from "@/server/lib/logger";
 
-registerNotificationListeners();
-registerGraduationListeners();
-registerActivityListeners();
-registerEmbeddingListeners();
-registerPushListeners();
-registerAuditLogListeners();
-registerSlackListeners();
-registerTeamsListeners();
-registerGamificationListeners();
-initializeJobWorkers().catch(() => {
-  // Initialization errors are logged internally — non-blocking
-});
+let listenersInitialized = false;
 
-function handler(req: Request) {
+async function initListeners() {
+  if (listenersInitialized) return;
+  listenersInitialized = true;
+
+  try {
+    const [
+      { registerNotificationListeners },
+      { registerGraduationListeners },
+      { registerActivityListeners },
+      { registerEmbeddingListeners },
+      { registerPushListeners },
+      { registerAuditLogListeners },
+      { registerSlackListeners },
+      { registerTeamsListeners },
+      { registerGamificationListeners },
+      { initializeJobWorkers },
+    ] = await Promise.all([
+      import("@/server/events/listeners/notification.listener"),
+      import("@/server/events/listeners/graduation.listener"),
+      import("@/server/events/listeners/activity.listener"),
+      import("@/server/events/listeners/embedding.listener"),
+      import("@/server/events/listeners/push.listener"),
+      import("@/server/events/listeners/audit-log.listener"),
+      import("@/server/events/listeners/slack.listener"),
+      import("@/server/events/listeners/teams.listener"),
+      import("@/server/events/listeners/gamification.listener"),
+      import("@/server/jobs/init"),
+    ]);
+
+    registerNotificationListeners();
+    registerGraduationListeners();
+    registerActivityListeners();
+    registerEmbeddingListeners();
+    registerPushListeners();
+    registerAuditLogListeners();
+    registerSlackListeners();
+    registerTeamsListeners();
+    registerGamificationListeners();
+    initializeJobWorkers().catch(() => {
+      // Initialization errors are logged internally — non-blocking
+    });
+  } catch (err) {
+    listenersInitialized = false;
+    logger.error({ err }, "Failed to initialize event listeners");
+  }
+}
+
+async function handler(req: Request) {
+  await initListeners();
   return fetchRequestHandler({
     endpoint: "/api/trpc",
     req,

@@ -190,7 +190,7 @@ export async function syncProject(input: SyncProjectInput, userId: string) {
 
   const project = await prisma.project.findUnique({
     where: { id: input.projectId },
-    select: { id: true, name: true, description: true, status: true },
+    select: { id: true, title: true, description: true, status: true },
   });
   if (!project) {
     throw new ExternalSyncServiceError("Project not found", "NOT_FOUND");
@@ -213,7 +213,7 @@ export async function syncProject(input: SyncProjectInput, userId: string) {
   }
 
   const result = await adapter.createIssue({
-    title: project.name,
+    title: project.title,
     description: project.description ?? "",
     fields,
   });

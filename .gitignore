@@ -50,3 +50,6 @@ prisma/*.db
 postgres_data/
 redis_data/
 minio_data/
+
+# Audit reports (generated, ephemeral)
+audit-report/

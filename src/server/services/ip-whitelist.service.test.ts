@@ -6,7 +6,6 @@ import {
   checkIp,
   toggleIpRange,
   isIpInCidr,
-  IpWhitelistServiceError,
 } from "./ip-whitelist.service";
 
 vi.mock("@/server/lib/prisma", () => ({

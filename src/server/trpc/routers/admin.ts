@@ -549,7 +549,11 @@ export const adminRouter = createTRPCRouter({
     }),
 
   loginCustomizationGetPublic: publicProcedure.query(async () => {
-    return getLoginCustomization();
+    try {
+      return await getLoginCustomization();
+    } catch {
+      return { loginBannerUrl: null, loginWelcomeTitle: null, loginWelcomeMessage: null };
+    }
   }),
 
   // ── SCIM Token Management Procedures ──────────────────────────

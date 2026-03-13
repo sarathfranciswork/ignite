@@ -82,9 +82,9 @@ function useSyncMutation(procedure: string, successMsg: string): MutationResult 
   return (syncRouter()[procedure] as any).useMutation({
     onSuccess: () => {
       toast.success(successMsg);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       void (utils as Record<string, any>).externalSync.list.invalidate();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       void (utils as Record<string, any>).externalSync.listItems.invalidate();
     },
     onError: (err: { message: string }) => {

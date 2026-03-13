@@ -52,12 +52,24 @@ interface MetricsResult {
   error: string | null;
 }
 
+interface ApiEndpointResult {
+  route: string;
+  url: string;
+  method: string;
+  status: number;
+  latencyMs: number;
+  error: string | null;
+  expectedStatus: number[];
+  pass: boolean;
+}
+
 interface AuditReport {
   timestamp: string;
   prodUrl: string;
   auditMode: string;
   health: HealthCheckResult;
   metrics: MetricsResult;
+  apiEndpoints: ApiEndpointResult[];
   pages: PageAuditResult[];
   summary: {
     totalPages: number;
@@ -67,6 +79,9 @@ interface AuditReport {
     brokenResourcePages: number;
     comingSoonPages: number;
     avgLoadTimeMs: number;
+    totalApiEndpoints: number;
+    apiEndpointsPassed: number;
+    apiEndpointsFailed: number;
   };
 }
 
@@ -84,28 +99,98 @@ const OUTPUT_DIR = path.resolve("audit-report");
 const SCREENSHOT_DIR = path.join(OUTPUT_DIR, "screenshots");
 
 const ROUTES: string[] = [
+  // ── Public ──────────────────────────────────────────────
   "/",
   "/login",
   "/register",
+  "/offline",
+
+  // ── Auth ────────────────────────────────────────────────
+  "/verify-2fa",
+
+  // ── Platform Core ──────────────────────────────────────
   "/dashboard",
-  "/campaigns",
-  "/channels",
   "/explore",
   "/tasks",
   "/reports",
   "/profile",
+  "/external",
+  "/settings/security",
+
+  // ── Channels ───────────────────────────────────────────
+  "/channels",
+  "/channels/new",
+
+  // ── Campaigns ──────────────────────────────────────────
+  "/campaigns",
+  "/campaigns/new",
+
+  // ── Projects ───────────────────────────────────────────
   "/projects",
+  "/projects/dashboard",
+  "/projects/templates",
+
+  // ── Partners ───────────────────────────────────────────
   "/partners",
+  "/partners/new",
+  "/partners/use-cases",
+  "/partners/use-cases/new",
+  "/partners/scouting",
+  "/partners/scouting/new",
+  "/partners/missions",
+  "/partners/missions/new",
+
+  // ── Strategy ───────────────────────────────────────────
   "/strategy/trends",
   "/strategy/technologies",
   "/strategy/insights",
+  "/strategy/portfolios",
   "/strategy/sias",
+
+  // ── Admin ──────────────────────────────────────────────
+  "/admin",
   "/admin/users",
-  "/admin/org-units",
+  "/admin/teams",
   "/admin/groups",
-  "/admin/notifications",
-  "/admin/customization",
+  "/admin/org-units",
+  "/admin/spaces",
+  "/admin/invitations",
   "/admin/settings",
+  "/admin/customization",
+  "/admin/terminology",
+  "/admin/login-page",
+  "/admin/notifications",
+  "/admin/audit-log",
+  "/admin/webhooks",
+  "/admin/api-keys",
+  "/admin/scim",
+  "/admin/slack",
+  "/admin/external-sync",
+  "/admin/compliance",
+  "/admin/health",
+  "/admin/integrations/bi-connectors",
+];
+
+// API endpoints to audit (method, route, expected statuses)
+// Unauthenticated requests — expect 401/403 for protected endpoints
+const API_ENDPOINTS: Array<{ method: string; route: string; expectedStatus: number[] }> = [
+  // Core infrastructure
+  { method: "GET", route: "/api/health", expectedStatus: [200] },
+  { method: "GET", route: "/api/metrics", expectedStatus: [200] },
+  // Auth (session check without auth should return 200 with null session or redirect)
+  { method: "GET", route: "/api/auth/session", expectedStatus: [200] },
+  // tRPC public endpoint
+  {
+    method: "GET",
+    route: "/api/trpc/admin.loginCustomizationGetPublic?batch=1&input=%7B%7D",
+    expectedStatus: [200],
+  },
+  // REST API v1 (unauthenticated should get 401)
+  { method: "GET", route: "/api/v1/ideas", expectedStatus: [401, 403] },
+  { method: "GET", route: "/api/v1/users", expectedStatus: [401, 403] },
+  { method: "GET", route: "/api/v1/campaigns", expectedStatus: [401, 403] },
+  // SCIM (unauthenticated should get 401)
+  { method: "GET", route: "/api/scim/v2/Users", expectedStatus: [401, 403] },
 ];
 
 // Page load timeout in milliseconds
@@ -308,6 +393,49 @@ async function auditPage(context: BrowserContext, route: string): Promise<PageAu
   return result;
 }
 
+// ── API Endpoint Audit ──────────────────────────────────────────────────────
+
+async function auditApiEndpoint(endpoint: {
+  method: string;
+  route: string;
+  expectedStatus: number[];
+}): Promise<ApiEndpointResult> {
+  const url = `${PROD_URL}${endpoint.route}`;
+  const result: ApiEndpointResult = {
+    route: endpoint.route,
+    url,
+    method: endpoint.method,
+    status: 0,
+    latencyMs: 0,
+    error: null,
+    expectedStatus: endpoint.expectedStatus,
+    pass: false,
+  };
+
+  try {
+    const startTime = Date.now();
+    const response = await fetch(url, {
+      method: endpoint.method,
+      signal: AbortSignal.timeout(15_000),
+      headers: { "User-Agent": "IgniteAuditBot/1.0" },
+    });
+    result.latencyMs = Date.now() - startTime;
+    result.status = response.status;
+    result.pass = endpoint.expectedStatus.includes(response.status);
+
+    const passLabel = result.pass ? "PASS" : "FAIL";
+    process.stdout.write(
+      `  [${passLabel}] ${endpoint.method} ${endpoint.route} → ${result.status} (${result.latencyMs}ms)\n`,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    result.error = message;
+    process.stderr.write(`  [ERROR] ${endpoint.method} ${endpoint.route}: ${message}\n`);
+  }
+
+  return result;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -334,7 +462,18 @@ async function main(): Promise<void> {
     `Metrics: ${metrics.available ? "available" : "unavailable"} (status: ${metrics.status})\n\n`,
   );
 
-  // Step 3: Page audits
+  // Step 3: API endpoint audits
+  process.stdout.write("--- API Endpoint Audits ---\n");
+  process.stdout.write(`Auditing ${API_ENDPOINTS.length} API endpoints...\n\n`);
+
+  const apiResults: ApiEndpointResult[] = [];
+  for (const endpoint of API_ENDPOINTS) {
+    const result = await auditApiEndpoint(endpoint);
+    apiResults.push(result);
+  }
+  process.stdout.write("\n");
+
+  // Step 4: Page audits
   process.stdout.write("--- Page Audits ---\n");
   process.stdout.write(`Auditing ${ROUTES.length} routes...\n\n`);
 
@@ -368,7 +507,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // Step 4: Build summary
+  // Step 5: Build summary
   const successfulPages = pageResults.filter(
     (p) => p.status >= 200 && p.status < 400 && !p.error,
   ).length;
@@ -378,14 +517,17 @@ async function main(): Promise<void> {
   const comingSoonPages = pageResults.filter((p) => p.hasComingSoon).length;
   const totalLoadTime = pageResults.reduce((sum, p) => sum + p.loadTimeMs, 0);
   const avgLoadTimeMs = pageResults.length > 0 ? Math.round(totalLoadTime / pageResults.length) : 0;
+  const apiEndpointsPassed = apiResults.filter((a) => a.pass).length;
+  const apiEndpointsFailed = apiResults.filter((a) => !a.pass).length;
 
-  // Step 5: Build report
+  // Step 6: Build report
   const report: AuditReport = {
     timestamp: new Date().toISOString(),
     prodUrl: PROD_URL,
     auditMode: AUDIT_MODE,
     health,
     metrics,
+    apiEndpoints: apiResults,
     pages: pageResults,
     summary: {
       totalPages: pageResults.length,
@@ -395,24 +537,30 @@ async function main(): Promise<void> {
       brokenResourcePages,
       comingSoonPages,
       avgLoadTimeMs,
+      totalApiEndpoints: apiResults.length,
+      apiEndpointsPassed,
+      apiEndpointsFailed,
     },
   };
 
-  // Step 6: Write report
+  // Step 7: Write report
   const reportPath = path.join(OUTPUT_DIR, "audit-report.json");
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   process.stdout.write(`\nReport written to: ${reportPath}\n`);
 
-  // Step 7: Print summary
+  // Step 8: Print summary
   process.stdout.write("\n=== Audit Summary ===\n");
-  process.stdout.write(`Total pages:          ${pageResults.length}\n`);
-  process.stdout.write(`Successful (2xx/3xx): ${successfulPages}\n`);
-  process.stdout.write(`Server errors (5xx):  ${serverErrors}\n`);
-  process.stdout.write(`JS error pages:       ${jsErrorPages}\n`);
+  process.stdout.write(`Health:                ${health.healthy ? "PASS" : "FAIL"}\n`);
+  process.stdout.write(
+    `API endpoints:         ${apiEndpointsPassed}/${apiResults.length} passed\n`,
+  );
+  process.stdout.write(`Total pages:           ${pageResults.length}\n`);
+  process.stdout.write(`Successful (2xx/3xx):  ${successfulPages}\n`);
+  process.stdout.write(`Server errors (5xx):   ${serverErrors}\n`);
+  process.stdout.write(`JS error pages:        ${jsErrorPages}\n`);
   process.stdout.write(`Broken resource pages: ${brokenResourcePages}\n`);
-  process.stdout.write(`Coming Soon pages:    ${comingSoonPages}\n`);
-  process.stdout.write(`Avg load time:        ${avgLoadTimeMs}ms\n`);
-  process.stdout.write(`Health:               ${health.healthy ? "PASS" : "FAIL"}\n`);
+  process.stdout.write(`Coming Soon pages:     ${comingSoonPages}\n`);
+  process.stdout.write(`Avg load time:         ${avgLoadTimeMs}ms\n`);
 
   if (AUDIT_MODE === "development") {
     process.stdout.write(
@@ -446,6 +594,7 @@ main().catch((err) => {
     auditMode: AUDIT_MODE,
     health: { healthy: false, status: 0, data: null, error: "Audit script crashed" },
     metrics: { available: false, status: 0, data: null, error: "Audit script crashed" },
+    apiEndpoints: [],
     pages: [],
     summary: {
       totalPages: 0,
@@ -455,6 +604,9 @@ main().catch((err) => {
       brokenResourcePages: 0,
       comingSoonPages: 0,
       avgLoadTimeMs: 0,
+      totalApiEndpoints: 0,
+      apiEndpointsPassed: 0,
+      apiEndpointsFailed: 0,
     },
   };
   fs.writeFileSync(
