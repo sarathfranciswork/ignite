@@ -245,6 +245,11 @@ export const Action = {
   SESSION_TERMINATE_OWN: "session.terminate.own",
   SESSION_TERMINATE_ANY: "session.terminate.any",
 
+  // Audit log
+  AUDIT_LOG_READ: "auditLog.read",
+  AUDIT_LOG_EXPORT: "auditLog.export",
+  AUDIT_LOG_CONFIGURE: "auditLog.configure",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -422,6 +427,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SESSION_LIST_OWN,
     Action.SESSION_TERMINATE_OWN,
     Action.SESSION_TERMINATE_ANY,
+    Action.AUDIT_LOG_READ,
   ],
   MEMBER: [
     Action.USER_READ_OWN,

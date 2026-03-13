@@ -6,6 +6,7 @@ import { registerGraduationListeners } from "@/server/events/listeners/graduatio
 import { registerActivityListeners } from "@/server/events/listeners/activity.listener";
 import { registerEmbeddingListeners } from "@/server/events/listeners/embedding.listener";
 import { registerPushListeners } from "@/server/events/listeners/push.listener";
+import { registerAuditLogListeners } from "@/server/events/listeners/audit-log.listener";
 import { initializeJobWorkers } from "@/server/jobs/init";
 
 registerNotificationListeners();
@@ -13,6 +14,7 @@ registerGraduationListeners();
 registerActivityListeners();
 registerEmbeddingListeners();
 registerPushListeners();
+registerAuditLogListeners();
 initializeJobWorkers().catch(() => {
   // Initialization errors are logged internally — non-blocking
 });
