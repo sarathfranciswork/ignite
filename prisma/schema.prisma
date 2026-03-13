@@ -102,6 +102,7 @@ model User {
   twoFactorAuth              TwoFactorAuth?
   userSessions               UserSession[]
   createdTeamsIntegrations   TeamsIntegration[]          @relation("TeamsIntegrationCreatedBy")
+  createdSlackIntegrations   SlackIntegration[]          @relation("SlackIntegrationCreatedBy")
 
   @@map("users")
 }
@@ -431,6 +432,7 @@ model Campaign {
   messages              CampaignMessage[]
   submissionDefinitions SubmissionDefinition[]
   teamsIntegrations     TeamsIntegration[]       @relation("CampaignTeamsIntegrations")
+  slackIntegrations     SlackIntegration[]       @relation("CampaignSlackIntegrations")
 
   @@index([status])
   @@index([submissionType])
@@ -540,6 +542,7 @@ model Channel {
   createdBy         User               @relation("ChannelCreatedBy", fields: [createdById], references: [id])
   members           ChannelMember[]
   teamsIntegrations TeamsIntegration[] @relation("ChannelTeamsIntegrations")
+  slackIntegrations SlackIntegration[] @relation("ChannelSlackIntegrations")
 
   @@index([status])
   @@index([createdById])
@@ -2680,4 +2683,47 @@ model UserSession {
   @@index([userId])
   @@index([lastActivityAt])
   @@map("user_sessions")
+}
+
+// ── Slack Integration ──────────────────────────────────────────
+
+enum SlackIntegrationStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+
+  @@map("slack_integration_status")
+}
+
+model SlackIntegration {
+  id              String                 @id @default(cuid())
+  name            String
+  spaceId         String?                @map("space_id")
+  teamId          String?                @map("team_id")
+  accessToken     String?                @map("access_token") @db.Text
+  botUserId       String?                @map("bot_user_id")
+  webhookUrl      String?                @map("webhook_url")
+  channelMappings Json                   @default("{}") @map("channel_mappings")
+  status          SlackIntegrationStatus @default(ACTIVE)
+  events          String[]               @default([])
+  description     String?                @db.Text
+  campaignId      String?                @map("campaign_id")
+  channelId       String?                @map("channel_id")
+  createdById     String                 @map("created_by_id")
+  lastError       String?                @map("last_error") @db.Text
+  lastSentAt      DateTime?              @map("last_sent_at")
+  isActive        Boolean                @default(true) @map("is_active")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  createdBy User      @relation("SlackIntegrationCreatedBy", fields: [createdById], references: [id])
+  campaign  Campaign? @relation("CampaignSlackIntegrations", fields: [campaignId], references: [id], onDelete: SetNull)
+  channel   Channel?  @relation("ChannelSlackIntegrations", fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+  @@index([status])
+  @@index([campaignId])
+  @@index([channelId])
+  @@index([spaceId])
+  @@map("slack_integrations")
 }

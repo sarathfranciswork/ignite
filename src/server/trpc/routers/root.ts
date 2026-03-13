@@ -37,6 +37,7 @@ import { ssoRouter } from "./sso";
 import { scoutingBoardRouter } from "./scouting-board";
 import { scoutingMissionRouter } from "./scouting-mission";
 import { siaRouter } from "./sia";
+import { slackIntegrationRouter } from "./slack-integration";
 import { teamsRouter } from "./teams";
 import { technologyRouter } from "./technology";
 import { trendRouter } from "./trend";
@@ -81,6 +82,7 @@ export const appRouter = createTRPCRouter({
   scoutingBoard: scoutingBoardRouter,
   scoutingMission: scoutingMissionRouter,
   sia: siaRouter,
+  slackIntegration: slackIntegrationRouter,
   teams: teamsRouter,
   technology: technologyRouter,
   trend: trendRouter,

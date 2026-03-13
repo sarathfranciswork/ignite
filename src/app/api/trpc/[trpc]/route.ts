@@ -7,6 +7,7 @@ import { registerActivityListeners } from "@/server/events/listeners/activity.li
 import { registerEmbeddingListeners } from "@/server/events/listeners/embedding.listener";
 import { registerPushListeners } from "@/server/events/listeners/push.listener";
 import { registerAuditLogListeners } from "@/server/events/listeners/audit-log.listener";
+import { registerSlackListeners } from "@/server/events/listeners/slack.listener";
 import { registerTeamsListeners } from "@/server/events/listeners/teams.listener";
 import { initializeJobWorkers } from "@/server/jobs/init";
 
@@ -16,6 +17,7 @@ registerActivityListeners();
 registerEmbeddingListeners();
 registerPushListeners();
 registerAuditLogListeners();
+registerSlackListeners();
 registerTeamsListeners();
 initializeJobWorkers().catch(() => {
   // Initialization errors are logged internally — non-blocking
