@@ -266,7 +266,7 @@ describe("updateProject", () => {
     projectUpdate.mockResolvedValue(mockProject);
     projectFindUnique.mockResolvedValueOnce(mockProject);
 
-    const result = await updateProject({ id: "proj-1", title: "New Title" }, "user-1");
+    const _result = await updateProject({ id: "proj-1", title: "New Title" }, "user-1");
 
     expect(projectUpdate).toHaveBeenCalledOnce();
     expect(eventBus.emit).toHaveBeenCalledWith("project.updated", expect.any(Object));
@@ -307,7 +307,7 @@ describe("addTeamMember", () => {
     teamMemberCreate.mockResolvedValue({ id: "tm-2" });
     projectFindUnique.mockResolvedValueOnce(mockProject);
 
-    const result = await addTeamMember(
+    const _result = await addTeamMember(
       { projectId: "proj-1", userId: "user-2", role: "MEMBER" },
       "user-1",
     );
@@ -342,7 +342,7 @@ describe("removeTeamMember", () => {
     teamMemberDelete.mockResolvedValue({ id: "tm-1" });
     projectFindUnique.mockResolvedValueOnce(mockProject);
 
-    const result = await removeTeamMember({ projectId: "proj-1", userId: "user-1" }, "user-1");
+    const _result = await removeTeamMember({ projectId: "proj-1", userId: "user-1" }, "user-1");
 
     expect(teamMemberDelete).toHaveBeenCalledOnce();
     expect(eventBus.emit).toHaveBeenCalledWith("project.teamMemberRemoved", expect.any(Object));
@@ -564,7 +564,7 @@ describe("updateTaskStatus", () => {
       completedAt: new Date(),
     });
 
-    const result = await updateTaskStatus(
+    const _result = await updateTaskStatus(
       { projectId: "proj-1", taskId: "task-1", status: "COMPLETED" },
       "user-1",
     );
