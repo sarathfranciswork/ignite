@@ -81,6 +81,10 @@ function decryptApiKey(encryptedKey: string): string {
   return decrypt(encryptedKey);
 }
 
+function isActiveProvider(provider: string): provider is "DEEPL" | "GOOGLE" {
+  return provider === "DEEPL" || provider === "GOOGLE";
+}
+
 export async function translateContent(
   input: TranslationTranslateInput,
   actorId: string,
@@ -92,11 +96,11 @@ export async function translateContent(
   let translatedText: string;
   let source: "MANUAL" | "DEEPL" | "GOOGLE" = "MANUAL";
 
-  if (config && config.autoTranslateProvider !== "NONE" && config.apiKeyEncrypted) {
+  if (config && isActiveProvider(config.autoTranslateProvider) && config.apiKeyEncrypted) {
     const apiKey = decryptApiKey(config.apiKeyEncrypted);
-    const provider = createProvider(config.autoTranslateProvider as "DEEPL" | "GOOGLE", apiKey);
+    const provider = createProvider(config.autoTranslateProvider, apiKey);
     translatedText = await provider.translate(input.text, input.locale, config.defaultLocale);
-    source = config.autoTranslateProvider as "DEEPL" | "GOOGLE";
+    source = config.autoTranslateProvider;
   } else {
     translatedText = input.text;
   }
@@ -163,15 +167,15 @@ export async function batchTranslate(
   let translatedTexts: string[];
   let source: "MANUAL" | "DEEPL" | "GOOGLE" = "MANUAL";
 
-  if (config && config.autoTranslateProvider !== "NONE" && config.apiKeyEncrypted) {
+  if (config && isActiveProvider(config.autoTranslateProvider) && config.apiKeyEncrypted) {
     const apiKey = decryptApiKey(config.apiKeyEncrypted);
-    const provider = createProvider(config.autoTranslateProvider as "DEEPL" | "GOOGLE", apiKey);
+    const provider = createProvider(config.autoTranslateProvider, apiKey);
     translatedTexts = await provider.batchTranslate(
       input.items.map((item) => item.text),
       input.targetLocale,
       config.defaultLocale,
     );
-    source = config.autoTranslateProvider as "DEEPL" | "GOOGLE";
+    source = config.autoTranslateProvider;
   } else {
     translatedTexts = input.items.map((item) => item.text);
   }

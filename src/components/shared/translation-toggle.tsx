@@ -25,6 +25,18 @@ export function TranslationToggle({
   const [selectedLocale, setSelectedLocale] = React.useState<string | null>(null);
   const [showEditor, setShowEditor] = React.useState(false);
   const [editText, setEditText] = React.useState("");
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
 
   const getAllProcedure = trpc.translation.getAll;
   const { data: translations } = getAllProcedure.useQuery({
@@ -35,7 +47,7 @@ export function TranslationToggle({
 
   const configProcedure = trpc.translation.getConfig;
   const { data: config } = configProcedure.useQuery(
-    { spaceId: spaceId ?? "default" },
+    { spaceId: spaceId! },
     { enabled: Boolean(spaceId) },
   );
 
@@ -74,13 +86,17 @@ export function TranslationToggle({
   const displayText = currentTranslation ? currentTranslation.translatedText : originalText;
 
   const handleTranslate = (locale: string) => {
+    if (!spaceId) {
+      toast.error("Space context is required for translation");
+      return;
+    }
     translateMutation.mutate({
       entityType,
       entityId,
       field,
       locale,
       text: originalText,
-      spaceId: spaceId ?? "default",
+      spaceId,
     });
     setSelectedLocale(locale);
     setIsOpen(false);
@@ -105,7 +121,7 @@ export function TranslationToggle({
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <div className="mb-1 flex items-center gap-1">
         <button
           onClick={() => setIsOpen(!isOpen)}

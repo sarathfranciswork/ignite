@@ -1,11 +1,16 @@
 "use client";
 
 import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { trpc } from "@/lib/trpc";
 import { Save, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { TranslationConfigureInput } from "@/server/services/translation.schemas";
+import {
+  translationConfigureFormSchema,
+  type TranslationConfigureFormValues,
+} from "@/types/translation";
 
 const LOCALES = [
   { code: "en", label: "English" },
@@ -27,14 +32,6 @@ const PROVIDERS = [
   { value: "DEEPL" as const, label: "DeepL" },
   { value: "GOOGLE" as const, label: "Google Translate" },
 ];
-
-interface TranslationConfigData {
-  defaultLocale: string;
-  enabledLocales: string[];
-  autoTranslateProvider: string;
-  apiKey: string;
-  maxRequestsPerHour: number;
-}
 
 function TranslationsPageSkeleton() {
   return (
@@ -64,25 +61,30 @@ export default function TranslationsPage() {
     { enabled: !!spaceId },
   );
 
-  const [formData, setFormData] = React.useState<TranslationConfigData>({
-    defaultLocale: "en",
-    enabledLocales: ["en"],
-    autoTranslateProvider: "NONE",
-    apiKey: "",
-    maxRequestsPerHour: 100,
+  const form = useForm<TranslationConfigureFormValues>({
+    resolver: zodResolver(translationConfigureFormSchema),
+    defaultValues: {
+      spaceId: "",
+      defaultLocale: "en",
+      enabledLocales: ["en"],
+      autoTranslateProvider: "NONE",
+      apiKey: undefined,
+      maxRequestsPerHour: 100,
+    },
   });
 
   React.useEffect(() => {
-    if (config) {
-      setFormData({
+    if (config && spaceId) {
+      form.reset({
+        spaceId,
         defaultLocale: config.defaultLocale,
         enabledLocales: config.enabledLocales,
-        autoTranslateProvider: config.autoTranslateProvider,
-        apiKey: "",
+        autoTranslateProvider: config.autoTranslateProvider as "NONE" | "DEEPL" | "GOOGLE",
+        apiKey: undefined,
         maxRequestsPerHour: config.maxRequestsPerHour,
       });
     }
-  }, [config]);
+  }, [config, spaceId, form]);
 
   const utils = trpc.useUtils();
   const configureProcedure = trpc.translation.configure;
@@ -96,29 +98,24 @@ export default function TranslationsPage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload: TranslationConfigureInput = {
-      spaceId,
-      defaultLocale: formData.defaultLocale,
-      enabledLocales: formData.enabledLocales,
-      autoTranslateProvider: formData.autoTranslateProvider as "NONE" | "DEEPL" | "GOOGLE",
-      maxRequestsPerHour: formData.maxRequestsPerHour,
-      ...(formData.apiKey ? { apiKey: formData.apiKey } : {}),
+  const onSubmit = (data: TranslationConfigureFormValues) => {
+    const payload = {
+      ...data,
+      ...(data.apiKey ? {} : { apiKey: undefined }),
     };
-
     configureMutation.mutate(payload);
   };
 
+  const watchProvider = form.watch("autoTranslateProvider");
+  const watchEnabledLocales = form.watch("enabledLocales") ?? ["en"];
+  const watchMaxRequests = form.watch("maxRequestsPerHour") ?? 100;
+
   const toggleLocale = (code: string) => {
-    setFormData((prev) => {
-      const enabled = prev.enabledLocales.includes(code);
-      if (enabled && prev.enabledLocales.length === 1) return prev;
-      const next = enabled
-        ? prev.enabledLocales.filter((l) => l !== code)
-        : [...prev.enabledLocales, code];
-      return { ...prev, enabledLocales: next };
-    });
+    const current = form.getValues("enabledLocales") ?? [];
+    const enabled = current.includes(code);
+    if (enabled && current.length === 1) return;
+    const next = enabled ? current.filter((l) => l !== code) : [...current, code];
+    form.setValue("enabledLocales", next, { shouldValidate: true });
   };
 
   if (spaces.isLoading || isConfigLoading) {
@@ -134,7 +131,7 @@ export default function TranslationsPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* Default Locale */}
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h3 className="text-sm font-semibold text-gray-900">Default Locale</h3>
@@ -142,8 +139,7 @@ export default function TranslationsPage() {
             The primary language for content on your platform.
           </p>
           <select
-            value={formData.defaultLocale}
-            onChange={(e) => setFormData((prev) => ({ ...prev, defaultLocale: e.target.value }))}
+            {...form.register("defaultLocale")}
             className="mt-2 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
             {LOCALES.map((l) => (
@@ -166,14 +162,14 @@ export default function TranslationsPage() {
                 key={l.code}
                 className={cn(
                   "flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
-                  formData.enabledLocales.includes(l.code)
+                  watchEnabledLocales.includes(l.code)
                     ? "border-primary-300 bg-primary-50 text-primary-700"
                     : "border-gray-200 bg-white text-gray-600 hover:border-gray-300",
                 )}
               >
                 <input
                   type="checkbox"
-                  checked={formData.enabledLocales.includes(l.code)}
+                  checked={watchEnabledLocales.includes(l.code)}
                   onChange={() => toggleLocale(l.code)}
                   className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
@@ -200,13 +196,7 @@ export default function TranslationsPage() {
               </label>
               <select
                 id="translation-provider"
-                value={formData.autoTranslateProvider}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    autoTranslateProvider: e.target.value,
-                  }))
-                }
+                {...form.register("autoTranslateProvider")}
                 className="mt-1 block w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
               >
                 {PROVIDERS.map((p) => (
@@ -217,7 +207,7 @@ export default function TranslationsPage() {
               </select>
             </div>
 
-            {formData.autoTranslateProvider !== "NONE" && (
+            {watchProvider !== "NONE" && (
               <>
                 <div>
                   <label
@@ -229,8 +219,7 @@ export default function TranslationsPage() {
                   <input
                     id="translation-api-key"
                     type="password"
-                    value={formData.apiKey}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, apiKey: e.target.value }))}
+                    {...form.register("apiKey")}
                     placeholder={
                       config?.hasApiKey ? "••••••••  (key already set)" : "Enter API key"
                     }
@@ -242,7 +231,7 @@ export default function TranslationsPage() {
                   <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
                   <p className="text-xs text-amber-700">
                     Translation API requests are rate-limited to{" "}
-                    <strong>{formData.maxRequestsPerHour}</strong> requests per hour per space.
+                    <strong>{watchMaxRequests}</strong> requests per hour per space.
                   </p>
                 </div>
               </>
@@ -258,13 +247,7 @@ export default function TranslationsPage() {
           </p>
           <input
             type="number"
-            value={formData.maxRequestsPerHour}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                maxRequestsPerHour: Math.max(1, Math.min(10000, Number(e.target.value))),
-              }))
-            }
+            {...form.register("maxRequestsPerHour", { valueAsNumber: true })}
             min={1}
             max={10000}
             className="mt-2 block w-32 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
