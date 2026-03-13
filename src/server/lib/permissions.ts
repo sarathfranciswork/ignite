@@ -236,6 +236,7 @@ export const Action = {
 
   // Reports & analytics
   REPORT_READ: "report.read",
+  REPORT_EXPORT: "report.export",
 
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
@@ -408,6 +409,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.GENERIC_SUBMISSION_UPDATE_OWN,
     Action.GENERIC_SUBMISSION_REVIEW,
     Action.REPORT_READ,
+    Action.REPORT_EXPORT,
   ],
   MEMBER: [
     Action.USER_READ_OWN,

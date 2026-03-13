@@ -241,6 +241,7 @@ export interface EventMap {
   "genericSubmission.submitted": EventPayload;
   "genericSubmission.reviewed": EventPayload;
   "genericSubmission.deleted": EventPayload;
+  "report.exported": EventPayload;
 }
 
 export type EventName = keyof EventMap;

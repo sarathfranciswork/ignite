@@ -16,6 +16,7 @@ import { communicationRouter } from "./communication";
 import { engagementRouter } from "./engagement";
 import { externalInvitationRouter } from "./external-invitation";
 import { evaluationRouter } from "./evaluation";
+import { exportRouter } from "./export";
 import { ideaRouter } from "./idea";
 import { insightRouter } from "./insight";
 import { notificationRouter } from "./notification";
@@ -57,6 +58,7 @@ export const appRouter = createTRPCRouter({
   dashboard: dashboardRouter,
   engagement: engagementRouter,
   evaluation: evaluationRouter,
+  export: exportRouter,
   externalInvitation: externalInvitationRouter,
   idea: ideaRouter,
   insight: insightRouter,
