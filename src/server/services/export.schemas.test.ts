@@ -4,6 +4,7 @@ import {
   exportPlatformReportInput,
   exportIdeaListInput,
   exportEvaluationResultsInput,
+  customKpiReportInput,
 } from "./export.schemas";
 
 describe("exportCampaignReportInput", () => {
@@ -96,5 +97,66 @@ describe("exportEvaluationResultsInput", () => {
       campaignId: "clxyz1234567890abcdef",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("customKpiReportInput", () => {
+  it("accepts valid input with required fields", () => {
+    const result = customKpiReportInput.safeParse({
+      campaignIds: ["clxxxxxxxxxxxxxxxxxxxxxxxxx"],
+      metrics: ["ideas_submitted"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts full input with all optional fields", () => {
+    const result = customKpiReportInput.safeParse({
+      campaignIds: ["clxxxxxxxxxxxxxxxxxxxxxxxxx", "clyyyyyyyyyyyyyyyyyyyyyyyy"],
+      dateRange: {
+        from: "2026-01-01T00:00:00.000Z",
+        to: "2026-03-01T00:00:00.000Z",
+      },
+      orgUnitId: "clxxxxxxxxxxxxxxxxxxxxxxxxx",
+      metrics: ["ideas_submitted", "total_comments", "member_count"],
+      groupBy: "date",
+      format: "excel",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty campaign IDs", () => {
+    const result = customKpiReportInput.safeParse({
+      campaignIds: [],
+      metrics: ["ideas_submitted"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty metrics", () => {
+    const result = customKpiReportInput.safeParse({
+      campaignIds: ["clxxxxxxxxxxxxxxxxxxxxxxxxx"],
+      metrics: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid metric name", () => {
+    const result = customKpiReportInput.safeParse({
+      campaignIds: ["clxxxxxxxxxxxxxxxxxxxxxxxxx"],
+      metrics: ["invalid_metric"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("defaults groupBy to campaign and format to json", () => {
+    const result = customKpiReportInput.safeParse({
+      campaignIds: ["clxxxxxxxxxxxxxxxxxxxxxxxxx"],
+      metrics: ["ideas_submitted"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.groupBy).toBe("campaign");
+      expect(result.data.format).toBe("json");
+    }
   });
 });

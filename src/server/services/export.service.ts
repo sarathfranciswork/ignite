@@ -7,6 +7,7 @@ import type {
   ExportPlatformReportInput,
   ExportIdeaListInput,
   ExportEvaluationResultsInput,
+  CustomKpiReportInput,
 } from "./export.schemas";
 
 const childLogger = logger.child({ service: "export" });
@@ -465,6 +466,215 @@ export async function exportEvaluationResults(
   return { base64, filename };
 }
 
+// ── Custom KPI Report ────────────────────────────────────────
+
+interface CustomKpiRow {
+  campaignId: string;
+  campaignTitle: string;
+  date: string;
+  orgUnitName: string | null;
+  metrics: Record<string, number>;
+}
+
+export interface CustomKpiReportResult {
+  rows: CustomKpiRow[];
+  metricNames: string[];
+  generatedAt: string;
+}
+
+export async function getCustomKpiReport(
+  input: CustomKpiReportInput,
+): Promise<CustomKpiReportResult> {
+  const campaignList = await prisma.campaign.findMany({
+    where: { id: { in: input.campaignIds } },
+    select: {
+      id: true,
+      title: true,
+      _count: { select: { members: true } },
+    },
+  });
+
+  if (campaignList.length === 0) {
+    throw new ExportServiceError("NO_CAMPAIGNS_FOUND", "No campaigns found for the given IDs");
+  }
+
+  const campaignMap = new Map(campaignList.map((c) => [c.id, c]));
+
+  const dateWhere = input.dateRange
+    ? {
+        snapshotDate: {
+          gte: new Date(input.dateRange.from),
+          lte: new Date(input.dateRange.to),
+        },
+      }
+    : {};
+
+  const snapshots = await prisma.campaignKpiSnapshot.findMany({
+    where: {
+      campaignId: { in: input.campaignIds },
+      ...dateWhere,
+    },
+    orderBy: [{ campaignId: "asc" }, { snapshotDate: "asc" }],
+    select: {
+      campaignId: true,
+      snapshotDate: true,
+      ideasSubmitted: true,
+      ideasQualified: true,
+      ideasHot: true,
+      totalComments: true,
+      totalVotes: true,
+      uniqueVisitors: true,
+      totalParticipants: true,
+    },
+  });
+
+  const likesPerCampaign = await prisma.idea.groupBy({
+    by: ["campaignId"],
+    where: { campaignId: { in: input.campaignIds } },
+    _sum: { likesCount: true },
+  });
+  const likesMap = new Map(likesPerCampaign.map((l) => [l.campaignId, l._sum.likesCount ?? 0]));
+
+  let orgUnitName: string | null = null;
+  if (input.orgUnitId) {
+    const orgUnit = await prisma.orgUnit.findUnique({
+      where: { id: input.orgUnitId },
+      select: { name: true },
+    });
+    orgUnitName = orgUnit?.name ?? null;
+  }
+
+  const metricNameMap: Record<string, string> = {
+    ideas_submitted: "Ideas Submitted",
+    ideas_qualified: "Ideas Qualified",
+    ideas_hot: "Ideas HOT!",
+    total_comments: "Total Comments",
+    total_votes: "Total Votes",
+    total_likes: "Total Likes",
+    unique_visitors: "Unique Visitors",
+    total_participants: "Total Participants",
+    member_count: "Member Count",
+  };
+
+  const rows: CustomKpiRow[] = [];
+  const metricNames = input.metrics.map((m) => metricNameMap[m] ?? m);
+
+  if (input.groupBy === "date") {
+    for (const snapshot of snapshots) {
+      const campaign = campaignMap.get(snapshot.campaignId);
+      if (!campaign) continue;
+
+      const metrics: Record<string, number> = {};
+      for (const metric of input.metrics) {
+        metrics[metricNameMap[metric] ?? metric] = getSnapshotMetric(
+          snapshot,
+          metric,
+          campaign._count.members,
+          likesMap.get(snapshot.campaignId) ?? 0,
+        );
+      }
+
+      rows.push({
+        campaignId: snapshot.campaignId,
+        campaignTitle: campaign.title,
+        date: snapshot.snapshotDate.toISOString().split("T")[0] ?? "",
+        orgUnitName,
+        metrics,
+      });
+    }
+  } else {
+    for (const campaign of campaignList) {
+      const campaignSnapshots = snapshots.filter((s) => s.campaignId === campaign.id);
+      const latest = campaignSnapshots[campaignSnapshots.length - 1];
+
+      const metrics: Record<string, number> = {};
+      for (const metric of input.metrics) {
+        metrics[metricNameMap[metric] ?? metric] = getSnapshotMetric(
+          latest ?? null,
+          metric,
+          campaign._count.members,
+          likesMap.get(campaign.id) ?? 0,
+        );
+      }
+
+      rows.push({
+        campaignId: campaign.id,
+        campaignTitle: campaign.title,
+        date: latest?.snapshotDate.toISOString().split("T")[0] ?? "N/A",
+        orgUnitName,
+        metrics,
+      });
+    }
+  }
+
+  childLogger.info(
+    { campaignCount: campaignList.length, metrics: input.metrics, rowCount: rows.length },
+    "Custom KPI report generated",
+  );
+
+  return { rows, metricNames, generatedAt: new Date().toISOString() };
+}
+
+export async function exportCustomKpiReport(
+  input: CustomKpiReportInput,
+  actor: string,
+): Promise<{ base64: string; filename: string }> {
+  const report = await getCustomKpiReport(input);
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Ignite Platform";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Custom KPI Report");
+
+  const metricColumns = report.metricNames.map((name) => ({
+    header: name,
+    key: name,
+    width: 18,
+  }));
+
+  sheet.columns = [
+    { header: "Campaign", key: "campaign", width: 30 },
+    { header: "Date", key: "date", width: 15 },
+    ...(report.rows.some((r) => r.orgUnitName)
+      ? [{ header: "Org Unit", key: "orgUnit", width: 20 }]
+      : []),
+    ...metricColumns,
+  ];
+  styleHeaderRow(sheet);
+
+  for (const row of report.rows) {
+    const rowData: Record<string, string | number> = {
+      campaign: row.campaignTitle,
+      date: row.date,
+    };
+    if (row.orgUnitName) {
+      rowData.orgUnit = row.orgUnitName;
+    }
+    for (const [key, value] of Object.entries(row.metrics)) {
+      rowData[key] = value;
+    }
+    sheet.addRow(rowData);
+  }
+
+  autoFitColumns(sheet);
+
+  const base64 = await workbookToBase64(workbook);
+  const filename = `custom_kpi_report_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+  eventBus.emit("report.exported", {
+    entity: "custom_kpi",
+    entityId: "custom_kpi",
+    actor,
+    timestamp: new Date().toISOString(),
+    metadata: { reportType: "customKpi", campaignCount: input.campaignIds.length },
+  });
+
+  childLogger.info({ actor, rowCount: report.rows.length }, "Custom KPI report exported to Excel");
+
+  return { base64, filename };
+}
+
 // ── Shared Sheet Builders ────────────────────────────────────
 
 async function addIdeaListSheet(
@@ -677,5 +887,53 @@ async function addEvaluationSheet(
     }
 
     autoFitColumns(scoresSheet);
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────
+
+interface SnapshotData {
+  ideasSubmitted: number;
+  ideasQualified: number;
+  ideasHot: number;
+  totalComments: number;
+  totalVotes: number;
+  uniqueVisitors: number;
+  totalParticipants: number;
+}
+
+function getSnapshotMetric(
+  snapshot: SnapshotData | null,
+  metric: string,
+  memberCount: number,
+  totalLikes: number,
+): number {
+  if (!snapshot) {
+    if (metric === "member_count") return memberCount;
+    if (metric === "total_likes") return totalLikes;
+    return 0;
+  }
+
+  switch (metric) {
+    case "ideas_submitted":
+      return snapshot.ideasSubmitted;
+    case "ideas_qualified":
+      return snapshot.ideasQualified;
+    case "ideas_hot":
+      return snapshot.ideasHot;
+    case "total_comments":
+      return snapshot.totalComments;
+    case "total_votes":
+      return snapshot.totalVotes;
+    case "total_likes":
+      return totalLikes;
+    case "unique_visitors":
+      return snapshot.uniqueVisitors;
+    case "total_participants":
+      return snapshot.totalParticipants;
+    case "member_count":
+      return memberCount;
+    default:
+      return 0;
   }
 }

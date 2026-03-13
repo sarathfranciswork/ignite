@@ -6,10 +6,18 @@ import { PortfolioAnalysisTab } from "./PortfolioAnalysisTab";
 import { PortfolioAnalyzerTab } from "./PortfolioAnalyzerTab";
 import { CampaignComparisonTab } from "./CampaignComparisonTab";
 import { SuccessFactorTab } from "./SuccessFactorTab";
+import { CustomKpiReportTab } from "./CustomKpiReportTab";
 import { cn } from "@/lib/utils";
-import { BarChart3, FolderKanban, GitBranch, ArrowLeftRight, Sparkles } from "lucide-react";
+import {
+  BarChart3,
+  FolderKanban,
+  GitBranch,
+  ArrowLeftRight,
+  Sparkles,
+  FileSpreadsheet,
+} from "lucide-react";
 
-type TabId = "platform" | "portfolio" | "analyzer" | "comparison" | "successFactors";
+type TabId = "platform" | "portfolio" | "analyzer" | "comparison" | "successFactors" | "customKpi";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
   { id: "platform", label: "Platform Summary", icon: BarChart3 },
@@ -17,6 +25,7 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof BarChart3 }> = [
   { id: "analyzer", label: "Deep Analytics", icon: GitBranch },
   { id: "comparison", label: "Campaign Comparison", icon: ArrowLeftRight },
   { id: "successFactors", label: "Success Factors", icon: Sparkles },
+  { id: "customKpi", label: "Custom Reports", icon: FileSpreadsheet },
 ];
 
 export function ReportsView() {
@@ -50,6 +59,7 @@ export function ReportsView() {
       {activeTab === "analyzer" && <PortfolioAnalyzerTab />}
       {activeTab === "comparison" && <CampaignComparisonTab />}
       {activeTab === "successFactors" && <SuccessFactorTab />}
+      {activeTab === "customKpi" && <CustomKpiReportTab />}
     </div>
   );
 }

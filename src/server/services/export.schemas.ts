@@ -52,7 +52,36 @@ export const exportEvaluationResultsInput = z.object({
   evaluationSessionId: z.string().cuid().optional(),
 });
 
+export const customKpiReportInput = z.object({
+  campaignIds: z.array(z.string().cuid()).min(1).max(20),
+  dateRange: z
+    .object({
+      from: z.string().datetime(),
+      to: z.string().datetime(),
+    })
+    .optional(),
+  orgUnitId: z.string().cuid().optional(),
+  metrics: z
+    .array(
+      z.enum([
+        "ideas_submitted",
+        "ideas_qualified",
+        "ideas_hot",
+        "total_comments",
+        "total_votes",
+        "total_likes",
+        "unique_visitors",
+        "total_participants",
+        "member_count",
+      ]),
+    )
+    .min(1),
+  groupBy: z.enum(["campaign", "date", "org_unit"]).default("campaign"),
+  format: z.enum(["json", "excel"]).default("json"),
+});
+
 export type ExportCampaignReportInput = z.infer<typeof exportCampaignReportInput>;
 export type ExportPlatformReportInput = z.infer<typeof exportPlatformReportInput>;
 export type ExportIdeaListInput = z.infer<typeof exportIdeaListInput>;
 export type ExportEvaluationResultsInput = z.infer<typeof exportEvaluationResultsInput>;
+export type CustomKpiReportInput = z.infer<typeof customKpiReportInput>;

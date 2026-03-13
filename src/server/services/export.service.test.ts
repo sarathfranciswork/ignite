@@ -4,6 +4,8 @@ import {
   exportPlatformReport,
   exportIdeaList,
   exportEvaluationResults,
+  getCustomKpiReport,
+  exportCustomKpiReport,
   ExportServiceError,
 } from "./export.service";
 
@@ -39,6 +41,9 @@ vi.mock("@/server/lib/prisma", () => ({
     },
     evaluationResponse: {
       findMany: vi.fn(),
+    },
+    orgUnit: {
+      findUnique: vi.fn(),
     },
   },
 }));
@@ -441,6 +446,153 @@ describe("exportEvaluationResults", () => {
     const result = await exportEvaluationResults({ campaignId: "campaign-1" }, "user-1");
 
     expect(result.base64).toBeTruthy();
+  });
+});
+
+describe("getCustomKpiReport", () => {
+  it("returns KPI report grouped by campaign", async () => {
+    campaignFindMany.mockResolvedValue([
+      { id: "c-1", title: "Campaign A", _count: { members: 10 } },
+      { id: "c-2", title: "Campaign B", _count: { members: 20 } },
+    ]);
+
+    kpiSnapshotFindMany.mockResolvedValue([
+      {
+        campaignId: "c-1",
+        snapshotDate: new Date("2026-03-01"),
+        ideasSubmitted: 5,
+        ideasQualified: 2,
+        ideasHot: 1,
+        totalComments: 15,
+        totalVotes: 10,
+        uniqueVisitors: 50,
+        totalParticipants: 30,
+      },
+      {
+        campaignId: "c-2",
+        snapshotDate: new Date("2026-03-01"),
+        ideasSubmitted: 8,
+        ideasQualified: 3,
+        ideasHot: 2,
+        totalComments: 25,
+        totalVotes: 20,
+        uniqueVisitors: 80,
+        totalParticipants: 50,
+      },
+    ]);
+
+    ideaGroupBy.mockResolvedValue([
+      { campaignId: "c-1", _sum: { likesCount: 30 } },
+      { campaignId: "c-2", _sum: { likesCount: 60 } },
+    ]);
+
+    const result = await getCustomKpiReport({
+      campaignIds: ["c-1", "c-2"],
+      metrics: ["ideas_submitted", "total_comments", "member_count"],
+      groupBy: "campaign",
+      format: "json",
+    });
+
+    expect(result.rows).toHaveLength(2);
+    expect(result.metricNames).toEqual(["Ideas Submitted", "Total Comments", "Member Count"]);
+    expect(result.rows[0]?.campaignTitle).toBe("Campaign A");
+    expect(result.rows[0]?.metrics["Ideas Submitted"]).toBe(5);
+    expect(result.rows[0]?.metrics["Member Count"]).toBe(10);
+  });
+
+  it("returns KPI report grouped by date", async () => {
+    campaignFindMany.mockResolvedValue([
+      { id: "c-1", title: "Campaign A", _count: { members: 10 } },
+    ]);
+
+    kpiSnapshotFindMany.mockResolvedValue([
+      {
+        campaignId: "c-1",
+        snapshotDate: new Date("2026-03-01"),
+        ideasSubmitted: 3,
+        ideasQualified: 1,
+        ideasHot: 0,
+        totalComments: 10,
+        totalVotes: 5,
+        uniqueVisitors: 20,
+        totalParticipants: 15,
+      },
+      {
+        campaignId: "c-1",
+        snapshotDate: new Date("2026-03-02"),
+        ideasSubmitted: 5,
+        ideasQualified: 2,
+        ideasHot: 1,
+        totalComments: 18,
+        totalVotes: 8,
+        uniqueVisitors: 30,
+        totalParticipants: 22,
+      },
+    ]);
+
+    ideaGroupBy.mockResolvedValue([{ campaignId: "c-1", _sum: { likesCount: 20 } }]);
+
+    const result = await getCustomKpiReport({
+      campaignIds: ["c-1"],
+      metrics: ["ideas_submitted"],
+      groupBy: "date",
+      format: "json",
+    });
+
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0]?.date).toBe("2026-03-01");
+    expect(result.rows[1]?.date).toBe("2026-03-02");
+  });
+
+  it("throws NO_CAMPAIGNS_FOUND when no campaigns match", async () => {
+    campaignFindMany.mockResolvedValue([]);
+
+    await expect(
+      getCustomKpiReport({
+        campaignIds: ["nonexistent"],
+        metrics: ["ideas_submitted"],
+        groupBy: "campaign",
+        format: "json",
+      }),
+    ).rejects.toThrow(ExportServiceError);
+  });
+});
+
+describe("exportCustomKpiReport", () => {
+  it("returns base64 Excel data for custom KPI report", async () => {
+    campaignFindMany.mockResolvedValue([
+      { id: "c-1", title: "Campaign A", _count: { members: 10 } },
+    ]);
+
+    kpiSnapshotFindMany.mockResolvedValue([
+      {
+        campaignId: "c-1",
+        snapshotDate: new Date("2026-03-01"),
+        ideasSubmitted: 5,
+        ideasQualified: 2,
+        ideasHot: 1,
+        totalComments: 15,
+        totalVotes: 10,
+        uniqueVisitors: 50,
+        totalParticipants: 30,
+      },
+    ]);
+
+    ideaGroupBy.mockResolvedValue([{ campaignId: "c-1", _sum: { likesCount: 30 } }]);
+
+    const result = await exportCustomKpiReport(
+      {
+        campaignIds: ["c-1"],
+        metrics: ["ideas_submitted", "total_comments"],
+        groupBy: "campaign",
+        format: "excel",
+      },
+      "user-1",
+    );
+
+    expect(result.base64).toBeTruthy();
+    expect(result.filename).toContain("custom_kpi_report_");
+    expect(result.filename.endsWith(".xlsx")).toBe(true);
   });
 });
 
