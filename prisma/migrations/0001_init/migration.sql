@@ -1,3 +1,6 @@
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "vector";
+
 -- CreateEnum
 CREATE TYPE "global_role" AS ENUM ('PLATFORM_ADMIN', 'INNOVATION_MANAGER', 'MEMBER', 'EXTERNAL');
 
