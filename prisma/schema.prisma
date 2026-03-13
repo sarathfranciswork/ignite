@@ -106,6 +106,7 @@ model User {
   createdExternalSyncs       ExternalSync[]              @relation("ExternalSyncCreatedBy")
   gdprRequests               GdprRequest[]               @relation("UserGdprRequests")
   createdIpWhitelists        IpWhitelist[]               @relation("IpWhitelistCreatedBy")
+  createdBiConnectors        BiConnector[]               @relation("BiConnectorCreatedBy")
 
   @@map("users")
 }
@@ -305,10 +306,11 @@ model InnovationSpace {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  memberships   InnovationSpaceMembership[]
+  memberships         InnovationSpaceMembership[]
   externalSyncs       ExternalSync[]              @relation("SpaceExternalSyncs")
   dataResidencyConfig DataResidencyConfig?        @relation("SpaceDataResidency")
   ipWhitelists        IpWhitelist[]               @relation("SpaceIpWhitelist")
+  biConnectors        BiConnector[]               @relation("SpaceBiConnectors")
 
   @@index([status])
   @@index([slug])
@@ -2880,4 +2882,36 @@ model IpWhitelist {
   @@index([createdById])
   @@index([isActive])
   @@map("ip_whitelists")
+}
+
+// ── BI Connector Models ──────────────────────────────────────
+
+enum BiConnectorProvider {
+  TABLEAU
+  POWER_BI
+
+  @@map("bi_connector_provider")
+}
+
+model BiConnector {
+  id              String              @id @default(cuid())
+  spaceId         String              @map("space_id")
+  provider        BiConnectorProvider
+  name            String
+  refreshToken    String?             @map("refresh_token") @db.Text
+  lastRefreshedAt DateTime?           @map("last_refreshed_at")
+  isActive        Boolean             @default(true) @map("is_active")
+  datasetConfig   Json                @default("{}") @map("dataset_config")
+  createdById     String              @map("created_by_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  createdBy User            @relation("BiConnectorCreatedBy", fields: [createdById], references: [id])
+  space     InnovationSpace @relation("SpaceBiConnectors", fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+  @@index([createdById])
+  @@index([provider])
+  @@index([isActive])
+  @@map("bi_connectors")
 }

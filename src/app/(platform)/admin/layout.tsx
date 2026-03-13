@@ -21,6 +21,7 @@ import {
   Key,
   ScrollText,
   MessageSquare,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ const integrationNav: AdminNavItem[] = [
   { label: "Webhooks", href: "/admin/webhooks", icon: Webhook },
   { label: "API Keys", href: "/admin/api-keys", icon: Key },
   { label: "MS Teams", href: "/admin/teams", icon: MessageSquare },
+  { label: "BI Connectors", href: "/admin/integrations/bi-connectors", icon: BarChart3 },
 ];
 
 const innovationConfigNav: AdminNavItem[] = [

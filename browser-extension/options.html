@@ -1,84 +1,95 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ignite Web Clipper Settings</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      max-width: 480px;
-      margin: 40px auto;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px;
-      color: #1a1a1a;
-      padding: 24px;
-    }
-    h1 { font-size: 20px; margin-bottom: 20px; }
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      color: #6b7280;
-      margin-bottom: 4px;
-      margin-top: 14px;
-    }
-    input {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 14px;
-      font-family: inherit;
-      outline: none;
-    }
-    input:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-    }
-    .hint {
-      font-size: 12px;
-      color: #9ca3af;
-      margin-top: 4px;
-    }
-    .btn {
-      display: inline-flex;
-      padding: 10px 20px;
-      margin-top: 20px;
-      background: #6366f1;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    .btn:hover { background: #4f46e5; }
-    .saved {
-      display: inline-block;
-      margin-left: 12px;
-      color: #065f46;
-      font-size: 13px;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .saved.show { opacity: 1; }
-  </style>
-</head>
-<body>
-  <h1>Ignite Web Clipper Settings</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ignite Web Clipper Settings</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        max-width: 480px;
+        margin: 40px auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px;
+        color: #1a1a1a;
+        padding: 24px;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: #6b7280;
+        margin-bottom: 4px;
+        margin-top: 14px;
+      }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+      }
+      input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+      }
+      .hint {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 4px;
+      }
+      .btn {
+        display: inline-flex;
+        padding: 10px 20px;
+        margin-top: 20px;
+        background: #6366f1;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: #4f46e5;
+      }
+      .saved {
+        display: inline-block;
+        margin-left: 12px;
+        color: #065f46;
+        font-size: 13px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .saved.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ignite Web Clipper Settings</h1>
 
-  <label for="ignite-url">Ignite URL</label>
-  <input type="url" id="ignite-url" placeholder="https://your-ignite-instance.com" />
-  <p class="hint">The base URL of your Ignite deployment (no trailing slash).</p>
+    <label for="ignite-url">Ignite URL</label>
+    <input type="url" id="ignite-url" placeholder="https://your-ignite-instance.com" />
+    <p class="hint">The base URL of your Ignite deployment (no trailing slash).</p>
 
-  <label for="api-key">API Key</label>
-  <input type="password" id="api-key" placeholder="ign_..." />
-  <p class="hint">Generate an API key from your Ignite profile settings.</p>
+    <label for="api-key">API Key</label>
+    <input type="password" id="api-key" placeholder="ign_..." />
+    <p class="hint">Generate an API key from your Ignite profile settings.</p>
 
-  <button class="btn" id="save-btn">Save Settings</button>
-  <span class="saved" id="saved-msg">Settings saved!</span>
+    <button class="btn" id="save-btn">Save Settings</button>
+    <span class="saved" id="saved-msg">Settings saved!</span>
 
-  <script src="options.js"></script>
-</body>
+    <script src="options.js"></script>
+  </body>
 </html>

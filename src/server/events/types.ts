@@ -264,6 +264,8 @@ export interface EventMap {
   "gdpr.erasureCompleted": EventPayload;
   "gdpr.exportCompleted": EventPayload;
   "ipWhitelist.updated": EventPayload;
+  "biConnector.configured": EventPayload;
+  "biConnector.refreshed": EventPayload;
 }
 
 export type EventName = keyof EventMap;

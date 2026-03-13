@@ -280,6 +280,12 @@ export const Action = {
   COMPLIANCE_IP_WHITELIST_READ: "compliance.ipWhitelist.read",
   COMPLIANCE_IP_WHITELIST_DELETE: "compliance.ipWhitelist.delete",
 
+  // BI connector management
+  BI_CONNECTOR_CREATE: "biConnector.create",
+  BI_CONNECTOR_READ: "biConnector.read",
+  BI_CONNECTOR_UPDATE: "biConnector.update",
+  BI_CONNECTOR_DELETE: "biConnector.delete",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -480,6 +486,10 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.COMPLIANCE_IP_WHITELIST_CREATE,
     Action.COMPLIANCE_IP_WHITELIST_READ,
     Action.COMPLIANCE_IP_WHITELIST_DELETE,
+    Action.BI_CONNECTOR_CREATE,
+    Action.BI_CONNECTOR_READ,
+    Action.BI_CONNECTOR_UPDATE,
+    Action.BI_CONNECTOR_DELETE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,
@@ -541,6 +551,7 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SESSION_TERMINATE_OWN,
     Action.COMPLIANCE_GDPR_REQUEST,
     Action.COMPLIANCE_GDPR_LIST,
+    Action.BI_CONNECTOR_READ,
   ],
   EXTERNAL: [
     Action.USER_READ_OWN,
