@@ -263,6 +263,13 @@ export const Action = {
   SLACK_INTEGRATION_UPDATE: "slackIntegration.update",
   SLACK_INTEGRATION_DELETE: "slackIntegration.delete",
 
+  // External sync management (Jira / Azure DevOps)
+  EXTERNAL_SYNC_CREATE: "externalSync.create",
+  EXTERNAL_SYNC_READ: "externalSync.read",
+  EXTERNAL_SYNC_UPDATE: "externalSync.update",
+  EXTERNAL_SYNC_DELETE: "externalSync.delete",
+  EXTERNAL_SYNC_EXECUTE: "externalSync.execute",
+
   // Use case pipeline management
   USE_CASE_CREATE: "useCase.create",
   USE_CASE_READ: "useCase.read",
@@ -450,6 +457,11 @@ export const GLOBAL_ROLE_PERMISSIONS: Record<GlobalRoleName, readonly ActionType
     Action.SLACK_INTEGRATION_READ,
     Action.SLACK_INTEGRATION_UPDATE,
     Action.SLACK_INTEGRATION_DELETE,
+    Action.EXTERNAL_SYNC_CREATE,
+    Action.EXTERNAL_SYNC_READ,
+    Action.EXTERNAL_SYNC_UPDATE,
+    Action.EXTERNAL_SYNC_DELETE,
+    Action.EXTERNAL_SYNC_EXECUTE,
   ],
   MEMBER: [
     Action.USER_READ_OWN,

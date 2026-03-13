@@ -256,6 +256,9 @@ export interface EventMap {
   "slack.integrationUpdated": EventPayload;
   "slack.integrationDeleted": EventPayload;
   "clip.created": EventPayload;
+  "externalSync.configured": EventPayload;
+  "externalSync.synced": EventPayload;
+  "externalSync.statusUpdated": EventPayload;
 }
 
 export type EventName = keyof EventMap;

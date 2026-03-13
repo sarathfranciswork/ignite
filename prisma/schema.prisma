@@ -103,6 +103,7 @@ model User {
   userSessions               UserSession[]
   createdTeamsIntegrations   TeamsIntegration[]          @relation("TeamsIntegrationCreatedBy")
   createdSlackIntegrations   SlackIntegration[]          @relation("SlackIntegrationCreatedBy")
+  createdExternalSyncs       ExternalSync[]              @relation("ExternalSyncCreatedBy")
 
   @@map("users")
 }
@@ -302,7 +303,8 @@ model InnovationSpace {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  memberships InnovationSpaceMembership[]
+  memberships   InnovationSpaceMembership[]
+  externalSyncs ExternalSync[]              @relation("SpaceExternalSyncs")
 
   @@index([status])
   @@index([slug])
@@ -2726,4 +2728,74 @@ model SlackIntegration {
   @@index([channelId])
   @@index([spaceId])
   @@map("slack_integrations")
+}
+
+// ── External Sync (Jira / Azure DevOps) ─────────────────────────
+
+enum ExternalSyncProvider {
+  JIRA
+  AZURE_DEVOPS
+
+  @@map("external_sync_provider")
+}
+
+enum SyncEntityType {
+  IDEA
+  PROJECT
+
+  @@map("sync_entity_type")
+}
+
+enum SyncStatus {
+  SYNCED
+  PENDING
+  ERROR
+
+  @@map("sync_status")
+}
+
+model ExternalSync {
+  id             String               @id @default(cuid())
+  spaceId        String               @map("space_id")
+  provider       ExternalSyncProvider
+  baseUrl        String               @map("base_url")
+  apiToken       String               @map("api_token") @db.Text
+  projectKey     String               @map("project_key")
+  isActive       Boolean              @default(true) @map("is_active")
+  fieldMappings  Json                 @default("{}") @map("field_mappings")
+  statusMappings Json                 @default("{}") @map("status_mappings")
+  createdById    String               @map("created_by_id")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  createdBy   User            @relation("ExternalSyncCreatedBy", fields: [createdById], references: [id])
+  space       InnovationSpace @relation("SpaceExternalSyncs", fields: [spaceId], references: [id], onDelete: Cascade)
+  syncedItems SyncedItem[]
+
+  @@index([spaceId])
+  @@index([createdById])
+  @@index([provider])
+  @@map("external_syncs")
+}
+
+model SyncedItem {
+  id           String         @id @default(cuid())
+  syncId       String         @map("sync_id")
+  entityType   SyncEntityType @map("entity_type")
+  entityId     String         @map("entity_id")
+  externalId   String         @map("external_id")
+  externalUrl  String?        @map("external_url")
+  lastSyncedAt DateTime       @map("last_synced_at")
+  syncStatus   SyncStatus     @default(PENDING) @map("sync_status")
+  errorMessage String?        @map("error_message") @db.Text
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  sync ExternalSync @relation(fields: [syncId], references: [id], onDelete: Cascade)
+
+  @@unique([syncId, entityType, entityId])
+  @@index([syncId])
+  @@index([entityType, entityId])
+  @@index([syncStatus])
+  @@map("synced_items")
 }
